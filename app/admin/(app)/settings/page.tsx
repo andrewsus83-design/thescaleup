@@ -1,4 +1,4 @@
-import { KeyRound, Plug, Database, CheckCircle2 } from "lucide-react";
+import { KeyRound, Plug, Database, CheckCircle2, AlertTriangle } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
 import {
   createSupabaseAdminClient,
@@ -23,7 +23,8 @@ export default async function SettingsPage() {
   }
 
   const db = createSupabaseAdminClient();
-  const { data } = await db.from("app_settings").select("key, value");
+  const { data, error } = await db.from("app_settings").select("key, value");
+  const tableMissing = !!error;
   const settings = new Map((data ?? []).map((r) => [r.key, r.value as string]));
   const mask = (v?: string | null) =>
     v ? "••••••" + v.slice(-4) : null;
@@ -34,6 +35,17 @@ export default async function SettingsPage() {
         title="Setting"
         description="Kelola API keys untuk pipeline & koneksi MCP. Nilai tersimpan terenkripsi di database dan tidak pernah tampil penuh."
       />
+
+      {tableMissing && (
+        <div className="mb-5 flex items-start gap-3 rounded-2xl border border-warn/25 bg-warn/10 p-4 text-sm text-warn">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Tabel <code className="font-mono">app_settings</code> belum ada, jadi
+            key tidak bisa disimpan. Jalankan migrasi admin SQL di Supabase (SQL
+            Editor) dulu, lalu muat ulang halaman ini.
+          </span>
+        </div>
+      )}
 
       <form action={saveSettings} className="space-y-4">
         <Card>
