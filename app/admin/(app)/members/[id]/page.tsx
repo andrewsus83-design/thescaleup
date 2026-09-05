@@ -17,13 +17,13 @@ import {
 import { Card, StatusBadge, EmptyState } from "@/components/admin/ui";
 import { MemberRowActions } from "@/components/admin/member-actions";
 import {
-  processMember,
   setMemberStatus,
   saveMemberNote,
   sendReport,
 } from "@/lib/admin/actions";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   if (!value) return null;
@@ -170,13 +170,10 @@ export default async function MemberDetail({
                   </button>
                 </form>
               </div>
-              {m.status === "pending" && (
-                <form action={processMember.bind(null, id)}>
-                  <button className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-br from-coral to-sunset px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110">
-                    Process Now &amp; Build Report
-                  </button>
-                </form>
-              )}
+              <p className="text-xs text-slate-500">
+                Gunakan tombol <span className="text-coral">Process Now</span> di
+                atas untuk menjalankan audit engine &amp; membuat report.
+              </p>
             </div>
           </Card>
 

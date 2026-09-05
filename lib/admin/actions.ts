@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { runAudit } from "@/lib/engine/audit";
 import type { MemberStatus } from "@/lib/admin/config";
 
 const VALID_STATUS: MemberStatus[] = [
@@ -40,7 +41,9 @@ export async function saveMemberNote(memberId: string, note: string) {
  * member's inputs, then mark done. The real multi-agent $2 engine plugs in at
  * buildReportScaffold() (replace the deterministic template with its output).
  */
-export async function processMember(memberId: string) {
+export async function processMember(
+  memberId: string,
+): Promise<{ ok: boolean; error?: string }> {
   await requireAdmin();
   const db = createSupabaseAdminClient();
 
@@ -49,31 +52,63 @@ export async function processMember(memberId: string) {
     .select("*")
     .eq("id", memberId)
     .single();
-  if (!member) return;
+  if (!member) return { ok: false, error: "Member tidak ditemukan." };
 
-  await db
-    .from("leads")
-    .update({ status: "processing" })
-    .eq("id", memberId);
+  await db.from("leads").update({ status: "processing" }).eq("id", memberId);
+  revalidatePath("/admin/members");
+  revalidatePath(`/admin/members/${memberId}`);
 
-  const scaffold = buildReportScaffold(member);
-  await db.from("reports").insert({
+  // Run the real audit engine (falls back to a scaffold if no LLM key).
+  const result = await runAudit(member);
+
+  let title: string;
+  let summary: string | null;
+  let content: Record<string, unknown>;
+  if (result.ok && result.content) {
+    title = result.title ?? `Audit ScaleUp — ${member.business ?? member.name}`;
+    summary = result.summary ?? null;
+    content = result.content;
+  } else {
+    const s = buildReportScaffold(member);
+    (s.content as Record<string, unknown>).engine_error = result.error ?? "unknown";
+    title = s.title;
+    summary = s.summary;
+    content = s.content;
+  }
+
+  const { error: insErr } = await db.from("reports").insert({
     member_id: memberId,
-    title: scaffold.title,
-    summary: scaffold.summary,
-    content: scaffold.content,
+    title,
+    summary,
+    content,
     status: "draft",
   });
 
-  await db
-    .from("leads")
-    .update({ status: "done", processed_at: new Date().toISOString() })
-    .eq("id", memberId);
+  if (insErr) {
+    await db.from("leads").update({ status: "pending" }).eq("id", memberId);
+    revalidatePath("/admin/members");
+    return {
+      ok: false,
+      error: `Gagal simpan report: ${insErr.message}. Jalankan migrasi admin SQL (tabel 'reports' belum ada).`,
+    };
+  }
 
+  await db.from("leads").update({ status: "done" }).eq("id", memberId);
   revalidatePath("/admin/members");
   revalidatePath(`/admin/members/${memberId}`);
   revalidatePath("/admin/reports");
   revalidatePath("/admin");
+
+  if (!result.ok) {
+    return {
+      ok: false,
+      error:
+        result.error === "NO_LLM_KEY"
+          ? "Report scaffold dibuat. Tambahkan API key LLM (Claude/OpenAI/Gemini) di Setting agar analisis AI berjalan."
+          : `Report scaffold dibuat (engine: ${result.error}).`,
+    };
+  }
+  return { ok: true };
 }
 
 function buildReportScaffold(m: Record<string, unknown>) {

@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Download, Send, Database } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  Send,
+  Database,
+  AlertTriangle,
+  TrendingUp,
+  Sparkles,
+} from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
 import {
   createSupabaseAdminClient,
@@ -36,6 +44,19 @@ export default async function ReportView({
   const scores = (content.scores ?? {}) as Record<string, number | null>;
   const roadmap = (content.roadmap ?? {}) as Record<string, string[]>;
   const hasScores = Object.values(scores).some((v) => v != null);
+  const whatsMissing = (content.whats_missing as string[]) ?? [];
+  const rb = (content.revenue_booster ?? null) as {
+    current_estimate?: string;
+    projected?: string;
+    uplift?: string;
+    levers?: string[];
+  } | null;
+  const exec = (content.executive ?? null) as Record<
+    string,
+    { summary?: string; actions?: string[] }
+  > | null;
+  const engineInfo = content.engine as { provider?: string; model?: string } | undefined;
+  const engineError = content.engine_error as string | undefined;
 
   return (
     <>
@@ -54,6 +75,12 @@ export default async function ReportView({
           </h1>
           {r.summary && (
             <p className="mt-2 max-w-2xl text-sm text-slate-400">{r.summary}</p>
+          )}
+          {engineInfo?.provider && (
+            <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-coral/25 bg-coral/10 px-2.5 py-1 font-mono text-[0.62rem] uppercase tracking-wider text-coral-soft">
+              <Sparkles className="h-3 w-3" /> {engineInfo.provider}
+              {engineInfo.model ? ` · ${engineInfo.model}` : ""}
+            </span>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -140,6 +167,94 @@ export default async function ReportView({
           </dl>
         </Card>
       </div>
+
+      {whatsMissing.length > 0 && (
+        <Card className="mt-4 border-bad/20">
+          <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-slate-500">
+            <AlertTriangle className="h-3.5 w-3.5 text-bad" /> Yang Hilang &amp; Bocor
+          </p>
+          <ul className="space-y-3">
+            {whatsMissing.map((w, i) => (
+              <li key={i} className="flex gap-3 text-sm text-slate-300">
+                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-bad/25 bg-bad/10 font-mono text-[0.66rem] text-bad">
+                  {i + 1}
+                </span>
+                {w}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {rb && (
+        <Card className="mt-4 border-coral/20 bg-gradient-to-br from-coral/10 via-card/40 to-card/40">
+          <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-slate-500">
+            <TrendingUp className="h-3.5 w-3.5 text-coral" /> Revenue Booster
+          </p>
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <p className="text-xs text-slate-500">Sekarang</p>
+              <p className="font-mono text-slate-400">{rb.current_estimate ?? "-"}</p>
+            </div>
+            <span className="pb-1 text-coral">→</span>
+            <div>
+              <p className="text-xs text-slate-500">Proyeksi</p>
+              <p className="font-display text-2xl font-extrabold text-gradient-coral">
+                {rb.projected ?? "-"}
+              </p>
+            </div>
+            {rb.uplift && (
+              <span className="mb-1 rounded-full border border-good/30 bg-good/10 px-2.5 py-1 font-mono text-xs text-good">
+                {rb.uplift}
+              </span>
+            )}
+          </div>
+          {rb.levers && rb.levers.length > 0 && (
+            <ul className="mt-4 space-y-2">
+              {rb.levers.map((l, i) => (
+                <li key={i} className="rounded-xl border border-white/5 bg-obsidian/50 px-4 py-2.5 text-sm text-slate-300">
+                  {l}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+
+      {exec && (
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          {(["cmo", "cbo", "cto", "creative"] as const).map((role) => {
+            const r2 = exec[role];
+            if (!r2) return null;
+            return (
+              <Card key={role}>
+                <p className="font-mono text-xs font-bold uppercase tracking-widest text-coral">
+                  {role}
+                </p>
+                {r2.summary && (
+                  <p className="mt-2 text-sm text-slate-300">{r2.summary}</p>
+                )}
+                {r2.actions && r2.actions.length > 0 && (
+                  <ul className="mt-3 space-y-2 border-t border-white/5 pt-3">
+                    {r2.actions.map((a, i) => (
+                      <li key={i} className="flex gap-2 text-sm text-slate-300">
+                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-coral" />
+                        {a}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {engineError && (
+        <p className="mt-4 text-xs text-warn">
+          Catatan engine: {engineError}
+        </p>
+      )}
     </>
   );
 }

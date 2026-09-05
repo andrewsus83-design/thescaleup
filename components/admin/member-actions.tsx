@@ -18,7 +18,12 @@ export function MemberRowActions({
     <div className="flex items-center justify-end gap-2">
       {status === "pending" && (
         <button
-          onClick={() => start(async () => processMember(id))}
+          onClick={() =>
+            start(async () => {
+              const r = await processMember(id);
+              if (r && !r.ok && r.error) window.alert(r.error);
+            })
+          }
           disabled={pending}
           className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-coral to-sunset px-2.5 py-1.5 text-xs font-semibold text-white transition-all hover:brightness-110 disabled:opacity-60"
         >
