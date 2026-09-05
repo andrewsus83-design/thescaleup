@@ -1,0 +1,286 @@
+@import "tailwindcss";
+
+/* =========================================================================
+   THE SCALEUP — BRAND DESIGN SYSTEM
+   Palette: Electric Coral / Deep Sunset over Obsidian.
+   Fonts: Plus Jakarta Sans (display) · Inter (body) · JetBrains Mono · Syne (art)
+   ========================================================================= */
+
+@theme {
+  /* ---- Brand color tokens ---- */
+  --color-ink: #070b14; /* deepest background */
+  --color-obsidian: #0a1020; /* base page background */
+  --color-surface: #0e1526; /* alternating section surface */
+  --color-card: #121b30; /* card surface */
+  --color-card-2: #16213b; /* raised card surface */
+  --color-line: #1e293b; /* hairline border */
+
+  --color-coral: #ff5733; /* PRIMARY accent */
+  --color-coral-soft: #ff7a5c; /* lighter coral for glows/gradients */
+  --color-sunset: #e03e1a; /* hover / pressed / deep accent */
+  --color-ember: #ff9a3d; /* warm secondary for gradients */
+  --color-tint: #fff5f2; /* warm soft light tint */
+  --color-mist: #f8fafc; /* primary light text */
+
+  /* ---- Status ---- */
+  --color-good: #22c55e;
+  --color-warn: #f59e0b;
+  --color-bad: #ef4444;
+
+  /* ---- Typography ---- */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jbmono), ui-monospace, "SF Mono", monospace;
+  --font-art: var(--font-syne), var(--font-jakarta), sans-serif;
+
+  /* ---- Motion ---- */
+  --animate-fade-up: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in: fade-in 0.9s ease-out both;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-marquee: marquee 34s linear infinite;
+  --animate-pulse-glow: pulse-glow 3.4s ease-in-out infinite;
+  --animate-shimmer: shimmer 2.6s linear infinite;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+/* =========================================================================
+   BASE
+   ========================================================================= */
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--color-obsidian);
+  color: var(--color-mist);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-coral) 32%, transparent);
+  color: #fff;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-ink);
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-coral) 30%, var(--color-line));
+  border-radius: 9999px;
+  border: 3px solid var(--color-ink);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-coral);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* =========================================================================
+   COMPONENT UTILITIES
+   ========================================================================= */
+@layer utilities {
+  /* Coral → sunset text gradient */
+  .text-gradient-coral {
+    background: linear-gradient(
+      100deg,
+      var(--color-coral-soft),
+      var(--color-coral) 45%,
+      var(--color-sunset)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .text-gradient-mist {
+    background: linear-gradient(180deg, #ffffff, #b8c2d9);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Section background: obsidian with faint radial coral wash */
+  .bg-hero-glow {
+    background:
+      radial-gradient(
+        60% 55% at 50% 0%,
+        color-mix(in srgb, var(--color-coral) 16%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        40% 40% at 85% 20%,
+        color-mix(in srgb, var(--color-ember) 10%, transparent),
+        transparent 70%
+      ),
+      var(--color-obsidian);
+  }
+
+  /* Dotted grid texture overlay */
+  .bg-grid {
+    background-image: radial-gradient(
+      color-mix(in srgb, var(--color-mist) 7%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 26px 26px;
+  }
+
+  .bg-grid-lines {
+    background-image:
+      linear-gradient(
+        to right,
+        color-mix(in srgb, var(--color-mist) 4%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--color-mist) 4%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 64px 64px;
+  }
+
+  /* Glass card */
+  .glass {
+    background: color-mix(in srgb, var(--color-card) 78%, transparent);
+    backdrop-filter: blur(14px);
+    border: 1px solid color-mix(in srgb, var(--color-mist) 8%, transparent);
+  }
+
+  .glass-coral {
+    background: color-mix(in srgb, var(--color-card) 72%, transparent);
+    backdrop-filter: blur(14px);
+    border: 1px solid color-mix(in srgb, var(--color-coral) 18%, transparent);
+  }
+
+  /* Coral CTA glow */
+  .glow-coral {
+    box-shadow:
+      0 10px 40px -12px color-mix(in srgb, var(--color-coral) 55%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--color-coral) 22%, transparent) inset;
+  }
+
+  .ring-coral {
+    box-shadow: 0 0 0 1px
+      color-mix(in srgb, var(--color-coral) 40%, transparent);
+  }
+
+  /* Animated conic border used on premium cards */
+  .border-glow::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      130deg,
+      color-mix(in srgb, var(--color-coral) 55%, transparent),
+      transparent 40%,
+      transparent 60%,
+      color-mix(in srgb, var(--color-ember) 40%, transparent)
+    );
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .shimmer-text {
+    background: linear-gradient(
+      110deg,
+      var(--color-mist) 20%,
+      var(--color-coral) 45%,
+      var(--color-mist) 70%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: var(--animate-shimmer);
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+}
