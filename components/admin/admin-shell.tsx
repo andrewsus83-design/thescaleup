@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Menu, X, LogOut } from "lucide-react";
+import { Menu, X, LogOut, ShieldAlert } from "lucide-react";
 import { adminNav } from "@/lib/admin/config";
 import { Logo } from "@/components/landing/logo";
 import { cn } from "@/lib/utils";
@@ -11,10 +11,12 @@ import { cn } from "@/lib/utils";
 export function AdminShell({
   email,
   role,
+  openMode,
   children,
 }: {
   email: string;
   role: string;
+  openMode?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -114,6 +116,15 @@ export function AdminShell({
 
       {/* Content */}
       <main className="lg:pl-64">
+        {openMode && (
+          <div className="flex items-center gap-2.5 border-b border-warn/20 bg-warn/10 px-5 py-2.5 text-xs text-warn sm:px-8">
+            <ShieldAlert className="h-4 w-4 shrink-0" />
+            <span>
+              Mode terbuka — backend ini tidak terproteksi (siapa pun dengan URL
+              bisa masuk). Untuk mengunci: set <code className="font-mono">ADMIN_OPEN=0</code> di Vercel lalu redeploy.
+            </span>
+          </div>
+        )}
         <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">{children}</div>
       </main>
     </div>

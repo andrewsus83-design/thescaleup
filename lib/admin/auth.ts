@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { isAdminEmail, ADMIN_EMAILS } from "@/lib/admin/config";
-import { hasAdminAccessCookie } from "@/lib/admin/access";
+import { hasAdminAccessCookie, isOpenMode } from "@/lib/admin/access";
 
 export type AdminUser = {
   id: string;
@@ -21,6 +21,16 @@ const OWNER_PERMS = { create: true, read: true, update: true, delete: true };
 
 /** Returns the current admin user, or null if not authenticated/authorized. */
 export async function getAdminUser(): Promise<AdminUser | null> {
+  // OPEN MODE — backend unprotected (temporary; toggle ADMIN_OPEN).
+  if (isOpenMode()) {
+    return {
+      id: "open",
+      email: ADMIN_EMAILS[0] ?? "admin@thescaleup.xyz",
+      role: "owner",
+      perms: OWNER_PERMS,
+    };
+  }
+
   // Shared access-code session (fallback for when OTP email isn't delivering).
   if (await hasAdminAccessCookie()) {
     return {

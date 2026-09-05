@@ -23,6 +23,12 @@ export function isAccessEnabled() {
   return !!process.env.ADMIN_ACCESS_CODE;
 }
 
+/** OPEN MODE — no login gate at all. Set ADMIN_OPEN=1 to enable; unset to lock. */
+export function isOpenMode() {
+  const v = process.env.ADMIN_OPEN;
+  return v === "1" || v === "true";
+}
+
 function safeEqual(a: string, b: string): boolean {
   const ab = Buffer.from(a);
   const bb = Buffer.from(b);
