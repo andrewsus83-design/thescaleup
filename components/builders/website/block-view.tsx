@@ -220,16 +220,12 @@ export function BlockView({
             <div className="grid gap-6 sm:grid-cols-3">
               {list(p, "items").map((it, i) => (
                 <div key={i} className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
-                  <div className="aspect-square bg-slate-100">
-                    {safeImg(it.image ?? "") ? (
-                      // eslint-disable-next-line @next/next/no-img-element
+                  {safeImg(it.image ?? "") && (
+                    <div className="aspect-square bg-slate-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={safeImg(it.image ?? "")} alt={it.name} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                        Foto
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                   <div className="p-4">
                     <h3 className="font-semibold text-slate-900">{it.name}</h3>
                     {it.desc && <p className="mt-1 text-sm text-slate-500">{it.desc}</p>}

@@ -107,12 +107,12 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     products: {
       title: "Menu Kami",
       items: [
-        { name: "Kopi Susu Gula Aren", price: "Rp 22.000", desc: "Signature, manisnya pas.", image: "" },
-        { name: "Nasi Ayam Bakar", price: "Rp 35.000", desc: "Ayam bakar bumbu meresap + sambal.", image: "" },
-        { name: "Croissant Cokelat", price: "Rp 25.000", desc: "Renyah di luar, lumer di dalam.", image: "" },
-        { name: "Es Teh Leci", price: "Rp 18.000", desc: "Segar untuk siang hari.", image: "" },
-        { name: "Mie Ayam Spesial", price: "Rp 30.000", desc: "Porsi mengenyangkan.", image: "" },
-        { name: "Kentang Goreng", price: "Rp 20.000", desc: "Teman ngobrol paling pas.", image: "" },
+        { name: "Kopi Susu Gula Aren", price: "Rp 22.000", desc: "Signature, manisnya pas.", image: "/templates/products/kuliner-1.jpg" },
+        { name: "Nasi Ayam Bakar", price: "Rp 35.000", desc: "Ayam bakar bumbu meresap + sambal.", image: "/templates/products/kuliner-2.jpg" },
+        { name: "Croissant Cokelat", price: "Rp 25.000", desc: "Renyah di luar, lumer di dalam.", image: "/templates/products/kuliner-3.jpg" },
+        { name: "Es Teh Leci", price: "Rp 18.000", desc: "Segar untuk siang hari.", image: "/templates/products/kuliner-4.jpg" },
+        { name: "Mie Ayam Spesial", price: "Rp 30.000", desc: "Porsi mengenyangkan.", image: "/templates/products/kuliner-5.jpg" },
+        { name: "Kentang Goreng", price: "Rp 20.000", desc: "Teman ngobrol paling pas.", image: "/templates/products/kuliner-6.jpg" },
       ],
     },
     faqs: [
@@ -155,12 +155,12 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     products: {
       title: "Katalog Produk",
       items: [
-        { name: "Oversized Tee", price: "Rp 149.000", desc: "Katun premium, adem.", image: "" },
-        { name: "Denim Jacket", price: "Rp 399.000", desc: "Klasik, cocok segala gaya.", image: "" },
-        { name: "Tote Bag Kanvas", price: "Rp 99.000", desc: "Kuat & muat banyak.", image: "" },
-        { name: "Kaos Polos Premium", price: "Rp 89.000", desc: "Tersedia 8 warna.", image: "" },
-        { name: "Celana Cargo", price: "Rp 259.000", desc: "Banyak kantong, stylish.", image: "" },
-        { name: "Topi Bucket", price: "Rp 79.000", desc: "Aksesori pelengkap look.", image: "" },
+        { name: "Oversized Tee", price: "Rp 149.000", desc: "Katun premium, adem.", image: "/templates/products/fashion-1.jpg" },
+        { name: "Denim Jacket", price: "Rp 399.000", desc: "Klasik, cocok segala gaya.", image: "/templates/products/fashion-2.jpg" },
+        { name: "Tote Bag Kanvas", price: "Rp 99.000", desc: "Kuat & muat banyak.", image: "/templates/products/fashion-3.jpg" },
+        { name: "Kaos Polos Premium", price: "Rp 89.000", desc: "Tersedia 8 warna.", image: "/templates/products/fashion-4.jpg" },
+        { name: "Celana Cargo", price: "Rp 259.000", desc: "Banyak kantong, stylish.", image: "/templates/products/fashion-5.jpg" },
+        { name: "Topi Bucket", price: "Rp 79.000", desc: "Aksesori pelengkap look.", image: "/templates/products/fashion-6.jpg" },
       ],
     },
     faqs: [
@@ -246,11 +246,11 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     products: {
       title: "Daftar Treatment",
       items: [
-        { name: "Facial Glow", price: "Rp 250.000", desc: "Kulit cerah & lembap seketika.", image: "" },
-        { name: "Perawatan Rambut", price: "Rp 180.000", desc: "Nutrisi untuk rambut sehat.", image: "" },
-        { name: "Paket Bridal", price: "Rp 1.500.000", desc: "Tampil sempurna di hari spesial.", image: "" },
-        { name: "Chemical Peeling", price: "Rp 350.000", desc: "Angkat sel kulit mati.", image: "" },
-        { name: "Body Massage", price: "Rp 200.000", desc: "Relaksasi tubuh menyeluruh.", image: "" },
+        { name: "Facial Glow", price: "Rp 250.000", desc: "Kulit cerah & lembap seketika.", image: "/templates/products/klinik-1.jpg" },
+        { name: "Perawatan Rambut", price: "Rp 180.000", desc: "Nutrisi untuk rambut sehat.", image: "/templates/products/klinik-2.jpg" },
+        { name: "Paket Bridal", price: "Rp 1.500.000", desc: "Tampil sempurna di hari spesial.", image: "/templates/products/klinik-3.jpg" },
+        { name: "Chemical Peeling", price: "Rp 350.000", desc: "Angkat sel kulit mati.", image: "/templates/products/klinik-4.jpg" },
+        { name: "Body Massage", price: "Rp 200.000", desc: "Relaksasi tubuh menyeluruh.", image: "/templates/products/klinik-5.jpg" },
       ],
     },
     faqs: [
@@ -337,10 +337,10 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     products: {
       title: "Listing Tersedia",
       items: [
-        { name: "Rumah 2 Lantai, Bekasi", price: "Rp 850 jt", desc: "3 KT, 2 KM, SHM, siap huni.", image: "" },
-        { name: "Apartemen Studio, Jakarta", price: "Rp 450 jt", desc: "Fully furnished, dekat MRT.", image: "" },
-        { name: "Tanah Kavling, Bogor", price: "Rp 300 jt", desc: "Lokasi berkembang, cocok investasi.", image: "" },
-        { name: "Ruko 3 Lantai, Depok", price: "Rp 1,2 M", desc: "Pinggir jalan raya, strategis.", image: "" },
+        { name: "Rumah 2 Lantai, Bekasi", price: "Rp 850 jt", desc: "3 KT, 2 KM, SHM, siap huni.", image: "/templates/products/properti-1.jpg" },
+        { name: "Apartemen Studio, Jakarta", price: "Rp 450 jt", desc: "Fully furnished, dekat MRT.", image: "/templates/products/properti-2.jpg" },
+        { name: "Tanah Kavling, Bogor", price: "Rp 300 jt", desc: "Lokasi berkembang, cocok investasi.", image: "/templates/products/properti-3.jpg" },
+        { name: "Ruko 3 Lantai, Depok", price: "Rp 1,2 M", desc: "Pinggir jalan raya, strategis.", image: "/templates/products/properti-4.jpg" },
       ],
     },
     faqs: [
