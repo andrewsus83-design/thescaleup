@@ -12,6 +12,9 @@ import { PageHeader, Card } from "@/components/admin/ui";
 import { getBuilder } from "@/lib/client/builders";
 import { builderTasks, BUILDER_SLUGS } from "@/lib/builders";
 import { clientRequestUpdate } from "@/lib/client/actions";
+import { memberBookings } from "@/lib/booking/data";
+import { BookingDashboard } from "@/components/booking/booking-dashboard";
+import { site } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -82,6 +85,20 @@ export default async function ClientAppPage({
 
   // Non-internal clients can only open a product that was actually built.
   if (!m.isInternal && !project) redirect("/dashboard");
+
+  // Booking = a real reservation dashboard (list + share link), not a static card.
+  if (slug === "booking") {
+    const rows = await memberBookings(m.id);
+    return (
+      <>
+        <PageHeader
+          title={b.title}
+          description="Kelola reservasi & bagikan link booking publik Anda (gaya Calendly)."
+        />
+        <BookingDashboard rows={rows} shareUrl={`${site.url}/book/${m.id}`} />
+      </>
+    );
+  }
 
   const data = (project?.data ?? {}) as Record<string, unknown>;
   const ready = project?.status === "submitted";
