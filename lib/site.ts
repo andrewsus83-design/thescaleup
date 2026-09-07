@@ -18,7 +18,7 @@ import {
 export const site = {
   name: "ScaleUp",
   wordmark: "ScaleUp",
-  url: "https://thescaleup.id",
+  url: "https://thescaleup.xyz",
   tagline: "Dewan Direksi AI untuk Scale-Up Bisnis Anda",
   description:
     "Masukkan 8 info bisnis Anda. Dalam hitungan menit, dewan AI kami — CMO, CBO, CTO — membedah website, sosial media, dan posisi Anda di AI Search, lalu menyerahkan skor kesehatan bisnis, kebocoran omzet, dan roadmap scale-up yang siap dieksekusi.",

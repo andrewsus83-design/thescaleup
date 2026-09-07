@@ -1,10 +1,14 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { runAudit } from "@/lib/engine/audit";
 import type { MemberStatus } from "@/lib/admin/config";
+import { PLAN_ITEM_STATUSES } from "@/lib/admin/plan-status";
+
+const PLAN_STATUSES = PLAN_ITEM_STATUSES.map((s) => s.value) as string[];
 
 const VALID_STATUS: MemberStatus[] = [
   "pending",
@@ -311,4 +315,272 @@ export async function deleteUser(userId: string) {
   const db = createSupabaseAdminClient();
   await db.from("admin_users").delete().eq("id", userId);
   revalidatePath("/admin/users");
+}
+
+/* --------------------------- master plan pipeline -------------------------- */
+
+const genToken = () => randomUUID().replace(/-/g, "");
+
+/** Approval gate before running analytic/research/report. */
+export async function approveMember(memberId: string) {
+  await requireAdmin();
+  const db = createSupabaseAdminClient();
+  await db
+    .from("leads")
+    .update({ approved_at: new Date().toISOString() })
+    .eq("id", memberId);
+  revalidatePath("/admin/members");
+  revalidatePath(`/admin/members/${memberId}`);
+}
+
+async function seedPlanItems(
+  db: ReturnType<typeof createSupabaseAdminClient>,
+  planId: string,
+  memberId: string,
+  content: Record<string, unknown>,
+) {
+  const items: Record<string, unknown>[] = [];
+  const roadmap = (content?.roadmap ?? {}) as Record<string, string[]>;
+  for (const phase of ["phase_1", "phase_2", "phase_3"]) {
+    for (const t of roadmap[phase] ?? [])
+      items.push({ phase, category: "general", title: t });
+  }
+  const exec = (content?.executive ?? {}) as Record<
+    string,
+    { actions?: string[] }
+  >;
+  for (const role of ["cmo", "cbo", "cto", "creative"]) {
+    for (const t of exec[role]?.actions ?? [])
+      items.push({ category: role, title: t });
+  }
+  if (items.length) {
+    await db.from("plan_items").insert(
+      items.map((it, i) => ({
+        master_plan_id: planId,
+        member_id: memberId,
+        status: "backlog",
+        priority: "medium",
+        sort: i,
+        ...it,
+      })),
+    );
+  }
+  return items.length;
+}
+
+/** Report → Master Plan: seed kanban items from the report's roadmap + actions. */
+export async function createMasterPlanFromReport(
+  reportId: string,
+): Promise<{ ok: boolean; planId?: string; error?: string }> {
+  await requireAdmin();
+  const db = createSupabaseAdminClient();
+  const { data: report } = await db
+    .from("reports")
+    .select("*")
+    .eq("id", reportId)
+    .single();
+  if (!report) return { ok: false, error: "Report tidak ditemukan." };
+
+  const content = (report.content ?? {}) as Record<string, unknown>;
+  const ctx = (content.context ?? {}) as Record<string, unknown>;
+  const business = (ctx.business as string) ?? "Bisnis";
+
+  const { count } = await db
+    .from("master_plans")
+    .select("id", { count: "exact", head: true })
+    .eq("member_id", report.member_id);
+
+  const { data: plan, error } = await db
+    .from("master_plans")
+    .insert({
+      member_id: report.member_id,
+      report_id: reportId,
+      title: `Master Plan — ${business}`,
+      version: (count ?? 0) + 1,
+      status: "active",
+    })
+    .select("id")
+    .single();
+  if (error || !plan)
+    return {
+      ok: false,
+      error: error?.message ?? "Gagal buat master plan (jalankan migrasi SQL).",
+    };
+
+  await seedPlanItems(db, plan.id, report.member_id, content);
+  revalidatePath(`/admin/members/${report.member_id}`);
+  revalidatePath("/admin/reports");
+  return { ok: true, planId: plan.id };
+}
+
+export async function updatePlanItemStatus(itemId: string, status: string) {
+  await requireAdmin();
+  if (!PLAN_STATUSES.includes(status)) return;
+  const db = createSupabaseAdminClient();
+  const { data } = await db
+    .from("plan_items")
+    .update({ status })
+    .eq("id", itemId)
+    .select("member_id")
+    .single();
+  revalidatePath(`/admin/members/${data?.member_id}`);
+  revalidatePath("/dashboard/plan");
+  revalidatePath("/dashboard");
+}
+
+export async function addPlanItem(formData: FormData) {
+  await requireAdmin();
+  const db = createSupabaseAdminClient();
+  const planId = String(formData.get("master_plan_id") ?? "");
+  const memberId = String(formData.get("member_id") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  if (!planId || !title) return;
+  await db.from("plan_items").insert({
+    master_plan_id: planId,
+    member_id: memberId || null,
+    title,
+    detail: (formData.get("detail") as string) || null,
+    category: (formData.get("category") as string) || "general",
+    priority: (formData.get("priority") as string) || "medium",
+    status: "backlog",
+  });
+  revalidatePath(`/admin/members/${memberId}`);
+}
+
+/* -------------------------------- invoices -------------------------------- */
+
+export async function createInvoice(formData: FormData) {
+  await requireAdmin();
+  const db = createSupabaseAdminClient();
+  const memberId = String(formData.get("member_id") ?? "");
+  if (!memberId) return;
+  const amount = Number(formData.get("amount") ?? 0) || 0;
+  const description = String(formData.get("description") ?? "Paket ScaleUp");
+  const d = new Date();
+  const number = `INV-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}-${randomUUID().slice(0, 4).toUpperCase()}`;
+  await db.from("invoices").insert({
+    member_id: memberId,
+    master_plan_id: (formData.get("master_plan_id") as string) || null,
+    number,
+    currency: "IDR",
+    amount,
+    items: [{ desc: description, qty: 1, price: amount }],
+    status: "draft",
+    due_date: (formData.get("due_date") as string) || null,
+  });
+  revalidatePath(`/admin/members/${memberId}`);
+}
+
+export async function setInvoiceStatus(invoiceId: string, status: string) {
+  await requireAdmin();
+  const db = createSupabaseAdminClient();
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = { status };
+  if (status === "paid") patch.paid_at = now;
+  const { data: inv } = await db
+    .from("invoices")
+    .update(patch)
+    .eq("id", invoiceId)
+    .select("member_id")
+    .single();
+
+  if (status === "paid" && inv?.member_id) {
+    const { data: m } = await db
+      .from("leads")
+      .select("access_token")
+      .eq("id", inv.member_id)
+      .single();
+    await db
+      .from("leads")
+      .update({
+        status: "joined",
+        joined_at: now,
+        paid_at: now,
+        access_token: (m?.access_token as string) || genToken(),
+      })
+      .eq("id", inv.member_id);
+  }
+  revalidatePath(`/admin/members/${inv?.member_id}`);
+  revalidatePath("/admin");
+}
+
+/* -------------------------------- reminders ------------------------------- */
+
+export async function addReminder(formData: FormData) {
+  await requireAdmin();
+  const db = createSupabaseAdminClient();
+  const memberId = String(formData.get("member_id") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  if (!memberId || !title) return;
+  await db.from("reminders").insert({
+    member_id: memberId,
+    title,
+    detail: (formData.get("detail") as string) || null,
+    due_date: (formData.get("due_date") as string) || null,
+    audience: (formData.get("audience") as string) || "client",
+  });
+  revalidatePath(`/admin/members/${memberId}`);
+  revalidatePath("/dashboard/reminders");
+}
+
+export async function toggleReminder(id: string, done: boolean) {
+  await requireAdmin();
+  const db = createSupabaseAdminClient();
+  const { data } = await db
+    .from("reminders")
+    .update({ done })
+    .eq("id", id)
+    .select("member_id")
+    .single();
+  revalidatePath(`/admin/members/${data?.member_id}`);
+  revalidatePath("/dashboard/reminders");
+}
+
+/* --------------------------- update / recycle ----------------------------- */
+
+/** Re-run the engine → new report → new master-plan version; archive the old. */
+export async function recyclePlan(
+  memberId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin();
+  const db = createSupabaseAdminClient();
+  const { data: member } = await db
+    .from("leads")
+    .select("*")
+    .eq("id", memberId)
+    .single();
+  if (!member) return { ok: false, error: "Member tidak ditemukan." };
+
+  await db
+    .from("master_plans")
+    .update({ status: "recycled" })
+    .eq("member_id", memberId)
+    .eq("status", "active");
+
+  const result = await runAudit(member);
+  let title: string;
+  let summary: string | null;
+  let content: Record<string, unknown>;
+  if (result.ok && result.content) {
+    title = result.title ?? `Audit ScaleUp — ${member.business ?? member.name}`;
+    summary = result.summary ?? null;
+    content = result.content;
+  } else {
+    const s = buildReportScaffold(member);
+    title = s.title;
+    summary = s.summary;
+    content = s.content;
+  }
+  const { data: report, error } = await db
+    .from("reports")
+    .insert({ member_id: memberId, title, summary, content, status: "draft" })
+    .select("id")
+    .single();
+  if (error || !report)
+    return { ok: false, error: error?.message ?? "Gagal buat report baru." };
+
+  const mp = await createMasterPlanFromReport(report.id);
+  revalidatePath(`/admin/members/${memberId}`);
+  revalidatePath("/dashboard");
+  return mp.ok ? { ok: true } : { ok: false, error: mp.error };
 }
