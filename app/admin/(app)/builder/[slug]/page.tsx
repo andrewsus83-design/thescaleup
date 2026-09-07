@@ -10,6 +10,9 @@ import { PageHeader, Card, EmptyState } from "@/components/admin/ui";
 import { StatusBadge } from "@/components/admin/ui";
 import { getBuilderConfig } from "@/lib/builders/configs";
 import { BuilderWizard } from "@/components/builders/builder-wizard";
+import { WebsiteBuilder } from "@/components/builders/website/website-builder";
+import { coerceDoc } from "@/lib/builders/website/schema";
+import { saveBuilderProject } from "@/lib/admin/builder-actions";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -85,14 +88,30 @@ export default async function BuilderToolPage({
       <Link href={`/admin/builder/${slug}`} className="mb-4 inline-flex items-center gap-2 text-sm text-slate-400 hover:text-coral">
         <ArrowLeft className="h-4 w-4" /> Ganti member
       </Link>
-      <PageHeader title={config.title} description={`Untuk ${memberName}`} />
-      <BuilderWizard
-        memberId={memberId}
-        config={config}
-        initialData={(project?.data ?? {}) as Record<string, unknown>}
+      <PageHeader
+        title={config.title}
+        description={
+          slug === "website"
+            ? `Bangun website ${memberName} secara visual — seret, atur, lihat langsung.`
+            : `Untuk ${memberName}`
+        }
       />
 
-      {config.suggestions && config.suggestions.length > 0 && (
+      {slug === "website" ? (
+        <WebsiteBuilder
+          memberId={memberId}
+          initialDoc={coerceDoc(project?.data, memberName)}
+          onSave={saveBuilderProject}
+        />
+      ) : (
+        <BuilderWizard
+          memberId={memberId}
+          config={config}
+          initialData={(project?.data ?? {}) as Record<string, unknown>}
+        />
+      )}
+
+      {slug !== "website" && config.suggestions && config.suggestions.length > 0 && (
         <Card className="mt-6 border-coral/15">
           <p className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-slate-500">
             <Sparkles className="h-3.5 w-3.5 text-coral" /> Saran Spesialis

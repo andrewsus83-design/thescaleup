@@ -19,7 +19,8 @@ export const dynamic = "force-dynamic";
 function normalizeUrl(u?: string | null): string | null {
   const s = String(u ?? "").trim();
   if (!s) return null;
-  return s.startsWith("http") ? s : `https://${s}`;
+  if (s.startsWith("/") || s.startsWith("http")) return s; // root-relative (e.g. /site/[id]) or absolute
+  return `https://${s}`;
 }
 
 // Per-product "open the real product" action. `keys` are the config fields the
