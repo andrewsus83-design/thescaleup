@@ -14,6 +14,8 @@ import { builderTasks, BUILDER_SLUGS } from "@/lib/builders";
 import { clientRequestUpdate } from "@/lib/client/actions";
 import { memberBookings } from "@/lib/booking/data";
 import { BookingDashboard } from "@/components/booking/booking-dashboard";
+import { loadCrm } from "@/lib/crm/data";
+import { CrmBoard } from "@/components/crm/crm-board";
 import { site } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
@@ -96,6 +98,20 @@ export default async function ClientAppPage({
           description="Kelola reservasi & bagikan link booking publik Anda (gaya Calendly)."
         />
         <BookingDashboard rows={rows} shareUrl={`${site.url}/book/${m.id}`} />
+      </>
+    );
+  }
+
+  // CRM = a real drag-and-drop pipeline board (stages from the CRM builder).
+  if (slug === "crm") {
+    const crm = await loadCrm(m.id);
+    return (
+      <>
+        <PageHeader
+          title={b.title}
+          description="Pipeline drag-and-drop — seret kartu kontak antar tahap penjualan."
+        />
+        <CrmBoard memberId={m.id} stages={crm.stages} sources={crm.sources} contacts={crm.contacts} />
       </>
     );
   }
