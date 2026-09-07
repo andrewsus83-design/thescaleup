@@ -7,6 +7,7 @@ import {
   Users2,
   ListChecks,
   Headset,
+  CalendarCheck,
   type LucideIcon,
 } from "lucide-react";
 import { BUILDER_DEFS, type BuilderDef } from "@/lib/builders";
@@ -22,6 +23,7 @@ const ICONS: Record<string, LucideIcon> = {
   crm: Users2,
   tasks: ListChecks,
   support: Headset,
+  booking: CalendarCheck,
 };
 
 export const BUILDERS: Builder[] = BUILDER_DEFS.map((b) => ({

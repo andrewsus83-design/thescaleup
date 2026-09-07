@@ -87,6 +87,16 @@ export const BUILDER_DEFS: BuilderDef[] = [
       "Chatbot, ticketing & SLA respon",
     ],
   },
+  {
+    slug: "booking",
+    title: "Booking System Builder",
+    tagline: "Reservasi & jadwal online",
+    features: [
+      "Booking online + kalender slot real-time",
+      "Konfirmasi & reminder otomatis (WA/email)",
+      "Kelola staff, kapasitas & no-show",
+    ],
+  },
 ];
 
 export const BUILDER_SLUGS = BUILDER_DEFS.map((b) => b.slug);
@@ -160,6 +170,14 @@ export const BUILDER_TASKS: Record<string, string[]> = {
     "Setup auto-reply/chatbot & ticketing + SLA",
     "Alur eskalasi & routing ke tim",
     "Dashboard CSAT, response time & resolusi",
+  ],
+  booking: [
+    "Setup layanan, durasi & kapasitas slot",
+    "Halaman booking online + form reservasi",
+    "Integrasi kalender & ketersediaan staff",
+    "Otomatisasi konfirmasi + reminder (WA/email)",
+    "Kebijakan DP/pembayaran & reschedule",
+    "Dashboard okupansi, no-show & report",
   ],
 };
 

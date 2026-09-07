@@ -35,6 +35,7 @@ const BUILDER_LABEL: Record<string, string> = {
   crm: "CRM",
   tasks: "Tasks",
   support: "Support",
+  booking: "Booking",
 };
 
 export function ClientShell({
