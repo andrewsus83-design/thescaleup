@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Download, Send, Database, Sparkles } from "lucide-react";
+import { ArrowLeft, Download, Database, Sparkles } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
 import {
   createSupabaseAdminClient,
@@ -8,7 +8,8 @@ import {
 } from "@/lib/supabase/admin";
 import { Card, EmptyState } from "@/components/admin/ui";
 import { ReportView } from "@/components/report/report-view";
-import { sendReport } from "@/lib/admin/actions";
+import { ReportStatusSelect } from "@/components/admin/report-status-select";
+import { reportStatusMeta } from "@/lib/admin/config";
 
 export const dynamic = "force-dynamic";
 
@@ -60,13 +61,12 @@ export default async function AdminReportPage({
           >
             <Download className="h-4 w-4" /> Download
           </a>
-          {r.status !== "sent" && (
-            <form action={sendReport.bind(null, r.id)}>
-              <button className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-coral to-sunset px-4 py-2 text-sm font-semibold text-white hover:brightness-110">
-                <Send className="h-4 w-4" /> Tandai terkirim
-              </button>
-            </form>
-          )}
+          <span
+            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs ${reportStatusMeta(r.status).badge}`}
+          >
+            {reportStatusMeta(r.status).label}
+          </span>
+          <ReportStatusSelect id={r.id} status={r.status ?? "draft"} />
         </div>
       </div>
 

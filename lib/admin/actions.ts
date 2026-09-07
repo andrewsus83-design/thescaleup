@@ -15,8 +15,6 @@ const VALID_STATUS: MemberStatus[] = [
   "pending",
   "processing",
   "done",
-  "prospect",
-  "joined",
   "rejected",
 ];
 
@@ -156,26 +154,43 @@ function buildReportScaffold(m: Record<string, unknown>) {
 
 /* --------------------------------- reports -------------------------------- */
 
-export async function sendReport(reportId: string) {
+/** Set a report's status. When "paid", grant the member client-dashboard access. */
+export async function setReportStatus(reportId: string, status: string) {
   await requireAdmin();
   const db = createSupabaseAdminClient();
   const now = new Date().toISOString();
+  const patch: Record<string, unknown> = { status };
+  if (status === "sent") patch.sent_at = now;
   const { data: report } = await db
     .from("reports")
-    .update({ status: "sent", sent_at: now })
+    .update(patch)
     .eq("id", reportId)
     .select("member_id")
     .single();
-  // TODO: wire real email delivery (Resend) here.
-  if (report?.member_id) {
+
+  if (status === "paid" && report?.member_id) {
+    const { data: m } = await db
+      .from("leads")
+      .select("access_token")
+      .eq("id", report.member_id)
+      .single();
     await db
       .from("leads")
-      .update({ status: "prospect" })
+      .update({
+        paid_at: now,
+        access_token:
+          (m?.access_token as string) || randomUUID().replace(/-/g, ""),
+      })
       .eq("id", report.member_id);
   }
+  revalidatePath(`/admin/members/${report?.member_id}`);
   revalidatePath("/admin/reports");
-  revalidatePath("/admin/members");
   revalidatePath("/admin");
+}
+
+/** Backwards-compat: mark a report as Sent. */
+export async function sendReport(reportId: string) {
+  await setReportStatus(reportId, "sent");
 }
 
 export async function deleteReport(reportId: string) {
@@ -532,7 +547,6 @@ export async function setInvoiceStatus(invoiceId: string, status: string) {
     await db
       .from("leads")
       .update({
-        status: "joined",
         paid_at: now,
         access_token: (m?.access_token as string) || genToken(),
       })

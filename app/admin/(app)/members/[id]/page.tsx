@@ -2,10 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
-  CheckCircle2,
   XCircle,
   FileText,
-  Send,
   Globe,
   Database,
   ClipboardCheck,
@@ -22,12 +20,12 @@ import {
 } from "@/lib/supabase/admin";
 import { Card, StatusBadge, EmptyState } from "@/components/admin/ui";
 import { MemberRowActions } from "@/components/admin/member-actions";
+import { ReportStatusSelect } from "@/components/admin/report-status-select";
 import { PlanBoard, type PlanItem } from "@/components/plan/plan-board";
 import { invoiceBadge } from "@/lib/admin/plan-status";
 import {
   setMemberStatus,
   saveMemberNote,
-  sendReport,
   approveMember,
   createMasterPlanFromReport,
   createInvoice,
@@ -81,10 +79,11 @@ export default async function MemberDetail({
     ? await db.from("plan_items").select("*").eq("master_plan_id", plan.id).order("sort")
     : { data: [] as PlanItem[] };
 
-  const latestReport = reports[0]
-    ? (await db.from("reports").select("id, content").eq("id", reports[0].id).single()).data
+  const paidReport = reports.find((r) => r.status === "paid") ?? null;
+  const planSource = paidReport
+    ? (await db.from("reports").select("id, content").eq("id", paidReport.id).single()).data
     : null;
-  const recBuilders = ((latestReport?.content as Record<string, unknown>)?.recommended_builders ?? []) as {
+  const recBuilders = ((planSource?.content as Record<string, unknown>)?.recommended_builders ?? []) as {
     builder: string;
     priority?: string;
     reason?: string;
@@ -196,18 +195,11 @@ export default async function MemberDetail({
               )}
               {/* 2. Process (engine) */}
               <MemberRowActions id={id} status={m.status ?? "pending"} />
-              <div className="grid grid-cols-2 gap-2">
-                <form action={setMemberStatus.bind(null, id, "joined")}>
-                  <button className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-good/25 bg-good/10 px-3 py-2 text-xs font-semibold text-good hover:bg-good/20">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Joined
-                  </button>
-                </form>
-                <form action={setMemberStatus.bind(null, id, "rejected")}>
-                  <button className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-bad/25 bg-bad/10 px-3 py-2 text-xs font-semibold text-bad hover:bg-bad/20">
-                    <XCircle className="h-3.5 w-3.5" /> Reject
-                  </button>
-                </form>
-              </div>
+              <form action={setMemberStatus.bind(null, id, "rejected")}>
+                <button className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-bad/25 bg-bad/10 px-3 py-2 text-xs font-semibold text-bad hover:bg-bad/20">
+                  <XCircle className="h-3.5 w-3.5" /> Reject Member
+                </button>
+              </form>
               {(plan || reports.length > 0) && (
                 <form action={recycle}>
                   <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-white/5">
@@ -248,15 +240,7 @@ export default async function MemberDetail({
                         <FileText className="h-4 w-4 shrink-0 text-coral" />
                         <span className="truncate text-sm text-slate-200">{r.title}</span>
                       </Link>
-                      {r.status !== "sent" ? (
-                        <form action={sendReport.bind(null, r.id)}>
-                          <button className="inline-flex items-center gap-1 rounded-md bg-white/5 px-2 py-1 text-xs text-slate-300 hover:bg-white/10">
-                            <Send className="h-3 w-3" /> Kirim
-                          </button>
-                        </form>
-                      ) : (
-                        <span className="text-xs text-good">terkirim</span>
-                      )}
+                      <ReportStatusSelect id={r.id} status={r.status ?? "draft"} />
                     </div>
                   </li>
                 ))}
@@ -264,17 +248,17 @@ export default async function MemberDetail({
             )}
           </Card>
 
-          {!plan && reports.length > 0 && (
+          {!plan && paidReport && (
             <Card>
               <p className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-slate-500">
                 <KanbanSquare className="h-3.5 w-3.5 text-coral" /> Buat Master Plan
               </p>
               <p className="mb-3 text-xs text-slate-500">
-                Pilih builder yang akan dibangun untuk klien. Rekomendasi mesin
-                (dari report) sudah dicentang.
+                Report sudah <span className="text-good">Paid</span> — pilih builder
+                yang akan dibangun. Rekomendasi mesin sudah dicentang.
               </p>
               <form action={makePlan} className="space-y-2">
-                <input type="hidden" name="report_id" value={reports[0].id} />
+                <input type="hidden" name="report_id" value={paidReport.id} />
                 {BUILDER_DEFS.map((b) => {
                   const rec = recBuilders.find((r) => r.builder === b.slug);
                   return (
@@ -316,6 +300,15 @@ export default async function MemberDetail({
                   <KanbanSquare className="h-4 w-4" /> Buat Master Plan
                 </button>
               </form>
+            </Card>
+          )}
+
+          {!plan && !paidReport && reports.length > 0 && (
+            <Card>
+              <p className="text-xs text-slate-500">
+                Report harus berstatus <span className="text-good">Paid</span>{" "}
+                dulu sebelum bisa dibuat Master Plan (ubah status report di atas).
+              </p>
             </Card>
           )}
         </div>

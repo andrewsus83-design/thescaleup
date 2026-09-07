@@ -7,6 +7,7 @@ import {
   Crosshair,
   Lightbulb,
   HeartHandshake,
+  Repeat,
 } from "lucide-react";
 import { ScoreRing } from "@/components/ui/score-ring";
 import { Card } from "@/components/admin/ui";
@@ -72,6 +73,8 @@ export function ReportView({
   const competitiveness = content.competitiveness as string | undefined;
   const opportunities = (content.opportunities as string[]) ?? [];
   const howHelps = content.how_scaleup_helps as string | undefined;
+  const builderPitch = content.builder_pitch as string | undefined;
+  const recurringStrategy = content.recurring_strategy as string | undefined;
   const pillars = [
     { label: "CRO", v: scores.cro },
     { label: "GEO / AI Search", v: scores.geo },
@@ -254,6 +257,22 @@ export function ReportView({
           icon={<HeartHandshake className="h-3.5 w-3.5 text-coral" />}
           label="Bagaimana ScaleUp Membantu"
           text={howHelps}
+        />
+      )}
+
+      {builderPitch && (
+        <Narrative
+          icon={<Blocks className="h-3.5 w-3.5 text-coral" />}
+          label="Kenapa Builder Ini — Alasan untuk Join & Bayar"
+          text={builderPitch}
+        />
+      )}
+      {recurringStrategy && (
+        <Narrative
+          accent
+          icon={<Repeat className="h-3.5 w-3.5 text-coral" />}
+          label="Recurring Solution (bukan one-off)"
+          text={recurringStrategy}
         />
       )}
 

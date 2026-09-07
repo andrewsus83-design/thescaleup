@@ -23,13 +23,7 @@ export function isAdminEmail(email?: string | null): boolean {
   return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
-export type MemberStatus =
-  | "pending"
-  | "processing"
-  | "done"
-  | "prospect"
-  | "joined"
-  | "rejected";
+export type MemberStatus = "pending" | "processing" | "done" | "rejected";
 
 export const MEMBER_STATUSES: {
   value: MemberStatus;
@@ -38,49 +32,40 @@ export const MEMBER_STATUSES: {
   badge: string;
   dot: string;
 }[] = [
-  {
-    value: "pending",
-    label: "Pending",
-    desc: "Sudah isi form, belum diproses admin",
-    badge: "border-warn/30 bg-warn/10 text-warn",
-    dot: "bg-warn",
-  },
-  {
-    value: "processing",
-    label: "Processing",
-    desc: "Sedang diriset & dibuatkan report",
-    badge: "border-sky-500/30 bg-sky-500/10 text-sky-400",
-    dot: "bg-sky-400",
-  },
-  {
-    value: "done",
-    label: "Done",
-    desc: "Report sudah selesai digenerate",
-    badge: "border-coral/30 bg-coral/10 text-coral",
-    dot: "bg-coral",
-  },
-  {
-    value: "prospect",
-    label: "Prospect",
-    desc: "Report terkirim, menunggu jawaban klien",
-    badge: "border-violet-500/30 bg-violet-500/10 text-violet-400",
-    dot: "bg-violet-400",
-  },
-  {
-    value: "joined",
-    label: "Joined",
-    desc: "Sudah berlangganan & di-flag admin",
-    badge: "border-good/30 bg-good/10 text-good",
-    dot: "bg-good",
-  },
-  {
-    value: "rejected",
-    label: "Rejected",
-    desc: "Ditolak / tidak diproses",
-    badge: "border-bad/30 bg-bad/10 text-bad",
-    dot: "bg-bad",
-  },
+  { value: "pending", label: "Pending", desc: "Sudah isi form, belum diproses", badge: "border-warn/30 bg-warn/10 text-warn", dot: "bg-warn" },
+  { value: "processing", label: "Report on Progress", desc: "Report sedang dibuat engine", badge: "border-sky-500/30 bg-sky-500/10 text-sky-400", dot: "bg-sky-400" },
+  { value: "done", label: "DONE", desc: "Report selesai", badge: "border-good/30 bg-good/10 text-good", dot: "bg-good" },
+  { value: "rejected", label: "Rejected", desc: "Ditolak", badge: "border-bad/30 bg-bad/10 text-bad", dot: "bg-bad" },
 ];
+
+export type ReportStatus =
+  | "draft"
+  | "sent"
+  | "waiting_payment"
+  | "paid"
+  | "rejected";
+
+export const REPORT_STATUSES: {
+  value: ReportStatus;
+  label: string;
+  badge: string;
+}[] = [
+  { value: "draft", label: "Draft", badge: "border-white/15 bg-white/5 text-slate-400" },
+  { value: "sent", label: "Sent", badge: "border-sky-500/30 bg-sky-500/10 text-sky-400" },
+  { value: "waiting_payment", label: "Waiting for Payment", badge: "border-warn/30 bg-warn/10 text-warn" },
+  { value: "paid", label: "Paid", badge: "border-good/30 bg-good/10 text-good" },
+  { value: "rejected", label: "Rejected", badge: "border-bad/30 bg-bad/10 text-bad" },
+];
+
+export function reportStatusMeta(v?: string | null) {
+  return (
+    REPORT_STATUSES.find((s) => s.value === v) ?? {
+      value: (v as ReportStatus) ?? "draft",
+      label: v ?? "—",
+      badge: "border-white/15 bg-white/5 text-slate-400",
+    }
+  );
+}
 
 export function statusMeta(status?: string | null) {
   return (

@@ -27,13 +27,13 @@ export default async function AdminDashboard() {
   }
 
   const db = createSupabaseAdminClient();
-  const [membersRes, reportsRes, plansRes, assetsRes] = await Promise.all([
+  const [membersRes, reportsRes, mpRes, assetsRes] = await Promise.all([
     db
       .from("leads")
       .select("id, name, business, status, created_at, category")
       .order("created_at", { ascending: false }),
     db.from("reports").select("id", { count: "exact", head: true }),
-    db.from("plans").select("id", { count: "exact", head: true }),
+    db.from("master_plans").select("id", { count: "exact", head: true }),
     db.from("assets").select("id", { count: "exact", head: true }),
   ]);
 
@@ -52,7 +52,7 @@ export default async function AdminDashboard() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Total Member" value={members.length} icon={<Users className="h-5 w-5" />} href="/admin/members" accent />
         <StatCard label="Pending" value={count("pending")} icon={<Users className="h-5 w-5" />} href="/admin/members?status=pending" />
-        <StatCard label="Joined" value={count("joined")} icon={<Users className="h-5 w-5" />} href="/admin/members?status=joined" />
+        <StatCard label="DONE" value={count("done")} icon={<Users className="h-5 w-5" />} href="/admin/members?status=done" />
         <StatCard label="Report" value={reportsRes.count ?? 0} icon={<FileText className="h-5 w-5" />} href="/admin/reports" />
       </div>
 
@@ -81,9 +81,9 @@ export default async function AdminDashboard() {
       </Card>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <StatCard label="Plan (Calendar)" value={plansRes.count ?? 0} icon={<CalendarDays className="h-5 w-5" />} href="/admin/calendar" />
+        <StatCard label="Master Plan" value={mpRes.count ?? 0} icon={<CalendarDays className="h-5 w-5" />} href="/admin/plans" />
         <StatCard label="Assets" value={assetsRes.count ?? 0} icon={<Images className="h-5 w-5" />} href="/admin/assets" />
-        <StatCard label="Report terkirim" value={count("prospect") + count("joined")} icon={<FileText className="h-5 w-5" />} href="/admin/reports" />
+        <StatCard label="Rejected" value={count("rejected")} icon={<FileText className="h-5 w-5" />} href="/admin/members?status=rejected" />
       </div>
 
       {/* recent members */}

@@ -50,6 +50,8 @@ Skema JSON yang WAJIB diikuti:
     "levers": ["pengungkit konkret + estimasi dampak", "...", "..."]
   },
   "how_scaleup_helps": "2-4 kalimat: bagaimana ScaleUp membantu bisnis ini secara konkret, dikaitkan dengan builder/jasa yang direkomendasikan.",
+  "builder_pitch": "Pitch persuasif: bagaimana builder-builder ScaleUp (yang direkomendasikan) menyelesaikan masalah SPESIFIK bisnis ini, sehingga calon klien yakin untuk JOIN & MEMBAYAR. Kaitkan tiap builder ke kebutuhan & dampak omzet.",
+  "recurring_strategy": "Bagaimana kerja sama ini menjadi solusi RECURRING (retainer/langganan bulanan), BUKAN one-off yang berhenti setelah selesai: apa yang terus dikelola/dioptimasi tiap bulan (konten, ads, GEO, CRO, data) sehingga skor & omzet naik berkelanjutan dan klien terus berlangganan.",
   "executive": {
     "cmo": { "summary": "...", "actions": ["...", "..."] },
     "cbo": { "summary": "...", "actions": ["...", "..."] },
