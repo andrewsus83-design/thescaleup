@@ -9,6 +9,22 @@ function list(props: Record<string, unknown>, key: string): Record<string, strin
   return Array.isArray(v) ? (v as Record<string, string>[]) : [];
 }
 
+/** Only allow safe link schemes — blocks stored javascript:/data: XSS on the
+ *  public site. */
+function safeHref(u: string): string {
+  const v = u.trim();
+  if (!v) return "#";
+  if (v.startsWith("#") || v.startsWith("/")) return v;
+  return /^(https?:|mailto:|tel:)/i.test(v) ? v : "#";
+}
+
+/** Only allow http(s) / root-relative image sources. */
+function safeImg(u: string): string {
+  const v = u.trim();
+  if (!v) return "";
+  return v.startsWith("/") || /^https?:\/\//i.test(v) ? v : "";
+}
+
 /** Renders one website block as real (light-theme) site markup. Shared by the
  *  builder canvas and the public /site renderer. */
 export function BlockView({
@@ -22,30 +38,31 @@ export function BlockView({
   const primary = theme.primary || "#FF5733";
 
   switch (block.type) {
-    case "hero":
+    case "hero": {
+      const heroImg = safeImg(s(p, "image"));
       return (
         <section
           className="relative overflow-hidden px-6 py-20 text-center sm:py-28"
           style={{
-            background: s(p, "image")
-              ? `linear-gradient(rgba(15,15,20,0.55),rgba(15,15,20,0.55)), url(${s(p, "image")}) center/cover`
+            background: heroImg
+              ? `linear-gradient(rgba(15,15,20,0.55),rgba(15,15,20,0.55)), url(${heroImg}) center/cover`
               : `linear-gradient(135deg, ${primary}14, #ffffff)`,
           }}
         >
           <div className="mx-auto max-w-3xl">
             <h1
-              className={`font-display text-4xl font-extrabold tracking-tight sm:text-5xl ${s(p, "image") ? "text-white" : "text-slate-900"}`}
+              className={`font-display text-4xl font-extrabold tracking-tight sm:text-5xl ${heroImg ? "text-white" : "text-slate-900"}`}
             >
               {s(p, "headline")}
             </h1>
             <p
-              className={`mx-auto mt-4 max-w-xl text-lg ${s(p, "image") ? "text-slate-100" : "text-slate-600"}`}
+              className={`mx-auto mt-4 max-w-xl text-lg ${heroImg ? "text-slate-100" : "text-slate-600"}`}
             >
               {s(p, "subheadline")}
             </p>
             {s(p, "ctaText") && (
               <a
-                href={s(p, "ctaHref") || "#"}
+                href={safeHref(s(p, "ctaHref"))}
                 className="mt-8 inline-block rounded-full px-7 py-3 text-sm font-semibold text-white shadow-lg"
                 style={{ backgroundColor: primary }}
               >
@@ -55,6 +72,7 @@ export function BlockView({
           </div>
         </section>
       );
+    }
 
     case "features":
       return (
@@ -90,9 +108,9 @@ export function BlockView({
               <p className="mt-4 whitespace-pre-wrap leading-relaxed text-slate-600">{s(p, "text")}</p>
             </div>
             <div className="aspect-video overflow-hidden rounded-2xl bg-slate-100">
-              {s(p, "image") ? (
+              {safeImg(s(p, "image")) ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={s(p, "image")} alt={s(p, "title")} className="h-full w-full object-cover" />
+                <img src={safeImg(s(p, "image"))} alt={s(p, "title")} className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full items-center justify-center text-sm text-slate-400">
                   Gambar
@@ -116,9 +134,9 @@ export function BlockView({
               {list(p, "items").map((it, i) => (
                 <div key={i} className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
                   <div className="aspect-square bg-slate-100">
-                    {it.image ? (
+                    {safeImg(it.image ?? "") ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={it.image} alt={it.name} className="h-full w-full object-cover" />
+                      <img src={safeImg(it.image ?? "")} alt={it.name} className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full items-center justify-center text-sm text-slate-400">
                         Foto
@@ -160,7 +178,7 @@ export function BlockView({
             <p className="mt-3 text-slate-600">{s(p, "text")}</p>
             {s(p, "buttonText") && (
               <a
-                href={s(p, "buttonHref") || "#"}
+                href={safeHref(s(p, "buttonHref"))}
                 className="mt-7 inline-block rounded-full px-7 py-3 text-sm font-semibold text-white shadow-lg"
                 style={{ backgroundColor: primary }}
               >

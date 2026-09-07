@@ -227,6 +227,15 @@ export function coerceDoc(data: unknown, brand: string): WebsiteDoc {
       brand: d.theme?.brand || brand,
       logo: d.theme?.logo || "",
     },
-    blocks: d.blocks.filter((b) => b && b.type && blockDef(b.type as WebBlockType)),
+    blocks: d.blocks
+      .filter((b) => b && b.type && blockDef(b.type as WebBlockType))
+      .map((b) => ({
+        id: typeof b.id === "string" && b.id ? b.id : newBlock(b.type as WebBlockType).id,
+        type: b.type as WebBlockType,
+        props:
+          b.props && typeof b.props === "object" && !Array.isArray(b.props)
+            ? (b.props as Record<string, unknown>)
+            : {},
+      })),
   };
 }

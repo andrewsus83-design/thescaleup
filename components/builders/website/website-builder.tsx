@@ -210,8 +210,13 @@ export function WebsiteBuilder({
                   onDragStart={() => setDragIndex(i)}
                   onDragEnter={() => setOverIndex(i)}
                   onDragOver={(e) => e.preventDefault()}
-                  onDragEnd={() => {
+                  onDrop={() => {
                     if (dragIndex !== null && overIndex !== null) move(dragIndex, overIndex);
+                    setDragIndex(null);
+                    setOverIndex(null);
+                  }}
+                  onDragEnd={() => {
+                    // Reset only — a drop outside the canvas is a no-op.
                     setDragIndex(null);
                     setOverIndex(null);
                   }}

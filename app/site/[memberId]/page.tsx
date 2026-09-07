@@ -22,6 +22,7 @@ async function load(memberId: string) {
         .select("data")
         .eq("member_id", memberId)
         .eq("builder", "website")
+        .eq("status", "submitted") // only PUBLISHED sites are served publicly
         .maybeSingle(),
     ]);
     return { member, data: project?.data as Record<string, unknown> | undefined };
@@ -33,8 +34,8 @@ async function load(memberId: string) {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { memberId } = await params;
   const r = await load(memberId);
-  const name =
-    (r?.member?.business as string) || (r?.member?.name as string) || "Website";
+  // Public page — use business only, never the private contact person's name.
+  const name = (r?.member?.business as string) || "Website";
   return { title: name, robots: { index: false, follow: false } };
 }
 
@@ -43,8 +44,7 @@ export default async function SitePage({ params }: Params) {
   const r = await load(memberId);
   if (!r || !r.member) notFound();
 
-  const brand =
-    (r.member.business as string) || (r.member.name as string) || "Brand";
+  const brand = (r.member.business as string) || "Website";
   const blocks = Array.isArray(r.data?.blocks) ? r.data!.blocks : [];
 
   if (blocks.length === 0) {
