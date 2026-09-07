@@ -22,6 +22,40 @@ function normalizeUrl(u?: string | null): string | null {
   return s.startsWith("http") ? s : `https://${s}`;
 }
 
+// Per-product "open the real product" action. `keys` are the config fields the
+// admin builder may fill with the live product URL; `fallback` is an in-app
+// destination when no external URL exists yet.
+const PRODUCT_ACTION: Record<
+  string,
+  { label: string; keys: string[]; fallback?: string }
+> = {
+  website: { label: "Kunjungi Website", keys: ["website_url", "url", "live_url", "domain"] },
+  store: { label: "Buka Toko", keys: ["store_url", "storefront_url", "shop_url", "url"] },
+  content: { label: "Lihat Konten di Hub", keys: ["content_url"], fallback: "/scalehub" },
+  ads: { label: "Buka Dashboard Iklan", keys: ["dashboard_url", "report_url", "url"] },
+  opportunity: { label: "Lihat Peluang", keys: ["doc_url", "url"] },
+  crm: { label: "Buka CRM", keys: ["crm_url", "url"] },
+  tasks: { label: "Buka Board", keys: ["board_url", "url"] },
+  support: { label: "Buka Support", keys: ["inbox_url", "helpdesk_url", "url"] },
+};
+
+function resolveProductUrl(
+  slug: string,
+  data: Record<string, unknown>,
+  website?: string | null,
+): string | null {
+  const cfg = PRODUCT_ACTION[slug];
+  for (const k of cfg?.keys ?? []) {
+    const u = normalizeUrl(data?.[k] as string);
+    if (u) return u;
+  }
+  if (slug === "website") {
+    const u = normalizeUrl(website);
+    if (u) return u;
+  }
+  return cfg?.fallback ?? null;
+}
+
 /** The client sees each builder as a finished PRODUCT (ready to use) — never
  *  the builder wizard. The wizard lives only in the admin backend. */
 export default async function ClientAppPage({
@@ -53,21 +87,11 @@ export default async function ClientAppPage({
   const Icon = b.icon;
   const tasks = builderTasks(slug);
 
-  const websiteUrl =
-    slug === "website"
-      ? normalizeUrl(
-          (data.website_url as string) ||
-            (data.url as string) ||
-            (lead?.website as string),
-        )
-      : null;
-
-  // Primary "use it" action per product (only where a real destination exists).
-  const primary: { label: string; href: string } | null = websiteUrl
-    ? { label: "Kunjungi Website", href: websiteUrl }
-    : slug === "content"
-      ? { label: "Lihat Konten di Hub", href: "/scalehub" }
-      : null;
+  // Primary "open the real product" action, resolved from the admin-built config.
+  const href = resolveProductUrl(slug, data, lead?.website as string);
+  const primary = href
+    ? { label: PRODUCT_ACTION[slug]?.label ?? "Buka produk", href }
+    : null;
 
   async function requestUpdate() {
     "use server";
