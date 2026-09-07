@@ -22,6 +22,7 @@ import {
   type WebsiteDoc,
 } from "@/lib/builders/website/schema";
 import { BlockView } from "@/components/builders/website/block-view";
+import { WEBSITE_TEMPLATES, templateDoc } from "@/lib/builders/website/templates";
 import { cn } from "@/lib/utils";
 
 type SaveFn = (
@@ -57,6 +58,15 @@ export function WebsiteBuilder({
   const selDef = sel ? blockDef(sel.type) : null;
 
   const setBlocks = (blocks: WebBlock[]) => setDoc((d) => ({ ...d, blocks }));
+
+  const applyTemplate = (id: string) => {
+    if (!id) return;
+    if (doc.blocks.length > 0 && !window.confirm("Ganti desain sekarang dengan template ini? Isi kanvas saat ini akan ditimpa.")) return;
+    const next = templateDoc(id, doc.theme.brand);
+    if (!next) return;
+    setDoc(next);
+    setSelected(next.blocks[0]?.id ?? null);
+  };
 
   const addBlock = (type: WebBlockType) => {
     const b = newBlock(type);
@@ -114,8 +124,21 @@ export function WebsiteBuilder({
           value={doc.theme.brand}
           onChange={(e) => setDoc((d) => ({ ...d, theme: { ...d.theme, brand: e.target.value } }))}
           placeholder="Nama brand"
-          className={cn(inputCls, "w-40")}
+          className={cn(inputCls, "w-36")}
         />
+        <select
+          value=""
+          onChange={(e) => { applyTemplate(e.target.value); e.target.value = ""; }}
+          className={cn(inputCls, "w-44")}
+          title="Mulai dari template siap pakai"
+        >
+          <option value="">Pakai template…</option>
+          {WEBSITE_TEMPLATES.map((t) => (
+            <option key={t.id} value={t.id} className="bg-obsidian">
+              {t.name}
+            </option>
+          ))}
+        </select>
         <label className="flex items-center gap-2 text-xs text-slate-400">
           Warna
           <input
