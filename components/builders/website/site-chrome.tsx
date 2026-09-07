@@ -1,4 +1,5 @@
 import type { WebsiteDoc } from "@/lib/builders/website/schema";
+import { siteGraph, jsonLdString } from "@/lib/builders/website/seo";
 
 function waLink(whatsapp?: string): string | null {
   const digits = (whatsapp ?? "").replace(/[^0-9]/g, "");
@@ -15,11 +16,13 @@ export function SiteChrome({
   doc,
   memberId,
   activeSlug,
+  extraLd = [],
   children,
 }: {
   doc: WebsiteDoc;
   memberId: string;
   activeSlug: string;
+  extraLd?: object[];
   children: React.ReactNode;
 }) {
   const primary = doc.theme.primary || "#FF5733";
@@ -30,6 +33,10 @@ export function SiteChrome({
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdString([...siteGraph(doc, memberId), ...extraLd]) }}
+      />
       <header className="sticky top-0 z-40 border-b border-slate-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
           <a href={href("")} className="flex items-center gap-2 font-display text-lg font-extrabold">

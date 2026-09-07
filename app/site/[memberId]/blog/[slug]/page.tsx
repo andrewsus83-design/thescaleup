@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { loadSite } from "@/lib/builders/website/load";
 import { postSlug } from "@/lib/builders/website/schema";
 import { parseContentToBlocks } from "@/lib/scalehub/content";
+import { articleGraph, breadcrumbGraph, siteBase } from "@/lib/builders/website/seo";
+import { site } from "@/lib/site";
 import { SiteChrome } from "@/components/builders/website/site-chrome";
 
 export const dynamic = "force-dynamic";
@@ -28,11 +30,27 @@ async function findPost(memberId: string, slug: string) {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { memberId, slug } = await params;
   const r = await findPost(memberId, slug);
-  if (!r) return { title: "Artikel", robots: { index: false, follow: false } };
+  if (!r) return { title: "Artikel" };
+  const coverAbs =
+    r.post.cover && r.post.cover.startsWith("/")
+      ? `${site.url.replace(/\/$/, "")}${r.post.cover}`
+      : r.post.cover;
+  const url = `${siteBase(memberId)}/blog/${slug}`;
   return {
     title: `${r.post.title} · ${r.site.brand}`,
     description: r.post.excerpt,
-    robots: { index: false, follow: false },
+    alternates: { canonical: url },
+    openGraph: {
+      type: "article",
+      siteName: r.site.brand,
+      locale: "id_ID",
+      title: r.post.title,
+      description: r.post.excerpt,
+      url,
+      ...(coverAbs ? { images: [coverAbs] } : {}),
+    },
+    twitter: { card: coverAbs ? "summary_large_image" : "summary", title: r.post.title, description: r.post.excerpt },
+    robots: { index: true, follow: true },
   };
 }
 
@@ -49,8 +67,16 @@ export default async function PostPage({ params }: Params) {
   const blocks = parseContentToBlocks(post.body ?? "");
   const cover = safe(post.cover);
 
+  const extraLd = [
+    ...articleGraph(memberId, site.doc!.theme.brand, post),
+    ...breadcrumbGraph(memberId, [
+      { name: "Home", slug: "" },
+      { name: "Blog", slug: "blog" },
+    ]),
+  ];
+
   return (
-    <SiteChrome doc={site.doc!} memberId={memberId} activeSlug="blog">
+    <SiteChrome doc={site.doc!} memberId={memberId} activeSlug="blog" extraLd={extraLd}>
       <article className="mx-auto max-w-3xl px-6 py-14">
         <a href={`/site/${memberId}/blog`} className="text-sm text-slate-500 hover:text-slate-800">
           ← Semua artikel

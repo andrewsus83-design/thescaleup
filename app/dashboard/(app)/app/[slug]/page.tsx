@@ -190,6 +190,61 @@ export default async function ClientAppPage({
           <span className="text-slate-300">Minta perubahan</span> di atas.
         </p>
       </Card>
+
+      {slug === "website" && (
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <Card className="border-good/20">
+            <p className="mb-3 font-mono text-xs uppercase tracking-wider text-good">
+              Kekuatan Website Anda — beda website kuat vs biasa
+            </p>
+            <ul className="space-y-2 text-sm text-slate-300">
+              {[
+                "Multi-halaman lengkap: Home, Layanan, FAQ, Blog, Kontak",
+                "Meta title & description tiap halaman — rapi di Google",
+                "Open Graph + Twitter Card — tampil menarik saat di-share di WA/IG/FB",
+                "Structured data (Schema): LocalBusiness, FAQPage, BlogPosting — gampang dikutip Google & AI Search (GEO)",
+                "Mobile-friendly, cepat, dan struktur heading yang benar",
+                "Blog bawaan — mesin konten SEO/GEO jangka panjang",
+                "Tombol WhatsApp di setiap halaman — fokus konversi",
+              ].map((t) => (
+                <li key={t} className="flex items-start gap-2.5">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-good" />
+                  {t}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 border-t border-white/5 pt-3 text-xs text-slate-500">
+              Website biasa hanya 1 halaman tanpa schema/OG — tidak muncul rapi di
+              Google, tidak dikutip AI Search, dan lemah saat dibagikan.
+            </p>
+          </Card>
+
+          <Card className="border-coral/20">
+            <p className="mb-3 font-mono text-xs uppercase tracking-wider text-coral">
+              Cara meningkatkan lebih lanjut
+            </p>
+            <ul className="space-y-2 text-sm text-slate-300">
+              {[
+                "Pasang domain sendiri (mis. brandanda.com) — makin dipercaya & kuat di Google",
+                "Tambah foto produk asli + testimoni pelanggan nyata",
+                "Terbitkan artikel blog rutin (2–4/bulan) agar naik di pencarian & AI",
+                "Kumpulkan review di Google Business Profile (sinyal lokal kuat)",
+                "Hubungkan Booking & CRM agar pengunjung langsung jadi pelanggan",
+                "Pasang Google Analytics untuk pantau traffic & konversi",
+              ].map((t) => (
+                <li key={t} className="flex items-start gap-2.5">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-coral" />
+                  {t}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 border-t border-white/5 pt-3 text-xs text-slate-500">
+              Mau ScaleUp bantu semua ini? Klik{" "}
+              <span className="text-slate-300">Minta perubahan</span> di atas.
+            </p>
+          </Card>
+        </div>
+      )}
     </>
   );
 }
