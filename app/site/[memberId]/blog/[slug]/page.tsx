@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { loadSite } from "@/lib/builders/website/load";
-import { getPage, postSlug } from "@/lib/builders/website/schema";
+import { postSlug } from "@/lib/builders/website/schema";
 import { parseContentToBlocks } from "@/lib/scalehub/content";
 import { SiteChrome } from "@/components/builders/website/site-chrome";
 
@@ -14,9 +14,12 @@ type PostItem = { title: string; date?: string; excerpt?: string; body?: string;
 async function findPost(memberId: string, slug: string) {
   const site = await loadSite(memberId);
   if (!site || !site.doc) return null;
-  const blog = getPage(site.doc, "blog");
-  const block = blog?.blocks.find((b) => b.type === "posts");
-  const items = (block?.props.items as PostItem[]) ?? [];
+  // Resolve a post from a "posts" block on ANY page (not only a page named "blog").
+  const items = site.doc.pages.flatMap((p) =>
+    p.blocks
+      .filter((b) => b.type === "posts")
+      .flatMap((b) => (Array.isArray(b.props.items) ? (b.props.items as PostItem[]) : [])),
+  );
   const post = items.find((it) => postSlug(it.title ?? "") === slug);
   if (!post) return null;
   return { site, post };

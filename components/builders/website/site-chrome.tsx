@@ -5,6 +5,11 @@ function waLink(whatsapp?: string): string | null {
   return digits ? `https://wa.me/${digits}` : null;
 }
 
+function safeImg(u?: string): string {
+  const v = String(u ?? "").trim();
+  return v.startsWith("/") || /^https?:\/\//i.test(v) ? v : "";
+}
+
 /** Nav header + footer shared across all pages of a built site. */
 export function SiteChrome({
   doc,
@@ -20,6 +25,7 @@ export function SiteChrome({
   const primary = doc.theme.primary || "#FF5733";
   const brand = doc.theme.brand || "Brand";
   const wa = waLink(doc.theme.whatsapp);
+  const logo = safeImg(doc.theme.logo);
   const href = (slug: string) => (slug ? `/site/${memberId}/${slug}` : `/site/${memberId}`);
 
   return (
@@ -27,9 +33,9 @@ export function SiteChrome({
       <header className="sticky top-0 z-40 border-b border-slate-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
           <a href={href("")} className="flex items-center gap-2 font-display text-lg font-extrabold">
-            {doc.theme.logo ? (
+            {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={doc.theme.logo} alt={brand} className="h-8 w-auto" />
+              <img src={logo} alt={brand} className="h-8 w-auto" />
             ) : (
               <span style={{ color: primary }}>{brand}</span>
             )}
