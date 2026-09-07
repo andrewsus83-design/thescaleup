@@ -1,0 +1,416 @@
+import type { BuilderConfig } from "@/lib/builders/wizard-types";
+
+export const crm: BuilderConfig = {
+  "slug": "crm",
+  "title": "CRM Builder",
+  "persona": "CBO + CTO ScaleUp — arsitek pertumbuhan revenue & sistem CRM untuk UMKM/brand Indonesia",
+  "steps": [
+    {
+      "title": "Setup Kontak & Sumber Leads",
+      "subtitle": "Kumpulkan semua pelanggan & calon pelanggan ke satu tempat. Makin rapi datanya, makin gampang di-follow-up dan diukur.",
+      "fields": [
+        {
+          "type": "cards",
+          "label": "Cara masukkan data kontak",
+          "key": "import_method",
+          "hint": "Pilih cara termudah sesuai kondisi data Anda sekarang.",
+          "options": [
+            {
+              "value": "spreadsheet",
+              "label": "Import dari Spreadsheet",
+              "desc": "Punya data di Excel/Google Sheets (nama, no WA, dll). Paling cepat untuk migrasi massal."
+            },
+            {
+              "value": "manual",
+              "label": "Input Manual Bertahap",
+              "desc": "Belum banyak data. Tim input satu-satu sambil jalan. Cocok untuk yang baru mulai."
+            },
+            {
+              "value": "integration",
+              "label": "Tarik dari Channel",
+              "desc": "Sinkron otomatis dari WA Business, Instagram, & marketplace. ScaleUp bantu setup koneksinya."
+            }
+          ]
+        },
+        {
+          "type": "url",
+          "label": "Link Google Sheets data kontak",
+          "key": "contact_sheet_url",
+          "placeholder": "https://docs.google.com/spreadsheets/...",
+          "hint": "Set akses 'Anyone with link' agar tim ScaleUp bisa proses. Kosongkan jika pilih input manual."
+        },
+        {
+          "type": "multiselect",
+          "label": "Sumber datang-nya leads",
+          "key": "lead_sources",
+          "hint": "Pilih semua channel tempat calon pelanggan menghubungi Anda. Ini dipakai untuk ukur channel mana paling untung.",
+          "options": [
+            {
+              "value": "whatsapp",
+              "label": "WhatsApp"
+            },
+            {
+              "value": "instagram",
+              "label": "Instagram (DM/Comment)"
+            },
+            {
+              "value": "tiktok",
+              "label": "TikTok"
+            },
+            {
+              "value": "facebook",
+              "label": "Facebook / Meta Ads"
+            },
+            {
+              "value": "marketplace",
+              "label": "Marketplace (Shopee/Tokopedia)"
+            },
+            {
+              "value": "website",
+              "label": "Website / Landing Page"
+            },
+            {
+              "value": "google_ads",
+              "label": "Google / Google Ads"
+            },
+            {
+              "value": "referral",
+              "label": "Referral / Mulut ke mulut"
+            },
+            {
+              "value": "offline",
+              "label": "Offline / Walk-in / Event"
+            }
+          ]
+        },
+        {
+          "type": "multiselect",
+          "label": "Data yang mau disimpan per kontak",
+          "key": "contact_fields",
+          "hint": "Minimal Nama + No WhatsApp. Sisanya sesuaikan kebutuhan follow-up & segmentasi.",
+          "options": [
+            {
+              "value": "nama",
+              "label": "Nama"
+            },
+            {
+              "value": "no_wa",
+              "label": "No. HP / WhatsApp"
+            },
+            {
+              "value": "email",
+              "label": "Email"
+            },
+            {
+              "value": "kota",
+              "label": "Kota / Domisili"
+            },
+            {
+              "value": "produk_minat",
+              "label": "Produk / layanan yang diminati"
+            },
+            {
+              "value": "sumber",
+              "label": "Sumber lead"
+            },
+            {
+              "value": "tag",
+              "label": "Tag / Label (hot, warm, cold)"
+            },
+            {
+              "value": "catatan",
+              "label": "Catatan interaksi"
+            }
+          ]
+        },
+        {
+          "type": "select",
+          "label": "Perkiraan jumlah kontak saat ini",
+          "key": "contact_volume",
+          "hint": "Untuk menentukan struktur database & paket otomatisasi yang pas.",
+          "options": [
+            {
+              "value": "lt_500",
+              "label": "< 500 kontak"
+            },
+            {
+              "value": "500_5000",
+              "label": "500 - 5.000 kontak"
+            },
+            {
+              "value": "5000_50000",
+              "label": "5.000 - 50.000 kontak"
+            },
+            {
+              "value": "gt_50000",
+              "label": "> 50.000 kontak"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Pipeline & Tahapan Penjualan",
+      "subtitle": "Tentukan perjalanan pelanggan dari kenal sampai jadi repeat buyer, biar tidak ada lead yang 'nyangkut' tanpa ditindaklanjuti.",
+      "fields": [
+        {
+          "type": "cards",
+          "label": "Template pipeline",
+          "key": "pipeline_template",
+          "hint": "Mulai dari template standar ScaleUp, atau susun sendiri sesuai proses jualan Anda.",
+          "options": [
+            {
+              "value": "standard",
+              "label": "Standar UMKM/Brand",
+              "desc": "Lead → Prospek → Follow-up → Closing → Repeat. Siap pakai, cocok untuk mayoritas bisnis."
+            },
+            {
+              "value": "high_ticket",
+              "label": "High-Ticket / Jasa",
+              "desc": "Ada tahap Konsultasi & Negosiasi. Untuk produk/jasa dengan proses keputusan panjang."
+            },
+            {
+              "value": "custom",
+              "label": "Custom",
+              "desc": "Susun tahapan sendiri. ScaleUp bantu rapikan agar tetap terukur."
+            }
+          ]
+        },
+        {
+          "type": "multiselect",
+          "label": "Tahapan pipeline yang dipakai",
+          "key": "pipeline_stages",
+          "hint": "Urutkan sesuai proses. Setiap kontak akan bergerak dari kiri ke kanan.",
+          "options": [
+            {
+              "value": "lead_baru",
+              "label": "Lead Baru",
+              "desc": "Baru masuk, belum dihubungi"
+            },
+            {
+              "value": "prospek",
+              "label": "Prospek / Qualified",
+              "desc": "Sudah direspon & tertarik"
+            },
+            {
+              "value": "followup",
+              "label": "Follow-up",
+              "desc": "Sedang di-nurture / menunggu keputusan"
+            },
+            {
+              "value": "negosiasi",
+              "label": "Negosiasi",
+              "desc": "Tawar harga / kirim penawaran"
+            },
+            {
+              "value": "closing",
+              "label": "Closing / Deal",
+              "desc": "Sudah bayar / jadi pelanggan"
+            },
+            {
+              "value": "repeat",
+              "label": "Repeat / Retensi",
+              "desc": "Pelanggan lama untuk repeat order"
+            },
+            {
+              "value": "lost",
+              "label": "Lost / Batal",
+              "desc": "Tidak jadi, untuk analisa alasan"
+            }
+          ]
+        },
+        {
+          "type": "textarea",
+          "label": "Kriteria lead 'layak dikejar' (qualified)",
+          "key": "qualification_criteria",
+          "placeholder": "Contoh: sudah tanya harga & stok, lokasi bisa dikirim, membalas dalam 24 jam...",
+          "hint": "Apa tanda lead serius? Contoh: sudah tanya harga, tahu produk, budget cukup, domisili terjangkau."
+        },
+        {
+          "type": "toggle",
+          "label": "Lacak nilai transaksi (deal value)",
+          "key": "track_deal_value",
+          "hint": "Aktifkan untuk hitung potensi & realisasi omzet per tahap dan proyeksi revenue."
+        },
+        {
+          "type": "radio",
+          "label": "Penugasan lead ke tim",
+          "key": "lead_assignment",
+          "hint": "Bagaimana lead masuk dibagi ke tim sales/CS?",
+          "options": [
+            {
+              "value": "round_robin",
+              "label": "Otomatis bergilir (round-robin)",
+              "desc": "Adil & merata antar tim"
+            },
+            {
+              "value": "by_source",
+              "label": "Berdasarkan sumber/channel",
+              "desc": "Mis. WA ke tim A, IG ke tim B"
+            },
+            {
+              "value": "manual",
+              "label": "Manual oleh admin",
+              "desc": "Admin assign sendiri"
+            },
+            {
+              "value": "single",
+              "label": "Satu orang / owner",
+              "desc": "Bisnis masih dipegang sendiri"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Otomatisasi Follow-up & Retensi",
+      "subtitle": "Set sekali, jalan otomatis. Reminder & pesan follow-up terkirim tepat waktu lewat WhatsApp/email — tidak ada lagi lead lupa di-chat.",
+      "fields": [
+        {
+          "type": "multiselect",
+          "label": "Channel follow-up",
+          "key": "followup_channels",
+          "hint": "WhatsApp paling efektif untuk pasar Indonesia. Email untuk broadcast & data pelanggan berkelanjutan.",
+          "options": [
+            {
+              "value": "whatsapp",
+              "label": "WhatsApp (chat/broadcast)"
+            },
+            {
+              "value": "email",
+              "label": "Email"
+            },
+            {
+              "value": "sms",
+              "label": "SMS"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "label": "Nomor WhatsApp pengirim",
+          "key": "wa_sender_number",
+          "placeholder": "+62...",
+          "hint": "Nomor bisnis untuk kirim follow-up. Idealnya WhatsApp Business API agar bisa broadcast tanpa diblokir."
+        },
+        {
+          "type": "multiselect",
+          "label": "Momen follow-up otomatis",
+          "key": "followup_triggers",
+          "hint": "Kapan sistem otomatis mengingatkan/mengirim pesan. Pilih yang relevan dengan siklus jualan Anda.",
+          "options": [
+            {
+              "value": "welcome",
+              "label": "Sambutan lead baru (H+0)",
+              "desc": "Respon instan begitu lead masuk"
+            },
+            {
+              "value": "followup_1",
+              "label": "Follow-up belum closing (H+1)",
+              "desc": "Ingatkan lead yang belum jawab"
+            },
+            {
+              "value": "followup_2",
+              "label": "Follow-up ke-2 (H+3)",
+              "desc": "Dorongan kedua + penawaran"
+            },
+            {
+              "value": "abandoned",
+              "label": "Prospek diam > 7 hari",
+              "desc": "Reaktivasi lead dingin"
+            },
+            {
+              "value": "after_purchase",
+              "label": "Terima kasih pasca-beli",
+              "desc": "Bangun loyalitas + minta review"
+            },
+            {
+              "value": "repeat_reminder",
+              "label": "Ingatkan repeat order",
+              "desc": "Sesuai siklus habis produk"
+            },
+            {
+              "value": "birthday",
+              "label": "Ucapan ulang tahun / hari spesial",
+              "desc": "Kirim promo personal"
+            }
+          ]
+        },
+        {
+          "type": "textarea",
+          "label": "Draft isi pesan (opsional)",
+          "key": "message_templates",
+          "placeholder": "Contoh sapaan: 'Halo Kak {nama}, terima kasih sudah tertarik dengan {produk}...'",
+          "hint": "Tulis nada/isi pesan yang Anda mau. Kosongkan dan tim copywriter ScaleUp yang buatkan sesuai brand voice."
+        },
+        {
+          "type": "cards",
+          "label": "Program retensi pelanggan",
+          "key": "retention_program",
+          "hint": "Strategi agar pelanggan beli lagi & lagi — sumber profit paling murah.",
+          "options": [
+            {
+              "value": "loyalty",
+              "label": "Loyalty / Poin",
+              "desc": "Reward pembelian berulang, dorong repeat rate"
+            },
+            {
+              "value": "reminder_cycle",
+              "label": "Reminder Siklus Beli",
+              "desc": "Ingatkan saat produk diperkirakan habis"
+            },
+            {
+              "value": "vip_broadcast",
+              "label": "VIP & Broadcast Promo",
+              "desc": "Segmentasi pelanggan loyal untuk penawaran eksklusif"
+            },
+            {
+              "value": "none_yet",
+              "label": "Belum, fokus akuisisi dulu",
+              "desc": "Aktifkan retensi di fase berikutnya"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Dashboard & Report (Dikerjakan ScaleUp)",
+      "subtitle": "Tim ScaleUp merakit CRM Anda, menyambungkan channel & otomatisasi, lalu menyiapkan dashboard performa. Anda tinggal pantau angkanya.",
+      "auto": true,
+      "fields": [
+        {
+          "type": "info",
+          "label": "Yang kami rakit & serahkan",
+          "hint": "Berdasarkan pilihan Anda di step sebelumnya, ScaleUp membangun: database kontak + import data, pipeline drag-and-drop, koneksi WhatsApp/email, dan alur follow-up otomatis — siap dipakai tim Anda."
+        },
+        {
+          "type": "info",
+          "label": "Dashboard konversi & funnel",
+          "hint": "Lihat berapa lead masuk, berapa jadi prospek, dan berapa closing di tiap tahap. Ketahuan persis di tahap mana leads paling banyak bocor."
+        },
+        {
+          "type": "info",
+          "label": "LTV & Repeat Rate",
+          "hint": "Otomatis hitung nilai seumur-hidup pelanggan (LTV), rata-rata order, dan persentase pelanggan yang beli ulang — kunci pertumbuhan jangka panjang."
+        },
+        {
+          "type": "info",
+          "label": "ROI per channel & response time",
+          "hint": "Bandingkan channel mana (WA/IG/Ads/Marketplace) yang menghasilkan closing terbanyak per rupiah, plus kecepatan respon tim Anda ke lead."
+        },
+        {
+          "type": "info",
+          "label": "Laporan berkala & optimasi",
+          "hint": "Report bulanan + sesi review bersama ScaleUp untuk memperbaiki template, timing follow-up, dan pipeline agar konversi terus naik."
+        }
+      ]
+    }
+  ],
+  "suggestions": [
+    "Jual sebagai layanan RECURRING: paket bulanan 'CRM + Follow-up Managed' — ScaleUp yang urus optimasi template, timing, dan report tiap bulan, bukan sekali setup lalu ditinggal. Ini yang bikin retensi klien tinggi.",
+    "Tawarkan add-on WhatsApp Business API resmi (broadcast tanpa risiko blokir) sebagai upsell margin tinggi; banyak UMKM butuh tapi bingung setup sendiri.",
+    "Tambahkan integrasi ke marketplace (Shopee/Tokopedia) & Meta Lead Ads agar leads masuk otomatis ke pipeline — jadi diferensiasi kuat vs agency lain yang cuma bikin database statis.",
+    "Sediakan 'Health Check' triwulanan: audit repeat rate & LTV klien, lalu rekomendasikan campaign retensi baru — jadi alasan natural untuk perpanjang kontrak dan upsell.",
+    "Bangun template pipeline & pesan per-industri (F&B, fashion, jasa, klinik) sebagai library siap pakai; percepat onboarding klien baru sekaligus jadi bukti keahlian vertikal ScaleUp."
+  ]
+};

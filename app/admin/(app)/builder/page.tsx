@@ -1,10 +1,11 @@
-import { Check, Database } from "lucide-react";
+import Link from "next/link";
+import { Check, Database, ArrowUpRight } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
 import {
   createSupabaseAdminClient,
   isSupabaseAdminConfigured,
 } from "@/lib/supabase/admin";
-import { PageHeader, Card, EmptyState } from "@/components/admin/ui";
+import { PageHeader, EmptyState } from "@/components/admin/ui";
 import { BUILDERS } from "@/lib/client/builders";
 
 export const dynamic = "force-dynamic";
@@ -43,16 +44,23 @@ export default async function AdminBuilderPage() {
           const Icon = b.icon;
           const u = usage.get(b.slug);
           return (
-            <Card key={b.slug} className="flex flex-col">
+            <Link
+              key={b.slug}
+              href={`/admin/builder/${b.slug}`}
+              className="group flex flex-col rounded-2xl border border-white/8 bg-card/40 p-5 transition-all hover:-translate-y-1 hover:border-coral/30"
+            >
               <div className="flex items-center justify-between">
                 <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-coral/20 bg-coral/10 text-coral">
                   <Icon className="h-5 w-5" />
                 </span>
-                {u && (
-                  <span className="font-mono text-xs text-slate-500">
-                    {u.done}/{u.total} item
-                  </span>
-                )}
+                <span className="flex items-center gap-2">
+                  {u && (
+                    <span className="font-mono text-xs text-slate-500">
+                      {u.done}/{u.total} item
+                    </span>
+                  )}
+                  <ArrowUpRight className="h-4 w-4 text-slate-600 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-coral" />
+                </span>
               </div>
               <h3 className="mt-4 font-display text-base font-bold text-mist">
                 {b.title}
@@ -66,7 +74,7 @@ export default async function AdminBuilderPage() {
                   </li>
                 ))}
               </ul>
-            </Card>
+            </Link>
           );
         })}
       </div>
