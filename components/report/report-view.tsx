@@ -1,8 +1,47 @@
-import { AlertTriangle, TrendingUp } from "lucide-react";
+import {
+  AlertTriangle,
+  TrendingUp,
+  Blocks,
+  Activity,
+  Eye,
+  Crosshair,
+  Lightbulb,
+  HeartHandshake,
+} from "lucide-react";
 import { ScoreRing } from "@/components/ui/score-ring";
 import { Card } from "@/components/admin/ui";
+import { builderTitle } from "@/lib/builders";
+import { cn } from "@/lib/utils";
+import { SuccessMeter } from "@/components/report/success-meter";
 
 type Exec = Record<string, { summary?: string; actions?: string[] }>;
+
+function Narrative({
+  icon,
+  label,
+  text,
+  accent,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  text: string;
+  accent?: boolean;
+}) {
+  return (
+    <Card
+      className={
+        accent
+          ? "border-coral/20 bg-gradient-to-br from-coral/10 via-card/40 to-card/40"
+          : undefined
+      }
+    >
+      <p className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-slate-500">
+        {icon} {label}
+      </p>
+      <p className="text-sm leading-relaxed text-slate-300">{text}</p>
+    </Card>
+  );
+}
 
 export function ReportView({
   content,
@@ -22,6 +61,17 @@ export function ReportView({
   } | null;
   const exec = (content.executive ?? null) as Exec | null;
   const roadmap = (content.roadmap ?? {}) as Record<string, string[]>;
+  const recBuilders = (content.recommended_builders ?? []) as {
+    builder: string;
+    priority?: string;
+    fit?: number;
+    reason?: string;
+  }[];
+  const currentCondition = content.current_condition as string | undefined;
+  const brandPerception = content.brand_perception as string | undefined;
+  const competitiveness = content.competitiveness as string | undefined;
+  const opportunities = (content.opportunities as string[]) ?? [];
+  const howHelps = content.how_scaleup_helps as string | undefined;
   const pillars = [
     { label: "CRO", v: scores.cro },
     { label: "GEO / AI Search", v: scores.geo },
@@ -35,6 +85,23 @@ export function ReportView({
         <Card>
           <p className="text-sm leading-relaxed text-slate-300">{summary}</p>
         </Card>
+      )}
+
+      <SuccessMeter content={content} />
+
+      {currentCondition && (
+        <Narrative
+          icon={<Activity className="h-3.5 w-3.5 text-coral" />}
+          label="Kondisi Saat Ini"
+          text={currentCondition}
+        />
+      )}
+      {brandPerception && (
+        <Narrative
+          icon={<Eye className="h-3.5 w-3.5 text-coral" />}
+          label="Apa yang Dunia Lihat (Brand & Sosial)"
+          text={brandPerception}
+        />
       )}
 
       {hasScores && (
@@ -55,6 +122,14 @@ export function ReportView({
         </Card>
       )}
 
+      {competitiveness && (
+        <Narrative
+          icon={<Crosshair className="h-3.5 w-3.5 text-coral" />}
+          label="Daya Saing vs Kompetitor"
+          text={competitiveness}
+        />
+      )}
+
       {whatsMissing.length > 0 && (
         <Card className="border-bad/20">
           <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-slate-500">
@@ -67,6 +142,24 @@ export function ReportView({
                   {i + 1}
                 </span>
                 {w}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {opportunities.length > 0 && (
+        <Card className="border-good/15">
+          <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-slate-500">
+            <Lightbulb className="h-3.5 w-3.5 text-good" /> Peluang
+          </p>
+          <ul className="space-y-3">
+            {opportunities.map((o, i) => (
+              <li key={i} className="flex gap-3 text-sm text-slate-300">
+                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-good/25 bg-good/10 font-mono text-[0.66rem] text-good">
+                  {i + 1}
+                </span>
+                {o}
               </li>
             ))}
           </ul>
@@ -111,6 +204,57 @@ export function ReportView({
             </ul>
           )}
         </Card>
+      )}
+
+      {recBuilders.length > 0 && (
+        <Card className="border-coral/15">
+          <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-slate-500">
+            <Blocks className="h-3.5 w-3.5 text-coral" /> Rekomendasi Builder (produk/jasa)
+          </p>
+          <div className="space-y-2.5">
+            {recBuilders.map((r, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-white/8 bg-obsidian/40 p-3.5"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-slate-200">
+                    {builderTitle(r.builder)}
+                  </span>
+                  {r.priority && (
+                    <span
+                      className={cn(
+                        "rounded-full border px-2 py-0.5 text-[0.6rem] uppercase",
+                        r.priority === "high"
+                          ? "border-coral/30 bg-coral/10 text-coral"
+                          : "border-white/15 text-slate-400",
+                      )}
+                    >
+                      {r.priority}
+                    </span>
+                  )}
+                  {typeof r.fit === "number" && (
+                    <span className="font-mono text-xs text-slate-500">
+                      fit {r.fit}
+                    </span>
+                  )}
+                </div>
+                {r.reason && (
+                  <p className="mt-1 text-xs text-slate-400">{r.reason}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {howHelps && (
+        <Narrative
+          accent
+          icon={<HeartHandshake className="h-3.5 w-3.5 text-coral" />}
+          label="Bagaimana ScaleUp Membantu"
+          text={howHelps}
+        />
       )}
 
       {exec && (

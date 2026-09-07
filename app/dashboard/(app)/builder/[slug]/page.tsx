@@ -30,7 +30,8 @@ export default async function BuilderDetail({
   const { data: items } = await db
     .from("plan_items")
     .select("status")
-    .eq("member_id", m.id);
+    .eq("member_id", m.id)
+    .eq("builder", slug);
   const counts = new Map<string, number>();
   for (const i of items ?? [])
     counts.set(i.status as string, (counts.get(i.status as string) ?? 0) + 1);

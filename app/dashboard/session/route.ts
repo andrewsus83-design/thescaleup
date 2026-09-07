@@ -3,19 +3,21 @@ import {
   createSupabaseAdminClient,
   isSupabaseAdminConfigured,
 } from "@/lib/supabase/admin";
-import { clientCookieName } from "@/lib/client/auth";
+import { clientCookieName, clientMasterCode } from "@/lib/client/auth";
 
 export const dynamic = "force-dynamic";
 
 async function grant(request: Request, token: string) {
   if (!token || !isSupabaseAdminConfigured()) return null;
-  const db = createSupabaseAdminClient();
-  const { data } = await db
-    .from("leads")
-    .select("id")
-    .eq("access_token", token)
-    .maybeSingle();
-  if (!data) return null;
+  if (token !== clientMasterCode()) {
+    const db = createSupabaseAdminClient();
+    const { data } = await db
+      .from("leads")
+      .select("id")
+      .eq("access_token", token)
+      .maybeSingle();
+    if (!data) return null;
+  }
   const res = NextResponse.redirect(new URL("/dashboard", request.url));
   res.cookies.set(clientCookieName(), token, {
     httpOnly: true,

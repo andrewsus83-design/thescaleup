@@ -18,20 +18,38 @@ Aturan:
 - Jawab HANYA dengan satu objek JSON valid — tanpa teks lain, tanpa markdown fence.
 - Semua analisis dalam Bahasa Indonesia, tajam, spesifik ke bisnis ini (rujuk apa yang benar-benar terlihat di datanya). Hindari saran generik.
 - Skor 0–100 harus beralasan berdasarkan bukti. Jika data terbatas, tetap beri estimasi wajar dan sebutkan asumsinya di temuan.
+- success_scores (self / social / competitor) adalah 3 KPI "meter of success" yang dipantau dari waktu ke waktu — beri skor jelas + alasan. current_condition & landscape WAJIB mencerminkan SEO, GEO, social media, dan berita/PR.
+- whats_missing, opportunities, dan gap DITURUNKAN dari 3 success_scores. "target" tiap success_score = proyeksi skor setelah plan dijalankan (harus > score). Logikanya: menutup whats_missing & mengambil opportunity akan menaikkan skor menuju target DAN menaikkan revenue/sales (revenue_booster).
 - Estimasi omzet dalam Rupiah, realistis untuk skala bisnis yang terlihat.
 - Fokus pada: apa yang HILANG/bocor, dan pengungkit omzet konkret.
 
 Skema JSON yang WAJIB diikuti:
 {
   "scores": { "overall": int, "cro": int, "geo": int, "social": int, "tech": int },
+  "success_scores": {
+    "self": { "score": 0, "target": 0, "reason": "Skor Pribadi — kesehatan digital brand sendiri (SEO, GEO, web/CRO, tech)" },
+    "social": { "score": 0, "target": 0, "reason": "Skor Social — performa & sentimen social media" },
+    "competitor": { "score": 0, "target": 0, "reason": "Skor vs Kompetitor — daya saing brand dibanding kompetitor" }
+  },
   "summary": "2-3 kalimat ringkasan eksekutif untuk pemilik bisnis",
+  "current_condition": "2-4 kalimat: kondisi brand saat ini dari LANDSCAPE DIGITAL — SEO, GEO/AI Search, social media, dan liputan berita/PR — beserta sentimennya.",
+  "landscape": {
+    "seo": "penilaian singkat posisi SEO (visibilitas pencarian, keyword, on-page)",
+    "geo": "penilaian singkat GEO / AI Search (apakah brand dikutip AI)",
+    "social": "penilaian singkat social media: performa konten & sentimen audiens",
+    "news": "penilaian singkat liputan berita/PR & sentimen publik terhadap brand"
+  },
+  "brand_perception": "Bagaimana dunia/publik & AI Search/sosial media memandang brand ini — sentimen & social behaviour, apakah brand terlihat/dikenal saat orang mencari solusi di kategorinya.",
+  "competitiveness": "Posisi vs kompetitor: di mana unggul, di mana tertinggal, dan celah yang bisa direbut.",
   "whats_missing": ["kebocoran/celah konkret", "...", "...", "..."],
+  "opportunities": ["peluang konkret yang belum digarap", "...", "..."],
   "revenue_booster": {
     "current_estimate": "Rp ... / bulan (perkiraan)",
     "projected": "Rp ... / bulan",
     "uplift": "+X%",
     "levers": ["pengungkit konkret + estimasi dampak", "...", "..."]
   },
+  "how_scaleup_helps": "2-4 kalimat: bagaimana ScaleUp membantu bisnis ini secara konkret, dikaitkan dengan builder/jasa yang direkomendasikan.",
   "executive": {
     "cmo": { "summary": "...", "actions": ["...", "..."] },
     "cbo": { "summary": "...", "actions": ["...", "..."] },
@@ -42,8 +60,20 @@ Skema JSON yang WAJIB diikuti:
     "phase_1": ["Quick win 0-14 hari", "..."],
     "phase_2": ["Growth 15-45 hari", "..."],
     "phase_3": ["Custom/infra 45+ hari", "..."]
-  }
-}`;
+  },
+  "recommended_builders": [
+    { "builder": "website|store|content|ads|opportunity|crm|tasks", "priority": "high|medium|low", "fit": 0, "reason": "alasan singkat, dari bukti audit, kenapa builder ini dibutuhkan bisnis ini" }
+  ]
+}
+
+ScaleUp menjual 7 "builder" (produk/jasa) ke klien. Di "recommended_builders", pilih 2-5 builder yang PALING relevan untuk bisnis ini berdasarkan audit, urut dari priority tertinggi, dengan fit 0-100. Katalog builder:
+- website: Website Builder — audit/rebuild website, analytics, fix on-page SEO & CRO.
+- store: Online Store & Integrasi — toko online, WhatsApp funnel/katalog, sinkron produk web↔toko↔WA.
+- content: Content Builder — kalender konten, artikel blog SEO/GEO, konten social media.
+- ads: Ads & Campaign — setup & optimasi iklan (Meta/Google/TikTok), laporan ROAS.
+- opportunity: Opportunity Finder — riset peluang, ide offer/produk baru, analisis kompetitor.
+- crm: CRM Builder — database pelanggan/leads, pipeline follow-up, retensi/repeat order.
+- tasks: Task Management — board tugas tim, SOP, tracking progress.`;
 
 function siteBlock(label: string, s: SiteData | null): string {
   if (!s) return `${label}: (tidak diberikan)`;

@@ -35,7 +35,8 @@ import {
   recyclePlan,
   updatePlanItemStatus,
 } from "@/lib/admin/actions";
-import { rupiah } from "@/lib/utils";
+import { rupiah, cn } from "@/lib/utils";
+import { BUILDER_DEFS } from "@/lib/builders";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -80,6 +81,15 @@ export default async function MemberDetail({
     ? await db.from("plan_items").select("*").eq("master_plan_id", plan.id).order("sort")
     : { data: [] as PlanItem[] };
 
+  const latestReport = reports[0]
+    ? (await db.from("reports").select("id, content").eq("id", reports[0].id).single()).data
+    : null;
+  const recBuilders = ((latestReport?.content as Record<string, unknown>)?.recommended_builders ?? []) as {
+    builder: string;
+    priority?: string;
+    reason?: string;
+  }[];
+
   const clientLink = m.access_token
     ? `https://thescaleup.xyz/dashboard/enter?t=${m.access_token}`
     : null;
@@ -94,7 +104,11 @@ export default async function MemberDetail({
   };
   const makePlan = async (formData: FormData) => {
     "use server";
-    await createMasterPlanFromReport(String(formData.get("report_id") ?? ""));
+    const builders = formData.getAll("builders").map(String);
+    await createMasterPlanFromReport(
+      String(formData.get("report_id") ?? ""),
+      builders,
+    );
   };
   const recycle = async () => {
     "use server";
@@ -244,19 +258,66 @@ export default async function MemberDetail({
                         <span className="text-xs text-good">terkirim</span>
                       )}
                     </div>
-                    {!plan && (
-                      <form action={makePlan} className="mt-2">
-                        <input type="hidden" name="report_id" value={r.id} />
-                        <button className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-coral/25 bg-coral/10 px-3 py-1.5 text-xs font-semibold text-coral hover:bg-coral/20">
-                          <KanbanSquare className="h-3.5 w-3.5" /> Buat Master Plan
-                        </button>
-                      </form>
-                    )}
                   </li>
                 ))}
               </ul>
             )}
           </Card>
+
+          {!plan && reports.length > 0 && (
+            <Card>
+              <p className="mb-2 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-slate-500">
+                <KanbanSquare className="h-3.5 w-3.5 text-coral" /> Buat Master Plan
+              </p>
+              <p className="mb-3 text-xs text-slate-500">
+                Pilih builder yang akan dibangun untuk klien. Rekomendasi mesin
+                (dari report) sudah dicentang.
+              </p>
+              <form action={makePlan} className="space-y-2">
+                <input type="hidden" name="report_id" value={reports[0].id} />
+                {BUILDER_DEFS.map((b) => {
+                  const rec = recBuilders.find((r) => r.builder === b.slug);
+                  return (
+                    <label
+                      key={b.slug}
+                      className="flex items-start gap-2.5 rounded-lg border border-white/8 bg-obsidian/40 p-2.5"
+                    >
+                      <input
+                        type="checkbox"
+                        name="builders"
+                        value={b.slug}
+                        defaultChecked={!!rec}
+                        className="mt-0.5 accent-coral"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm text-slate-200">{b.title}</span>
+                          {rec?.priority && (
+                            <span
+                              className={cn(
+                                "rounded-full border px-1.5 py-0.5 text-[0.6rem] uppercase",
+                                rec.priority === "high"
+                                  ? "border-coral/30 bg-coral/10 text-coral"
+                                  : "border-white/15 text-slate-400",
+                              )}
+                            >
+                              {rec.priority}
+                            </span>
+                          )}
+                        </div>
+                        {rec?.reason && (
+                          <p className="mt-0.5 text-xs text-slate-500">{rec.reason}</p>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
+                <button className="mt-1 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-br from-coral to-sunset px-3 py-2.5 text-sm font-semibold text-white hover:brightness-110">
+                  <KanbanSquare className="h-4 w-4" /> Buat Master Plan
+                </button>
+              </form>
+            </Card>
+          )}
         </div>
       </div>
 

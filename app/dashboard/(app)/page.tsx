@@ -8,8 +8,8 @@ import {
 } from "lucide-react";
 import { requireClient } from "@/lib/client/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { ScoreRing } from "@/components/ui/score-ring";
 import { Card, PageHeader, EmptyState } from "@/components/admin/ui";
+import { SuccessMeter } from "@/components/report/success-meter";
 import { clientRequestUpdate } from "@/lib/client/actions";
 
 export const dynamic = "force-dynamic";
@@ -29,18 +29,11 @@ export default async function ClientHome() {
   ]);
 
   const content = (reportRes.data?.content ?? {}) as Record<string, unknown>;
-  const scores = (content.scores ?? {}) as Record<string, number | null>;
   const rb = (content.revenue_booster ?? null) as {
     current_estimate?: string;
     projected?: string;
     uplift?: string;
   } | null;
-  const pillars = [
-    { label: "CRO", v: scores.cro },
-    { label: "GEO", v: scores.geo },
-    { label: "Social", v: scores.social },
-    { label: "Tech", v: scores.tech },
-  ];
   const items = itemsRes.data ?? [];
   const total = items.length;
   const done = items.filter(
@@ -70,16 +63,12 @@ export default async function ClientHome() {
         />
       ) : (
         <>
-          {/* scores */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {pillars.map((p) => (
-              <Card key={p.label} className="flex flex-col items-center gap-2">
-                <ScoreRing value={Number(p.v ?? 0)} size={92} stroke={8} />
-                <span className="text-xs font-medium text-slate-400">
-                  {p.label}
-                </span>
-              </Card>
-            ))}
+          {/* 3 KPI meter of success */}
+          <SuccessMeter content={content} compact />
+          <div className="mt-2 text-right">
+            <Link href="/dashboard/score" className="text-sm text-coral hover:text-coral-soft">
+              Detail score →
+            </Link>
           </div>
 
           {/* revenue + progress */}

@@ -7,6 +7,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { runAudit } from "@/lib/engine/audit";
 import type { MemberStatus } from "@/lib/admin/config";
 import { PLAN_ITEM_STATUSES } from "@/lib/admin/plan-status";
+import { BUILDER_SLUGS, builderDef } from "@/lib/builders";
 
 const PLAN_STATUSES = PLAN_ITEM_STATUSES.map((s) => s.value) as string[];
 
@@ -26,7 +27,6 @@ export async function setMemberStatus(memberId: string, status: string) {
   if (!VALID_STATUS.includes(status as MemberStatus)) return;
   const db = createSupabaseAdminClient();
   const patch: Record<string, unknown> = { status };
-  if (status === "joined") patch.joined_at = new Date().toISOString();
   await db.from("leads").update(patch).eq("id", memberId);
   revalidatePath("/admin/members");
   revalidatePath(`/admin/members/${memberId}`);
@@ -170,7 +170,7 @@ export async function sendReport(reportId: string) {
   if (report?.member_id) {
     await db
       .from("leads")
-      .update({ status: "prospect", report_sent_at: now })
+      .update({ status: "prospect" })
       .eq("id", report.member_id);
   }
   revalidatePath("/admin/reports");
@@ -338,29 +338,54 @@ async function seedPlanItems(
   planId: string,
   memberId: string,
   content: Record<string, unknown>,
+  builders: string[],
 ) {
+  const recs = (content?.recommended_builders ?? []) as {
+    builder: string;
+    priority?: string;
+  }[];
+  const prioOf = (slug: string) =>
+    recs.find((r) => r.builder === slug)?.priority ?? "medium";
+
   const items: Record<string, unknown>[] = [];
+  let sort = 0;
+
+  // Builder deliverables (tagged per builder).
+  for (const slug of builders) {
+    const def = builderDef(slug);
+    if (!def) continue;
+    const prio = prioOf(slug);
+    for (const f of def.features) {
+      items.push({
+        title: f,
+        builder: slug,
+        category: "general",
+        priority: prio,
+        status: prio === "high" ? "pending" : "backlog",
+        sort: sort++,
+      });
+    }
+  }
+
+  // Strategic roadmap items (general, foundational).
   const roadmap = (content?.roadmap ?? {}) as Record<string, string[]>;
   for (const phase of ["phase_1", "phase_2", "phase_3"]) {
     for (const t of roadmap[phase] ?? [])
-      items.push({ phase, category: "general", title: t });
+      items.push({
+        title: t,
+        phase,
+        category: "general",
+        priority: "medium",
+        status: "backlog",
+        sort: sort++,
+      });
   }
-  const exec = (content?.executive ?? {}) as Record<
-    string,
-    { actions?: string[] }
-  >;
-  for (const role of ["cmo", "cbo", "cto", "creative"]) {
-    for (const t of exec[role]?.actions ?? [])
-      items.push({ category: role, title: t });
-  }
+
   if (items.length) {
     await db.from("plan_items").insert(
-      items.map((it, i) => ({
+      items.map((it) => ({
         master_plan_id: planId,
         member_id: memberId,
-        status: "backlog",
-        priority: "medium",
-        sort: i,
         ...it,
       })),
     );
@@ -368,9 +393,13 @@ async function seedPlanItems(
   return items.length;
 }
 
-/** Report → Master Plan: seed kanban items from the report's roadmap + actions. */
+/**
+ * Report → Master Plan, built from the selected builders (defaults to the
+ * engine's recommended_builders). Items are seeded per builder + roadmap.
+ */
 export async function createMasterPlanFromReport(
   reportId: string,
+  builders?: string[],
 ): Promise<{ ok: boolean; planId?: string; error?: string }> {
   await requireAdmin();
   const db = createSupabaseAdminClient();
@@ -384,6 +413,16 @@ export async function createMasterPlanFromReport(
   const content = (report.content ?? {}) as Record<string, unknown>;
   const ctx = (content.context ?? {}) as Record<string, unknown>;
   const business = (ctx.business as string) ?? "Bisnis";
+
+  const recSlugs = (
+    (content.recommended_builders ?? []) as { builder: string }[]
+  ).map((r) => r.builder);
+  const selected =
+    builders && builders.length
+      ? builders.filter((b) => BUILDER_SLUGS.includes(b))
+      : recSlugs.length
+        ? recSlugs
+        : BUILDER_SLUGS.slice(0, 3);
 
   const { count } = await db
     .from("master_plans")
@@ -407,7 +446,7 @@ export async function createMasterPlanFromReport(
       error: error?.message ?? "Gagal buat master plan (jalankan migrasi SQL).",
     };
 
-  await seedPlanItems(db, plan.id, report.member_id, content);
+  await seedPlanItems(db, plan.id, report.member_id, content, selected);
   revalidatePath(`/admin/members/${report.member_id}`);
   revalidatePath("/admin/reports");
   return { ok: true, planId: plan.id };
@@ -494,7 +533,6 @@ export async function setInvoiceStatus(invoiceId: string, status: string) {
       .from("leads")
       .update({
         status: "joined",
-        joined_at: now,
         paid_at: now,
         access_token: (m?.access_token as string) || genToken(),
       })
