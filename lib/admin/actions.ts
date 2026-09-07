@@ -605,7 +605,7 @@ export async function addReminder(formData: FormData) {
     audience: (formData.get("audience") as string) || "client",
   });
   revalidatePath(`/admin/members/${memberId}`);
-  revalidatePath("/dashboard/reminders");
+  revalidatePath("/dashboard/calendar");
 }
 
 export async function toggleReminder(id: string, done: boolean) {
@@ -618,7 +618,7 @@ export async function toggleReminder(id: string, done: boolean) {
     .select("member_id")
     .single();
   revalidatePath(`/admin/members/${data?.member_id}`);
-  revalidatePath("/dashboard/reminders");
+  revalidatePath("/dashboard/calendar");
 }
 
 /* --------------------------- update / recycle ----------------------------- */

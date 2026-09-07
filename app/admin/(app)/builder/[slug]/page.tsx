@@ -88,7 +88,6 @@ export default async function BuilderToolPage({
       <PageHeader title={config.title} description={`Untuk ${memberName}`} />
       <BuilderWizard
         memberId={memberId}
-        memberName={memberName}
         config={config}
         initialData={(project?.data ?? {}) as Record<string, unknown>}
       />

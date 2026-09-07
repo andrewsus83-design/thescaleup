@@ -30,12 +30,22 @@ export async function POST(req: Request) {
     );
   }
 
-  const record = {
-    ...body,
+  // Whitelist onboarding fields only — never trust the caller to set
+  // status/access_token/is_internal/id/approved_at/etc. (mass-assignment guard).
+  const ALLOWED = [
+    "name", "whatsapp", "email", "business", "website", "instagram",
+    "tiktok", "competitor1", "competitor2", "category", "goal", "budget",
+    "bottleneck", "notes",
+  ] as const;
+  const record: Record<string, unknown> = {
     source: "landing_onboarding",
     user_agent: req.headers.get("user-agent") ?? null,
     created_at: new Date().toISOString(),
   };
+  for (const k of ALLOWED) {
+    const v = body[k];
+    if (v != null && v !== "") record[k] = String(v);
+  }
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey =

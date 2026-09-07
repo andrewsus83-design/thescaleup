@@ -27,12 +27,10 @@ function keyOf(f: BuilderField, i: number, step: number) {
 
 function FieldView({
   field,
-  fkey,
   value,
   set,
 }: {
   field: BuilderField;
-  fkey: string;
   value: unknown;
   set: (v: unknown) => void;
 }) {
@@ -360,13 +358,11 @@ function FieldView({
 
 export function BuilderWizard({
   memberId,
-  memberName,
   config,
   initialData,
   onSave,
 }: {
   memberId: string;
-  memberName: string;
   config: BuilderConfig;
   initialData: Data;
   onSave?: (
@@ -447,7 +443,6 @@ export function BuilderWizard({
               <FieldView
                 key={k}
                 field={f}
-                fkey={k}
                 value={data[k]}
                 set={(v) => set(k, v)}
               />

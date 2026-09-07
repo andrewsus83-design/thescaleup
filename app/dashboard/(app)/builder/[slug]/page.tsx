@@ -77,7 +77,6 @@ export default async function ClientBuilderPage({
       <PageHeader title={config.title} description={`Untuk ${m.business}`} />
       <BuilderWizard
         memberId={m.id}
-        memberName={m.business}
         config={config}
         initialData={(project?.data ?? {}) as Record<string, unknown>}
         onSave={clientSaveBuilderProject}

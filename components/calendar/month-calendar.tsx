@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -55,10 +55,30 @@ export function MonthCalendar({
     return map;
   }, [events]);
 
-  const today = new Date();
-  const todayKey = keyOf(today.getFullYear(), today.getMonth(), today.getDate());
-  const [view, setView] = useState({ y: today.getFullYear(), m: today.getMonth() });
-  const [selected, setSelected] = useState<string>(todayKey);
+  // Compute "today" after mount only — avoids SSR(UTC) vs client(WIB) hydration
+  // mismatch on the highlighted cell / selected-day header.
+  const [todayKey, setTodayKey] = useState<string | null>(null);
+  const [view, setView] = useState<{ y: number; m: number } | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  useEffect(() => {
+    const t = new Date();
+    setTodayKey(keyOf(t.getFullYear(), t.getMonth(), t.getDate()));
+    setView({ y: t.getFullYear(), m: t.getMonth() });
+    setSelected(keyOf(t.getFullYear(), t.getMonth(), t.getDate()));
+  }, []);
+
+  const prev = () =>
+    setView((v) => (v ? (v.m === 0 ? { y: v.y - 1, m: 11 } : { y: v.y, m: v.m - 1 }) : v));
+  const next = () =>
+    setView((v) => (v ? (v.m === 11 ? { y: v.y + 1, m: 0 } : { y: v.y, m: v.m + 1 }) : v));
+
+  if (!view || !selected) {
+    return (
+      <div className="rounded-2xl border border-white/8 bg-card/40 p-10 text-center text-sm text-slate-500">
+        Memuat kalender…
+      </div>
+    );
+  }
 
   const startDow = new Date(view.y, view.m, 1).getDay();
   const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
@@ -66,11 +86,6 @@ export function MonthCalendar({
   for (let i = 0; i < startDow; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   while (cells.length % 7 !== 0) cells.push(null);
-
-  const prev = () =>
-    setView((v) => (v.m === 0 ? { y: v.y - 1, m: 11 } : { y: v.y, m: v.m - 1 }));
-  const next = () =>
-    setView((v) => (v.m === 11 ? { y: v.y + 1, m: 0 } : { y: v.y, m: v.m + 1 }));
 
   const selEvents = byDate.get(selected) ?? [];
   const groups =

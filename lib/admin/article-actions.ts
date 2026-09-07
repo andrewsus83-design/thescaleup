@@ -15,7 +15,6 @@ type Db = ReturnType<typeof createSupabaseAdminClient>;
 function revalidateAll() {
   revalidatePath("/admin/scalehub");
   revalidatePath("/scalehub");
-  revalidatePath("/dashboard/scalehub");
   revalidatePath("/sitemap.xml");
 }
 

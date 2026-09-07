@@ -20,15 +20,22 @@ export type ClientMember = {
 };
 
 /** ScaleUp dogfoods its own platform as client #1: this member gets full
- *  builder access in the client dashboard. Matched by business name or owner email. */
-function computeInternal(business?: string | null, email?: string | null): boolean {
-  const b = (business ?? "").trim().toLowerCase();
-  if (b === "scaleup" || b === "thescaleup") return true;
-  const owners = (process.env.ADMIN_EMAILS ?? "andrewsus83@gmail.com")
+ *  builder access in the client dashboard. Gated on an explicit, server-side
+ *  member-id allowlist — NEVER on user-supplied fields (business/email), which
+ *  a public lead insert could spoof. Configure via INTERNAL_MEMBER_IDS (CSV);
+ *  defaults to the seeded ScaleUp member id. */
+function internalMemberIds(): string[] {
+  return (
+    process.env.INTERNAL_MEMBER_IDS ??
+    "6d00483c-e993-4b8b-8204-af6e3464ae24"
+  )
     .split(",")
-    .map((e) => e.trim().toLowerCase())
+    .map((s) => s.trim())
     .filter(Boolean);
-  return !!email && owners.includes(email.toLowerCase());
+}
+
+function computeInternal(id: string): boolean {
+  return internalMemberIds().includes(id);
 }
 
 export function clientCookieName() {
@@ -67,7 +74,7 @@ export async function getClientMember(): Promise<ClientMember | null> {
       email: data.email as string | null,
       status: data.status as string,
       access_token: (data.access_token as string) ?? clientMasterCode(),
-      isInternal: computeInternal(data.business as string, data.email as string),
+      isInternal: computeInternal(data.id as string),
     };
   } catch {
     return null;

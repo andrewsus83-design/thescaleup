@@ -30,7 +30,7 @@ export async function clientToggleReminder(id: string, done: boolean) {
     .update({ done })
     .eq("id", id)
     .eq("member_id", m.id);
-  revalidatePath("/dashboard/reminders");
+  revalidatePath("/dashboard/calendar");
   revalidatePath("/dashboard");
 }
 
@@ -46,7 +46,7 @@ export async function clientAddTodo(formData: FormData) {
     due_date: (formData.get("due_date") as string) || null,
     audience: "client",
   });
-  revalidatePath("/dashboard/reminders");
+  revalidatePath("/dashboard/calendar");
 }
 
 /** Internal (ScaleUp) client saves a builder project from their own dashboard. */
