@@ -361,7 +361,7 @@ async function seedPlanItems(
         builder: slug,
         category: "general",
         priority: prio,
-        status: prio === "high" ? "pending" : "backlog",
+        status: "propose",
         sort: sort++,
       });
     }
@@ -376,7 +376,7 @@ async function seedPlanItems(
         phase,
         category: "general",
         priority: "medium",
-        status: "backlog",
+        status: "propose",
         sort: sort++,
       });
   }

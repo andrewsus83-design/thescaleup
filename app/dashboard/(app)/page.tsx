@@ -36,9 +36,7 @@ export default async function ClientHome() {
   } | null;
   const items = itemsRes.data ?? [];
   const total = items.length;
-  const done = items.filter(
-    (i) => i.status === "done" || i.status === "implemented",
-  ).length;
+  const done = items.filter((i) => i.status === "done").length;
   const pct = total ? Math.round((done / total) * 100) : 0;
 
   return (

@@ -1,30 +1,26 @@
 export type PlanItemStatus =
-  | "approval"
-  | "pending"
-  | "backlog"
-  | "on_progress"
-  | "in_review"
-  | "implemented"
-  | "done";
+  | "propose"
+  | "approved"
+  | "on_going"
+  | "done"
+  | "rejected";
 
 export const PLAN_ITEM_STATUSES: {
   value: PlanItemStatus;
   label: string;
   badge: string;
 }[] = [
-  { value: "approval", label: "Approval", badge: "border-violet-500/30 bg-violet-500/10 text-violet-400" },
-  { value: "pending", label: "Pending", badge: "border-warn/30 bg-warn/10 text-warn" },
-  { value: "backlog", label: "Backlog", badge: "border-white/15 bg-white/5 text-slate-400" },
-  { value: "on_progress", label: "On Progress", badge: "border-sky-500/30 bg-sky-500/10 text-sky-400" },
-  { value: "in_review", label: "In Review", badge: "border-coral/30 bg-coral/10 text-coral" },
-  { value: "implemented", label: "Implemented", badge: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" },
-  { value: "done", label: "Done", badge: "border-good/30 bg-good/10 text-good" },
+  { value: "propose", label: "Propose", badge: "border-warn/30 bg-warn/10 text-warn" },
+  { value: "approved", label: "Approved", badge: "border-coral/30 bg-coral/10 text-coral" },
+  { value: "on_going", label: "On Going", badge: "border-sky-500/30 bg-sky-500/10 text-sky-400" },
+  { value: "done", label: "DONE", badge: "border-good/30 bg-good/10 text-good" },
+  { value: "rejected", label: "Rejected", badge: "border-bad/30 bg-bad/10 text-bad" },
 ];
 
 export function planStatusMeta(v?: string | null) {
   return (
     PLAN_ITEM_STATUSES.find((s) => s.value === v) ?? {
-      value: (v as PlanItemStatus) ?? "backlog",
+      value: (v as PlanItemStatus) ?? "propose",
       label: v ?? "—",
       badge: "border-white/15 bg-white/5 text-slate-400",
     }

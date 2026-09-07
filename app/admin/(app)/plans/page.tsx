@@ -57,7 +57,7 @@ export default async function AdminPlansPage() {
           {plans.map((p) => {
             const counts = byPlan.get(p.id) ?? new Map();
             const total = [...counts.values()].reduce((a, b) => a + b, 0);
-            const done = (counts.get("done") ?? 0) + (counts.get("implemented") ?? 0);
+            const done = counts.get("done") ?? 0;
             const pct = total ? Math.round((done / total) * 100) : 0;
             const member = p.member as { business?: string; name?: string } | null;
             return (

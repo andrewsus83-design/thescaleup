@@ -24,6 +24,7 @@ export default async function ClientCalendarPage() {
       .from("plan_items")
       .select("id, title, due_date, status")
       .eq("member_id", m.id)
+      .eq("status", "approved")
       .not("due_date", "is", null),
     db
       .from("reminders")
