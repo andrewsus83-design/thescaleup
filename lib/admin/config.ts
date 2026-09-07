@@ -7,6 +7,7 @@ import {
   Settings,
   ShieldCheck,
   KanbanSquare,
+  Blocks,
   type LucideIcon,
 } from "lucide-react";
 
@@ -96,12 +97,13 @@ export function statusMeta(status?: string | null) {
 export const adminNav: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/members", label: "Member", icon: Users },
-  { href: "/admin/plans", label: "Master Plan", icon: KanbanSquare },
   { href: "/admin/reports", label: "Report", icon: FileText },
+  { href: "/admin/plans", label: "Master Plan", icon: KanbanSquare },
   { href: "/admin/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/admin/builder", label: "Builder", icon: Blocks },
   { href: "/admin/assets", label: "Assets", icon: Images },
   { href: "/admin/settings", label: "Setting", icon: Settings },
-  { href: "/admin/users", label: "User", icon: ShieldCheck },
+  { href: "/admin/users", label: "User Management", icon: ShieldCheck },
 ];
 
 /** API providers configurable in Settings. */
