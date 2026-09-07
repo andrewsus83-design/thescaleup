@@ -117,6 +117,24 @@ export function WebsiteBuilder({
       else setSavedAt(new Date().toLocaleTimeString("id-ID"));
     });
 
+  // Preview follows the current canvas: save (without changing publish status),
+  // then open the admin preview which shows the latest saved version (incl. draft).
+  const previewSite = () => {
+    const w = window.open("", "_blank");
+    start(async () => {
+      const r = await onSave(memberId, "website", { ...doc, website_url: `/site/${memberId}` });
+      if (!r.ok && r.error) {
+        if (w) w.close();
+        window.alert(r.error);
+        return;
+      }
+      setSavedAt(new Date().toLocaleTimeString("id-ID"));
+      const url = `/site/${memberId}?preview=1`;
+      if (w) w.location.href = url;
+      else window.open(url, "_blank");
+    });
+  };
+
   return (
     <div>
       {/* toolbar */}
@@ -163,9 +181,14 @@ export function WebsiteBuilder({
         </div>
         <div className="ml-auto flex items-center gap-2">
           {savedAt && <span className="text-xs text-good">Tersimpan {savedAt}</span>}
-          <a href={`/site/${memberId}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-white/10">
+          <button
+            onClick={previewSite}
+            disabled={pending}
+            title="Simpan lalu buka pratinjau versi terkini"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-white/10 disabled:opacity-50"
+          >
             <ExternalLink className="h-3.5 w-3.5" /> Preview
-          </a>
+          </button>
           <button onClick={() => save("draft")} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-white/10 disabled:opacity-50">
             {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Draft
           </button>

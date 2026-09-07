@@ -17,19 +17,22 @@ export function SiteChrome({
   memberId,
   activeSlug,
   extraLd = [],
+  preview = false,
   children,
 }: {
   doc: WebsiteDoc;
   memberId: string;
   activeSlug: string;
   extraLd?: object[];
+  preview?: boolean;
   children: React.ReactNode;
 }) {
   const primary = doc.theme.primary || "#FF5733";
   const brand = doc.theme.brand || "Brand";
   const wa = waLink(doc.theme.whatsapp);
   const logo = safeImg(doc.theme.logo);
-  const href = (slug: string) => (slug ? `/site/${memberId}/${slug}` : `/site/${memberId}`);
+  const q = preview ? "?preview=1" : "";
+  const href = (slug: string) => (slug ? `/site/${memberId}/${slug}${q}` : `/site/${memberId}${q}`);
 
   return (
     <div className="min-h-screen bg-white text-slate-900">

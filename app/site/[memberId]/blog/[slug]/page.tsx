@@ -4,17 +4,21 @@ import { loadSite } from "@/lib/builders/website/load";
 import { postSlug } from "@/lib/builders/website/schema";
 import { parseContentToBlocks } from "@/lib/scalehub/content";
 import { articleGraph, breadcrumbGraph, siteBase } from "@/lib/builders/website/seo";
+import { getAdminUser } from "@/lib/admin/auth";
 import { site } from "@/lib/site";
 import { SiteChrome } from "@/components/builders/website/site-chrome";
 
 export const dynamic = "force-dynamic";
 
-type Params = { params: Promise<{ memberId: string; slug: string }> };
+type Params = {
+  params: Promise<{ memberId: string; slug: string }>;
+  searchParams: Promise<{ preview?: string }>;
+};
 
 type PostItem = { title: string; date?: string; excerpt?: string; body?: string; cover?: string };
 
-async function findPost(memberId: string, slug: string) {
-  const site = await loadSite(memberId);
+async function findPost(memberId: string, slug: string, allowDraft = false) {
+  const site = await loadSite(memberId, { allowDraft });
   if (!site || !site.doc) return null;
   // Resolve a post from a "posts" block on ANY page (not only a page named "blog").
   const items = site.doc.pages.flatMap((p) =>
@@ -59,9 +63,11 @@ const safe = (u?: string) => {
   return v.startsWith("/") || /^https?:\/\//i.test(v) ? v : "";
 };
 
-export default async function PostPage({ params }: Params) {
+export default async function PostPage({ params, searchParams }: Params) {
   const { memberId, slug } = await params;
-  const r = await findPost(memberId, slug);
+  const preview = (await searchParams).preview === "1";
+  const allowDraft = preview && !!(await getAdminUser());
+  const r = await findPost(memberId, slug, allowDraft);
   if (!r) notFound();
   const { site, post } = r;
   const blocks = parseContentToBlocks(post.body ?? "");
@@ -76,9 +82,9 @@ export default async function PostPage({ params }: Params) {
   ];
 
   return (
-    <SiteChrome doc={site.doc!} memberId={memberId} activeSlug="blog" extraLd={extraLd}>
+    <SiteChrome doc={site.doc!} memberId={memberId} activeSlug="blog" extraLd={extraLd} preview={preview}>
       <article className="mx-auto max-w-3xl px-6 py-14">
-        <a href={`/site/${memberId}/blog`} className="text-sm text-slate-500 hover:text-slate-800">
+        <a href={`/site/${memberId}/blog${preview ? "?preview=1" : ""}`} className="text-sm text-slate-500 hover:text-slate-800">
           ← Semua artikel
         </a>
         {post.date && <p className="mt-6 text-sm text-slate-400">{post.date}</p>}

@@ -12,7 +12,7 @@ import { getBuilderConfig } from "@/lib/builders/configs";
 import { BuilderWizard } from "@/components/builders/builder-wizard";
 import { WebsiteBuilder } from "@/components/builders/website/website-builder";
 import { coerceDoc } from "@/lib/builders/website/schema";
-import { saveBuilderProject } from "@/lib/admin/builder-actions";
+import { saveWebsite } from "@/lib/admin/builder-actions";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -101,7 +101,7 @@ export default async function BuilderToolPage({
         <WebsiteBuilder
           memberId={memberId}
           initialDoc={coerceDoc(project?.data, memberName)}
-          onSave={saveBuilderProject}
+          onSave={saveWebsite}
         />
       ) : (
         <BuilderWizard

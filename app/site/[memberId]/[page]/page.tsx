@@ -3,12 +3,16 @@ import { notFound } from "next/navigation";
 import { loadSite } from "@/lib/builders/website/load";
 import { getPage } from "@/lib/builders/website/schema";
 import { heroImage, siteBase, faqGraph, breadcrumbGraph } from "@/lib/builders/website/seo";
+import { getAdminUser } from "@/lib/admin/auth";
 import { SiteChrome } from "@/components/builders/website/site-chrome";
 import { BlockView } from "@/components/builders/website/block-view";
 
 export const dynamic = "force-dynamic";
 
-type Params = { params: Promise<{ memberId: string; page: string }> };
+type Params = {
+  params: Promise<{ memberId: string; page: string }>;
+  searchParams: Promise<{ preview?: string }>;
+};
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { memberId, page } = await params;
@@ -39,9 +43,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
-export default async function SiteInnerPage({ params }: Params) {
+export default async function SiteInnerPage({ params, searchParams }: Params) {
   const { memberId, page } = await params;
-  const s = await loadSite(memberId);
+  const preview = (await searchParams).preview === "1";
+  const allowDraft = preview && !!(await getAdminUser());
+  const s = await loadSite(memberId, { allowDraft });
   if (!s || !s.doc) notFound();
   const pg = getPage(s.doc, page);
   if (!pg) notFound();
@@ -55,9 +61,9 @@ export default async function SiteInnerPage({ params }: Params) {
   ];
 
   return (
-    <SiteChrome doc={s.doc} memberId={memberId} activeSlug={page} extraLd={extraLd}>
+    <SiteChrome doc={s.doc} memberId={memberId} activeSlug={page} extraLd={extraLd} preview={preview}>
       {pg.blocks.map((b) => (
-        <BlockView key={b.id} block={b} theme={s.doc!.theme} ctx={{ memberId }} />
+        <BlockView key={b.id} block={b} theme={s.doc!.theme} ctx={{ memberId, preview }} />
       ))}
     </SiteChrome>
   );

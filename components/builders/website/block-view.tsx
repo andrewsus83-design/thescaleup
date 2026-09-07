@@ -35,10 +35,11 @@ export function BlockView({
 }: {
   block: WebBlock;
   theme: WebsiteTheme;
-  ctx?: { memberId?: string };
+  ctx?: { memberId?: string; preview?: boolean };
 }) {
   const p = block.props;
   const primary = theme.primary || "#FF5733";
+  const pvq = ctx?.preview ? "?preview=1" : "";
   const blogBase = ctx?.memberId ? `/site/${ctx.memberId}/blog` : "#";
 
   switch (block.type) {
@@ -97,7 +98,7 @@ export function BlockView({
               {list(p, "items").map((it, i) => (
                 <a
                   key={i}
-                  href={`${blogBase}/${postSlug(it.title ?? "")}`}
+                  href={`${blogBase}/${postSlug(it.title ?? "")}${pvq}`}
                   className="group flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:shadow-md"
                 >
                   <div className="aspect-video bg-slate-100">
