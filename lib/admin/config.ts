@@ -6,6 +6,7 @@ import {
   Images,
   Settings,
   ShieldCheck,
+  KanbanSquare,
   type LucideIcon,
 } from "lucide-react";
 
@@ -95,6 +96,7 @@ export function statusMeta(status?: string | null) {
 export const adminNav: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/members", label: "Member", icon: Users },
+  { href: "/admin/plans", label: "Master Plan", icon: KanbanSquare },
   { href: "/admin/reports", label: "Report", icon: FileText },
   { href: "/admin/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/admin/assets", label: "Assets", icon: Images },

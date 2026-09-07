@@ -12,7 +12,6 @@ import {
   CalendarDays,
   ListTodo,
   FileText,
-  Blocks,
   Gauge,
 } from "lucide-react";
 import { Logo } from "@/components/landing/logo";
@@ -22,7 +21,6 @@ const clientNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/score", label: "Score", icon: Gauge },
   { href: "/dashboard/plan", label: "Master Plan", icon: KanbanSquare },
-  { href: "/dashboard/builder", label: "Builder", icon: Blocks },
   { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/dashboard/reminders", label: "Reminders", icon: ListTodo },
   { href: "/dashboard/report", label: "Report", icon: FileText },
