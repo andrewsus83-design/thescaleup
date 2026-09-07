@@ -56,7 +56,7 @@ export function ClientShell({
       const b = getBuilder(slug);
       if (!b) return null;
       return {
-        href: `/dashboard/builder/${slug}`,
+        href: `/dashboard/app/${slug}`,
         label: BUILDER_LABEL[slug] ?? b.title,
         icon: b.icon,
       };

@@ -49,38 +49,6 @@ export async function clientAddTodo(formData: FormData) {
   revalidatePath("/dashboard/calendar");
 }
 
-/** Internal (ScaleUp) client saves a builder project from their own dashboard. */
-export async function clientSaveBuilderProject(
-  memberId: string,
-  builder: string,
-  data: Record<string, unknown>,
-  status?: string,
-): Promise<{ ok: boolean; error?: string }> {
-  const m = await getClientMember();
-  if (!m || !m.isInternal || m.id !== memberId) {
-    return { ok: false, error: "Tidak diizinkan." };
-  }
-  const db = createSupabaseAdminClient();
-  const row: Record<string, unknown> = {
-    member_id: memberId,
-    builder,
-    data,
-    updated_at: new Date().toISOString(),
-  };
-  if (status) row.status = status;
-  const { error } = await db
-    .from("builder_projects")
-    .upsert(row, { onConflict: "member_id,builder" });
-  if (error) {
-    return {
-      ok: false,
-      error: `${error.message} — pastikan migrasi builder_projects sudah dijalankan.`,
-    };
-  }
-  revalidatePath(`/dashboard/builder/${builder}`);
-  return { ok: true };
-}
-
 /** Client asks the team to refresh/recycle their plan — surfaces to admin. */
 export async function clientRequestUpdate() {
   const m = await getClientMember();
