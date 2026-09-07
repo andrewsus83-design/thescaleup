@@ -22,7 +22,7 @@ import { Card, StatusBadge, EmptyState } from "@/components/admin/ui";
 import { MemberRowActions } from "@/components/admin/member-actions";
 import { ReportStatusSelect } from "@/components/admin/report-status-select";
 import { PlanBoard, type PlanItem } from "@/components/plan/plan-board";
-import { invoiceBadge } from "@/lib/admin/plan-status";
+import { invoiceBadge, DEFAULT_INVOICE_TERMS } from "@/lib/admin/plan-status";
 import {
   setMemberStatus,
   saveMemberNote,
@@ -92,6 +92,11 @@ export default async function MemberDetail({
   const clientLink = m.access_token
     ? `https://thescaleup.xyz/dashboard/enter?t=${m.access_token}`
     : null;
+
+  // Scope of Work preview for the invoice (auto from the master plan's items).
+  const scopePreview = ((planItems ?? []) as { title: string; status: string }[])
+    .filter((it) => it.status !== "rejected")
+    .map((it) => it.title);
 
   const saveNote = async (formData: FormData) => {
     "use server";
@@ -333,23 +338,71 @@ export default async function MemberDetail({
           <h2 className="font-display text-lg font-bold text-mist">Invoice</h2>
         </div>
         <Card className="mb-4">
-          <form action={createInvoice} className="grid gap-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
+          <form action={createInvoice} className="space-y-3">
             <input type="hidden" name="member_id" value={id} />
             {plan && <input type="hidden" name="master_plan_id" value={plan.id} />}
-            <label>
-              <span className="mb-1.5 block text-xs text-slate-400">Deskripsi</span>
-              <input name="description" defaultValue="Paket Scale-Up" className="w-full rounded-xl border border-white/10 bg-obsidian/50 px-3.5 py-2.5 text-sm text-mist focus:border-coral/50 focus:outline-none" />
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+              <label>
+                <span className="mb-1.5 block text-xs text-slate-400">Deskripsi</span>
+                <input name="description" defaultValue="Paket Scale-Up" className="w-full rounded-xl border border-white/10 bg-obsidian/50 px-3.5 py-2.5 text-sm text-mist focus:border-coral/50 focus:outline-none" />
+              </label>
+              <label>
+                <span className="mb-1.5 block text-xs text-slate-400">Jumlah (Rp)</span>
+                <input name="amount" type="number" min="0" placeholder="1499000" className="w-full rounded-xl border border-white/10 bg-obsidian/50 px-3.5 py-2.5 text-sm text-mist focus:border-coral/50 focus:outline-none sm:w-36" />
+              </label>
+              <label>
+                <span className="mb-1.5 block text-xs text-slate-400">Jatuh tempo</span>
+                <input name="due_date" type="date" className="rounded-xl border border-white/10 bg-obsidian/50 px-3.5 py-2.5 text-sm text-mist focus:border-coral/50 focus:outline-none" />
+              </label>
+            </div>
+
+            {/* Scope of Work — apa yang ScaleUp kerjakan */}
+            <div>
+              <span className="mb-1.5 block text-xs text-slate-400">
+                Scope of Work — tugas yang akan ScaleUp kerjakan
+              </span>
+              {scopePreview.length > 0 && (
+                <div className="mb-2 rounded-xl border border-white/8 bg-obsidian/40 p-3 text-xs text-slate-400">
+                  Otomatis dari Master Plan ({scopePreview.length} tugas). Biarkan kolom di bawah
+                  kosong untuk memakai daftar ini, atau tulis manual (satu tugas per baris).
+                  <ul className="mt-2 space-y-1">
+                    {scopePreview.slice(0, 6).map((t, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-coral" />
+                        {t}
+                      </li>
+                    ))}
+                    {scopePreview.length > 6 && (
+                      <li className="text-slate-600">+{scopePreview.length - 6} tugas lainnya…</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+              <textarea
+                name="scope"
+                rows={3}
+                placeholder={
+                  scopePreview.length
+                    ? "Kosongkan untuk memakai daftar dari Master Plan di atas"
+                    : "Satu tugas per baris:\nDesain ulang landing page\nSetup WhatsApp funnel & auto-reply\nKalender konten 30 hari"
+                }
+                className="w-full resize-y rounded-xl border border-white/10 bg-obsidian/50 px-3.5 py-2.5 text-sm text-mist placeholder:text-slate-600 focus:border-coral/50 focus:outline-none"
+              />
+            </div>
+
+            {/* Terms & Conditions */}
+            <label className="block">
+              <span className="mb-1.5 block text-xs text-slate-400">Terms &amp; Conditions</span>
+              <textarea
+                name="terms"
+                rows={7}
+                defaultValue={DEFAULT_INVOICE_TERMS}
+                className="w-full resize-y rounded-xl border border-white/10 bg-obsidian/50 px-3.5 py-2.5 text-xs leading-relaxed text-slate-300 focus:border-coral/50 focus:outline-none"
+              />
             </label>
-            <label>
-              <span className="mb-1.5 block text-xs text-slate-400">Jumlah (Rp)</span>
-              <input name="amount" type="number" min="0" placeholder="1499000" className="w-36 rounded-xl border border-white/10 bg-obsidian/50 px-3.5 py-2.5 text-sm text-mist focus:border-coral/50 focus:outline-none" />
-            </label>
-            <label>
-              <span className="mb-1.5 block text-xs text-slate-400">Jatuh tempo</span>
-              <input name="due_date" type="date" className="rounded-xl border border-white/10 bg-obsidian/50 px-3.5 py-2.5 text-sm text-mist focus:border-coral/50 focus:outline-none" />
-            </label>
+
             <button className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-coral to-sunset px-5 text-sm font-semibold text-white hover:brightness-110">
-              <Plus className="h-4 w-4" /> Buat
+              <Plus className="h-4 w-4" /> Buat Invoice
             </button>
           </form>
         </Card>
@@ -358,34 +411,71 @@ export default async function MemberDetail({
           <p className="text-sm text-slate-500">Belum ada invoice.</p>
         ) : (
           <div className="space-y-2">
-            {invoices.map((inv) => (
-              <Card key={inv.id} className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="font-mono text-sm text-slate-200">{inv.number}</p>
-                  <p className="text-xs text-slate-500">
-                    {rupiah(Number(inv.amount))}
-                    {inv.due_date ? ` · jatuh tempo ${inv.due_date}` : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`rounded-full border px-2.5 py-1 text-xs ${invoiceBadge(inv.status)}`}>
-                    {inv.status}
-                  </span>
-                  {inv.status !== "sent" && inv.status !== "paid" && (
-                    <form action={setInvoiceStatus.bind(null, inv.id, "sent")}>
-                      <button className="rounded-lg bg-white/5 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10">Kirim</button>
-                    </form>
+            {invoices.map((inv) => {
+              const scope = (inv.scope ?? []) as string[];
+              return (
+                <Card key={inv.id} className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-mono text-sm text-slate-200">{inv.number}</p>
+                      <p className="text-xs text-slate-500">
+                        {rupiah(Number(inv.amount))}
+                        {inv.due_date ? ` · jatuh tempo ${inv.due_date}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-full border px-2.5 py-1 text-xs ${invoiceBadge(inv.status)}`}>
+                        {inv.status}
+                      </span>
+                      {inv.status !== "sent" && inv.status !== "paid" && (
+                        <form action={setInvoiceStatus.bind(null, inv.id, "sent")}>
+                          <button className="rounded-lg bg-white/5 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10">Kirim</button>
+                        </form>
+                      )}
+                      {inv.status !== "paid" && (
+                        <form action={setInvoiceStatus.bind(null, inv.id, "paid")}>
+                          <button className="rounded-lg border border-good/25 bg-good/10 px-3 py-1.5 text-xs font-semibold text-good hover:bg-good/20">
+                            Tandai Lunas
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  </div>
+                  {(scope.length > 0 || inv.terms) && (
+                    <details className="rounded-xl border border-white/8 bg-obsidian/40 p-3 text-xs">
+                      <summary className="cursor-pointer select-none text-slate-400 hover:text-slate-200">
+                        Scope of Work &amp; Terms
+                      </summary>
+                      {scope.length > 0 && (
+                        <div className="mt-3">
+                          <p className="font-mono text-[0.62rem] uppercase tracking-wider text-slate-500">
+                            Scope of Work
+                          </p>
+                          <ul className="mt-1.5 space-y-1 text-slate-300">
+                            {scope.map((t, i) => (
+                              <li key={i} className="flex gap-2">
+                                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-coral" />
+                                {t}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {inv.terms && (
+                        <div className="mt-3">
+                          <p className="font-mono text-[0.62rem] uppercase tracking-wider text-slate-500">
+                            Terms &amp; Conditions
+                          </p>
+                          <pre className="mt-1.5 whitespace-pre-wrap font-sans leading-relaxed text-slate-400">
+                            {inv.terms}
+                          </pre>
+                        </div>
+                      )}
+                    </details>
                   )}
-                  {inv.status !== "paid" && (
-                    <form action={setInvoiceStatus.bind(null, inv.id, "paid")}>
-                      <button className="rounded-lg border border-good/25 bg-good/10 px-3 py-1.5 text-xs font-semibold text-good hover:bg-good/20">
-                        Tandai Lunas
-                      </button>
-                    </form>
-                  )}
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

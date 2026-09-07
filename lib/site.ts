@@ -34,7 +34,7 @@ export const nav = [
   { label: "Cara Kerja", href: "/cara-kerja" },
   { label: "Executive Board", href: "/executive-board" },
   { label: "Harga", href: "/#harga" },
-  { label: "Blog", href: "/blog" },
+  { label: "ScaleHub", href: "/scalehub" },
   { label: "FAQ", href: "/faq" },
 ] as const;
 

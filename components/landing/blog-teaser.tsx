@@ -12,15 +12,15 @@ export function BlogTeaser() {
         <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-end">
           <SectionHeading
             align="left"
-            eyebrow="Blog"
+            eyebrow="ScaleHub"
             title="Wawasan untuk bisnis yang mau naik kelas"
-            subtitle="Strategi GEO, CRO, dan otomatisasi — dibongkar dengan bahasa yang membumi."
+            subtitle="Strategi GEO, CRO, dan otomatisasi — plus cerita pertumbuhan brand klien kami."
           />
           <Link
-            href="/blog"
+            href="/scalehub"
             className="inline-flex shrink-0 items-center gap-2 font-display text-sm font-semibold text-coral transition-colors hover:text-coral-soft"
           >
-            Lihat semua artikel
+            Buka ScaleHub
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
@@ -29,7 +29,7 @@ export function BlogTeaser() {
           {latest.map((p) => (
             <Link
               key={p.slug}
-              href={`/blog/${p.slug}`}
+              href={`/scalehub/${p.slug}`}
               className="group flex flex-col rounded-3xl border border-white/8 bg-card/40 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-coral/30"
             >
               <div className="flex items-center justify-between">

@@ -9,6 +9,7 @@ import { ads } from "./ads";
 import { opportunity } from "./opportunity";
 import { crm } from "./crm";
 import { tasks } from "./tasks";
+import { support } from "./support";
 
 export const BUILDER_CONFIGS: Record<string, BuilderConfig> = {
   website,
@@ -18,6 +19,7 @@ export const BUILDER_CONFIGS: Record<string, BuilderConfig> = {
   opportunity,
   crm,
   tasks,
+  support,
 };
 
 export function getBuilderConfig(slug: string): BuilderConfig | undefined {

@@ -1,8 +1,8 @@
 import type { MetadataRoute } from "next";
 import { site } from "@/lib/site";
-import { posts } from "@/lib/blog";
+import { getAllArticles } from "@/lib/scalehub/data";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = site.url.replace(/\/$/, "");
   const now = new Date();
 
@@ -11,16 +11,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/cara-kerja`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/executive-board`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/faq`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
-    { url: `${base}/blog`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${base}/scalehub`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
     { url: `${base}/mulai`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
   ];
 
-  const blog: MetadataRoute.Sitemap = posts.map((p) => ({
-    url: `${base}/blog/${p.slug}`,
-    lastModified: new Date(p.date),
-    changeFrequency: "monthly",
-    priority: 0.6,
-  }));
+  let articles: MetadataRoute.Sitemap = [];
+  try {
+    const all = await getAllArticles();
+    articles = all.map((a) => ({
+      url: `${base}/scalehub/${a.slug}`,
+      lastModified: new Date(a.date),
+      changeFrequency: "monthly",
+      priority: 0.6,
+    }));
+  } catch {
+    // DB unavailable at build — sitemap still lists static pages.
+  }
 
-  return [...pages, ...blog];
+  return [...pages, ...articles];
 }

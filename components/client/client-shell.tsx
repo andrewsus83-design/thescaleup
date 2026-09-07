@@ -13,6 +13,7 @@ import {
   ListTodo,
   FileText,
   Gauge,
+  Newspaper,
 } from "lucide-react";
 import { Logo } from "@/components/landing/logo";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ const clientNav = [
   { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/dashboard/reminders", label: "Reminders", icon: ListTodo },
   { href: "/dashboard/report", label: "Report", icon: FileText },
+  { href: "/dashboard/scalehub", label: "ScaleHub", icon: Newspaper },
 ];
 
 export function ClientShell({

@@ -6,8 +6,11 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { runAudit } from "@/lib/engine/audit";
 import type { MemberStatus } from "@/lib/admin/config";
-import { PLAN_ITEM_STATUSES } from "@/lib/admin/plan-status";
-import { BUILDER_SLUGS, builderDef } from "@/lib/builders";
+import {
+  PLAN_ITEM_STATUSES,
+  DEFAULT_INVOICE_TERMS,
+} from "@/lib/admin/plan-status";
+import { BUILDER_SLUGS, builderTasks } from "@/lib/builders";
 
 const PLAN_STATUSES = PLAN_ITEM_STATUSES.map((s) => s.value) as string[];
 
@@ -365,12 +368,12 @@ async function seedPlanItems(
   const items: Record<string, unknown>[] = [];
   let sort = 0;
 
-  // Builder deliverables (tagged per builder).
+  // Builder deliverables (tagged per builder) — from the concrete task catalog.
   for (const slug of builders) {
-    const def = builderDef(slug);
-    if (!def) continue;
+    const tasks = builderTasks(slug);
+    if (!tasks.length) continue;
     const prio = prioOf(slug);
-    for (const f of def.features) {
+    for (const f of tasks) {
       items.push({
         title: f,
         builder: slug,
@@ -510,18 +513,48 @@ export async function createInvoice(formData: FormData) {
   if (!memberId) return;
   const amount = Number(formData.get("amount") ?? 0) || 0;
   const description = String(formData.get("description") ?? "Paket ScaleUp");
+  const planId = (formData.get("master_plan_id") as string) || null;
+  const terms =
+    String(formData.get("terms") ?? "").trim() || DEFAULT_INVOICE_TERMS;
+
+  // Scope of Work — what ScaleUp will deliver. Admin-typed list wins; otherwise
+  // auto-populate from the master plan's (non-rejected) items.
+  const manualScope = String(formData.get("scope") ?? "")
+    .split("\n")
+    .map((s) => s.replace(/^[-•\s]+/, "").trim())
+    .filter(Boolean);
+  let scope: string[] = manualScope;
+  if (!scope.length && planId) {
+    const { data: items } = await db
+      .from("plan_items")
+      .select("title, status, sort")
+      .eq("master_plan_id", planId)
+      .neq("status", "rejected")
+      .order("sort");
+    scope = (items ?? []).map((it) => it.title as string);
+  }
+
   const d = new Date();
   const number = `INV-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}-${randomUUID().slice(0, 4).toUpperCase()}`;
-  await db.from("invoices").insert({
+  const base = {
     member_id: memberId,
-    master_plan_id: (formData.get("master_plan_id") as string) || null,
+    master_plan_id: planId,
     number,
     currency: "IDR",
     amount,
     items: [{ desc: description, qty: 1, price: amount }],
     status: "draft",
     due_date: (formData.get("due_date") as string) || null,
-  });
+  };
+  // Try with scope+terms; fall back to base columns if the migration for those
+  // columns hasn't been run yet (keeps invoice creation working regardless).
+  const { error } = await db.from("invoices").insert({ ...base, scope, terms });
+  if (error) {
+    const { error: e2 } = await db.from("invoices").insert(base);
+    // Both inserts failed — a real problem (e.g. invoices table missing).
+    // Surface it instead of silently reporting success.
+    if (e2) throw new Error(`Gagal membuat invoice: ${e2.message}`);
+  }
   revalidatePath(`/admin/members/${memberId}`);
 }
 

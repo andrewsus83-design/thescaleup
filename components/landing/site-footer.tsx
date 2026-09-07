@@ -16,7 +16,7 @@ const columns = [
   {
     title: "Perusahaan",
     links: [
-      { label: "Blog", href: "/blog" },
+      { label: "ScaleHub", href: "/scalehub" },
       { label: "Dashboard Klien", href: "/dashboard" },
       { label: "Mulai Audit", href: "/mulai" },
     ],

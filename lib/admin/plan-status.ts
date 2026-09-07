@@ -37,6 +37,15 @@ export const PLAN_CATEGORIES: Record<string, string> = {
 
 export const INVOICE_STATUSES = ["draft", "sent", "paid", "void"] as const;
 
+/** Default Terms & Conditions attached to every invoice (admin can edit). */
+export const DEFAULT_INVOICE_TERMS = `1. Pembayaran 50% di muka sebagai tanda mulai, 50% saat serah terima (untuk paket proyek).
+2. Timeline pengerjaan dihitung sejak pembayaran pertama & kelengkapan aset/akses dari klien diterima.
+3. Termasuk 2x revisi mayor per deliverable; revisi tambahan di luar itu dihitung sebagai add-on.
+4. Scope pekerjaan sesuai daftar tugas di atas. Permintaan di luar scope dihitung terpisah.
+5. Klien menyediakan akses & aset (akun, logo, data) maksimal 3 hari kerja setelah invoice terbit.
+6. Untuk layanan berlangganan (retainer): pembayaran di awal tiap periode; pembatalan minimal H-14.
+7. Harga belum termasuk biaya pihak ketiga (ad spend, domain, tools berbayar) kecuali disebutkan.`;
+
 export function invoiceBadge(status?: string | null): string {
   switch (status) {
     case "paid":
