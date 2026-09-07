@@ -1,118 +1,102 @@
-import { CalendarDays } from "lucide-react";
+import { Plus } from "lucide-react";
 import { requireClient } from "@/lib/client/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { PageHeader, Card, EmptyState } from "@/components/admin/ui";
-import { planStatusMeta } from "@/lib/admin/plan-status";
-import { cn } from "@/lib/utils";
+import { PageHeader, Card } from "@/components/admin/ui";
+import { MonthCalendar, type CalEvent } from "@/components/calendar/month-calendar";
+import { ReminderList } from "@/components/client/reminder-list";
+import { clientAddTodo } from "@/lib/client/actions";
 
 export const dynamic = "force-dynamic";
-
-function fmt(d: string) {
-  return new Date(d).toLocaleDateString("id-ID", {
-    weekday: "short",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
 
 export default async function ClientCalendarPage() {
   const m = await requireClient();
   const db = createSupabaseAdminClient();
-  const [itemsRes, remRes] = await Promise.all([
+  const [plansRes, remRes, remListRes] = await Promise.all([
     db
-      .from("plan_items")
-      .select("id, title, due_date, status")
+      .from("plans")
+      .select("id, title, due_date, status, phase")
       .eq("member_id", m.id)
-      .eq("status", "approved")
       .not("due_date", "is", null),
     db
       .from("reminders")
       .select("id, title, due_date, done")
       .eq("member_id", m.id)
       .not("due_date", "is", null),
+    db
+      .from("reminders")
+      .select("id, title, detail, done, due_date")
+      .eq("member_id", m.id)
+      .eq("audience", "client")
+      .order("done", { ascending: true })
+      .order("due_date", { ascending: true }),
   ]);
 
-  type Ev = { date: string; title: string; kind: "plan" | "reminder"; status?: string; done?: boolean };
-  const events: Ev[] = [
-    ...(itemsRes.data ?? []).map((i) => ({
-      date: i.due_date as string,
-      title: i.title as string,
-      kind: "plan" as const,
-      status: i.status as string,
-    })),
-    ...(remRes.data ?? []).map((r) => ({
+  const groupOf = (s: string) =>
+    s === "in_progress" ? "In Progress" : s === "done" ? "Highlights" : "Updates";
+  const toneOf = (s: string): CalEvent["tone"] =>
+    s === "in_progress" ? "sky" : s === "done" ? "good" : "slate";
+
+  const events: CalEvent[] = [
+    ...((plansRes.data ?? []).map((p) => ({
+      date: p.due_date as string,
+      title: p.title as string,
+      group: groupOf(p.status as string),
+      tone: toneOf(p.status as string),
+      meta: (p.phase as string) || undefined,
+    })) as CalEvent[]),
+    ...((remRes.data ?? []).map((r) => ({
       date: r.due_date as string,
       title: r.title as string,
-      kind: "reminder" as const,
-      done: r.done as boolean,
-    })),
-  ].sort((a, b) => a.date.localeCompare(b.date));
-
-  const byDate = new Map<string, Ev[]>();
-  for (const e of events) {
-    if (!byDate.has(e.date)) byDate.set(e.date, []);
-    byDate.get(e.date)!.push(e);
-  }
+      group: "Updates",
+      tone: (r.done ? "good" : "warn") as CalEvent["tone"],
+      meta: r.done ? "selesai" : "reminder",
+    })) as CalEvent[]),
+  ];
 
   return (
     <>
       <PageHeader
         title="Calendar"
-        description="Jadwal plan & reminder yang punya tanggal."
+        description="Pilih tanggal untuk melihat Updates, yang sedang In Progress, dan Highlights."
       />
-      {events.length === 0 ? (
-        <EmptyState
-          icon={<CalendarDays className="h-5 w-5" />}
-          title="Belum ada agenda"
-          hint="Item plan atau reminder dengan due date akan muncul di sini."
-        />
-      ) : (
-        <div className="space-y-4">
-          {[...byDate.entries()].map(([date, evs]) => (
-            <Card key={date}>
-              <p className="mb-3 font-mono text-xs uppercase tracking-wider text-coral">
-                {fmt(date)}
-              </p>
-              <div className="space-y-2">
-                {evs.map((e, i) => {
-                  const meta =
-                    e.kind === "plan" ? planStatusMeta(e.status) : null;
-                  return (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-obsidian/40 px-4 py-2.5"
-                    >
-                      <span
-                        className={cn(
-                          "text-sm",
-                          e.done ? "text-slate-500 line-through" : "text-slate-200",
-                        )}
-                      >
-                        {e.title}
-                      </span>
-                      {meta ? (
-                        <span
-                          className={cn(
-                            "shrink-0 rounded-full border px-2 py-0.5 text-[0.66rem]",
-                            meta.badge,
-                          )}
-                        >
-                          {meta.label}
-                        </span>
-                      ) : (
-                        <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[0.66rem] text-slate-500">
-                          reminder
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+      <MonthCalendar
+        events={events}
+        groupOrder={["Updates", "In Progress", "Highlights"]}
+      />
+
+      <div className="mt-8">
+        <h2 className="mb-3 font-display text-lg font-bold text-mist">
+          Reminders &amp; Todo
+        </h2>
+        <Card className="mb-4">
+          <form
+            action={clientAddTodo}
+            className="flex flex-col gap-3 sm:flex-row sm:items-end"
+          >
+            <label className="flex-1">
+              <span className="mb-1.5 block text-xs text-slate-400">Todo baru</span>
+              <input
+                name="title"
+                required
+                placeholder="Contoh: pasang pixel Meta di landing page"
+                className="w-full rounded-xl border border-white/10 bg-obsidian/50 px-3.5 py-2.5 text-sm text-mist placeholder:text-slate-600 focus:border-coral/50 focus:outline-none"
+              />
+            </label>
+            <label>
+              <span className="mb-1.5 block text-xs text-slate-400">Due date</span>
+              <input
+                name="due_date"
+                type="date"
+                className="rounded-xl border border-white/10 bg-obsidian/50 px-3.5 py-2.5 text-sm text-mist focus:border-coral/50 focus:outline-none"
+              />
+            </label>
+            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-coral to-sunset px-5 text-sm font-semibold text-white hover:brightness-110">
+              <Plus className="h-4 w-4" /> Tambah
+            </button>
+          </form>
+        </Card>
+        <ReminderList items={remListRes.data ?? []} />
+      </div>
     </>
   );
 }

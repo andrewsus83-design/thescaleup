@@ -15,7 +15,21 @@ export type ClientMember = {
   email?: string | null;
   status: string;
   access_token: string;
+  /** ScaleUp's own internal client — unlocks the builder apps in the dashboard. */
+  isInternal: boolean;
 };
+
+/** ScaleUp dogfoods its own platform as client #1: this member gets full
+ *  builder access in the client dashboard. Matched by business name or owner email. */
+function computeInternal(business?: string | null, email?: string | null): boolean {
+  const b = (business ?? "").trim().toLowerCase();
+  if (b === "scaleup" || b === "thescaleup") return true;
+  const owners = (process.env.ADMIN_EMAILS ?? "andrewsus83@gmail.com")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return !!email && owners.includes(email.toLowerCase());
+}
 
 export function clientCookieName() {
   return COOKIE;
@@ -53,6 +67,7 @@ export async function getClientMember(): Promise<ClientMember | null> {
       email: data.email as string | null,
       status: data.status as string,
       access_token: (data.access_token as string) ?? clientMasterCode(),
+      isInternal: computeInternal(data.business as string, data.email as string),
     };
   } catch {
     return null;

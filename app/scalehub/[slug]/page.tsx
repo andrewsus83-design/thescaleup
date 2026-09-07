@@ -153,6 +153,23 @@ export default async function ScaleHubArticle({ params }: Params) {
                   </ul>
                 );
               }
+              if (block.type === "img") {
+                return (
+                  <figure key={i} className="my-8">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={block.url}
+                      alt={block.caption ?? ""}
+                      className="mx-auto w-full rounded-2xl border border-white/8 object-cover"
+                    />
+                    {block.caption && (
+                      <figcaption className="mt-2 text-center text-xs text-slate-500">
+                        {block.caption}
+                      </figcaption>
+                    )}
+                  </figure>
+                );
+              }
               return (
                 <p key={i} className="text-base leading-[1.8] text-slate-300">
                   {block.text}

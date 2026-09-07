@@ -12,7 +12,7 @@ export function BlogTeaser() {
         <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-end">
           <SectionHeading
             align="left"
-            eyebrow="ScaleHub"
+            eyebrow="Hub"
             title="Wawasan untuk bisnis yang mau naik kelas"
             subtitle="Strategi GEO, CRO, dan otomatisasi — plus cerita pertumbuhan brand klien kami."
           />
@@ -20,7 +20,7 @@ export function BlogTeaser() {
             href="/scalehub"
             className="inline-flex shrink-0 items-center gap-2 font-display text-sm font-semibold text-coral transition-colors hover:text-coral-soft"
           >
-            Buka ScaleHub
+            Buka Hub
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

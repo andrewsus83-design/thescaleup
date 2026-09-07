@@ -10,35 +10,79 @@ import {
   LayoutDashboard,
   KanbanSquare,
   CalendarDays,
-  ListTodo,
   FileText,
-  Gauge,
-  Newspaper,
+  type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/landing/logo";
+import { getBuilder } from "@/lib/client/builders";
 import { cn } from "@/lib/utils";
 
-const clientNav = [
+type NavItem = { href: string; label: string; icon: LucideIcon };
+
+const baseNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/score", label: "Score", icon: Gauge },
   { href: "/dashboard/plan", label: "Master Plan", icon: KanbanSquare },
   { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/dashboard/reminders", label: "Reminders", icon: ListTodo },
   { href: "/dashboard/report", label: "Report", icon: FileText },
-  { href: "/dashboard/scalehub", label: "ScaleHub", icon: Newspaper },
 ];
+
+const BUILDER_LABEL: Record<string, string> = {
+  website: "Web",
+  store: "Store",
+  content: "Content",
+  ads: "Ads",
+  opportunity: "Opportunity",
+  crm: "CRM",
+  tasks: "Tasks",
+  support: "Support",
+};
 
 export function ClientShell({
   business,
+  builderSlugs = [],
   children,
 }: {
   business: string;
+  builderSlugs?: string[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href);
+
+  const builderNav: NavItem[] = builderSlugs
+    .map((slug) => {
+      const b = getBuilder(slug);
+      if (!b) return null;
+      return {
+        href: `/dashboard/builder/${slug}`,
+        label: BUILDER_LABEL[slug] ?? b.title,
+        icon: b.icon,
+      };
+    })
+    .filter((x): x is NavItem => x !== null);
+
+  const renderItem = (item: NavItem) => {
+    const Icon = item.icon;
+    const active = isActive(item.href);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={() => setOpen(false)}
+        className={cn(
+          "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
+          active
+            ? "bg-coral/10 text-coral ring-1 ring-coral/25"
+            : "text-slate-400 hover:bg-white/5 hover:text-white",
+        )}
+      >
+        <Icon className="h-4.5 w-4.5" />
+        {item.label}
+      </Link>
+    );
+  };
 
   const Inner = () => (
     <>
@@ -47,27 +91,16 @@ export function ClientShell({
           <Logo />
         </Link>
       </div>
-      <nav className="mt-8 flex flex-1 flex-col gap-1">
-        {clientNav.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setOpen(false)}
-              className={cn(
-                "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
-                active
-                  ? "bg-coral/10 text-coral ring-1 ring-coral/25"
-                  : "text-slate-400 hover:bg-white/5 hover:text-white",
-              )}
-            >
-              <Icon className="h-4.5 w-4.5" />
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav className="mt-8 flex flex-1 flex-col gap-1 overflow-y-auto">
+        {baseNav.map(renderItem)}
+        {builderNav.length > 0 && (
+          <>
+            <p className="mt-5 px-3.5 pb-1 font-mono text-[0.62rem] uppercase tracking-wider text-slate-600">
+              App / Platform
+            </p>
+            {builderNav.map(renderItem)}
+          </>
+        )}
       </nav>
       <div className="mt-4 border-t border-white/8 pt-4">
         <div className="rounded-xl bg-white/5 px-3.5 py-3">

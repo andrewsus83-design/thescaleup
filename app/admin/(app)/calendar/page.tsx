@@ -1,26 +1,22 @@
-import { CalendarDays, Trash2, Plus, Database } from "lucide-react";
+import Link from "next/link";
+import { Plus, Database, ArrowLeft, Users } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
 import {
   createSupabaseAdminClient,
   isSupabaseAdminConfigured,
 } from "@/lib/supabase/admin";
-import { PageHeader, Card, EmptyState } from "@/components/admin/ui";
-import { ConfirmSubmit } from "@/components/admin/confirm-submit";
-import { PlanStatusSelect } from "@/components/admin/plan-status-select";
-import { addPlan, deletePlan } from "@/lib/admin/actions";
-import { cn } from "@/lib/utils";
+import { PageHeader, Card, EmptyState, StatusBadge } from "@/components/admin/ui";
+import { addPlan } from "@/lib/admin/actions";
+import { MonthCalendar, type CalEvent } from "@/components/calendar/month-calendar";
 
 export const dynamic = "force-dynamic";
 
-const planStatusStyle: Record<string, string> = {
-  planned: "text-slate-400",
-  in_progress: "text-sky-400",
-  done: "text-good",
-};
-
-export default async function CalendarPage() {
-  const user = await requireAdmin();
-
+export default async function CalendarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ member?: string }>;
+}) {
+  await requireAdmin();
   if (!isSupabaseAdminConfigured()) {
     return (
       <>
@@ -30,44 +26,110 @@ export default async function CalendarPage() {
     );
   }
 
+  const { member: memberId } = await searchParams;
   const db = createSupabaseAdminClient();
-  const [{ data: members }, { data: plans }] = await Promise.all([
-    db.from("leads").select("id, business, name, status").order("business"),
+  const { data: members } = await db
+    .from("leads")
+    .select("id, business, name, status")
+    .order("created_at", { ascending: false });
+  const memberList = members ?? [];
+
+  // Step 1 — pick a client.
+  if (!memberId) {
+    return (
+      <>
+        <PageHeader
+          title="Calendar"
+          description="Pilih klien dulu untuk melihat kalender & tanggal jatuh temponya."
+        />
+        {memberList.length === 0 ? (
+          <EmptyState icon={<Users className="h-5 w-5" />} title="Belum ada member" />
+        ) : (
+          <Card className="p-0">
+            <ul className="divide-y divide-white/5">
+              {memberList.map((m) => (
+                <li key={m.id}>
+                  <Link
+                    href={`/admin/calendar?member=${m.id}`}
+                    className="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-white/5"
+                  >
+                    <span className="truncate text-sm text-slate-200">
+                      {m.business || m.name || "—"}
+                    </span>
+                    <StatusBadge status={m.status} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+      </>
+    );
+  }
+
+  // Step 2 — that client's calendar.
+  const [{ data: member }, plansRes, remRes] = await Promise.all([
+    db.from("leads").select("business, name").eq("id", memberId).single(),
     db
       .from("plans")
-      .select("*, member:leads(business, name)")
-      .order("due_date", { ascending: true, nullsFirst: false }),
+      .select("id, title, due_date, status, phase")
+      .eq("member_id", memberId)
+      .not("due_date", "is", null),
+    db
+      .from("reminders")
+      .select("id, title, due_date, done")
+      .eq("member_id", memberId)
+      .not("due_date", "is", null),
   ]);
+  const memberName = member?.business || member?.name || "Klien";
 
-  const memberList = members ?? [];
-  const planList = plans ?? [];
+  const groupOf = (s: string) =>
+    s === "in_progress" ? "Sedang Dikerjakan" : s === "done" ? "Selesai" : "Terjadwal";
+  const toneOf = (s: string): CalEvent["tone"] =>
+    s === "in_progress" ? "sky" : s === "done" ? "good" : "coral";
+
+  const events: CalEvent[] = [
+    ...((plansRes.data ?? []).map((p) => ({
+      date: p.due_date as string,
+      title: p.title as string,
+      group: groupOf(p.status as string),
+      tone: toneOf(p.status as string),
+      meta: (p.phase as string) || "due",
+    })) as CalEvent[]),
+    ...((remRes.data ?? []).map((r) => ({
+      date: r.due_date as string,
+      title: r.title as string,
+      group: "Reminder",
+      tone: (r.done ? "good" : "warn") as CalEvent["tone"],
+      meta: r.done ? "selesai" : "reminder",
+    })) as CalEvent[]),
+  ];
 
   return (
     <>
+      <Link
+        href="/admin/calendar"
+        className="mb-4 inline-flex items-center gap-2 text-sm text-slate-400 hover:text-coral"
+      >
+        <ArrowLeft className="h-4 w-4" /> Ganti klien
+      </Link>
       <PageHeader
         title="Calendar"
-        description="Plan & janji scale-up untuk tiap member yang sudah join."
+        description={`Jadwal & jatuh tempo — ${memberName}. Klik tanggal untuk melihat apa yang jatuh tempo hari itu.`}
       />
 
-      {/* add plan */}
-      <Card className="mb-5">
+      <MonthCalendar
+        events={events}
+        groupOrder={["Terjadwal", "Sedang Dikerjakan", "Selesai", "Reminder"]}
+        emptyLabel="Tidak ada yang jatuh tempo di tanggal ini."
+      />
+
+      <Card className="mt-6">
         <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-slate-500">
-          <Plus className="h-3.5 w-3.5" /> Tambah plan
+          <Plus className="h-3.5 w-3.5" /> Jadwalkan plan (due date)
         </p>
         <form action={addPlan} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <select
-            name="member_id"
-            className="rounded-xl border border-white/10 bg-obsidian/50 px-3 py-2.5 text-sm text-slate-200 focus:border-coral/50 focus:outline-none"
-          >
-            <option value="" className="bg-obsidian">
-              — Pilih member —
-            </option>
-            {memberList.map((m) => (
-              <option key={m.id} value={m.id} className="bg-obsidian">
-                {m.business || m.name || m.id.slice(0, 8)}
-              </option>
-            ))}
-          </select>
+          <input type="hidden" name="member_id" value={memberId} />
           <input
             name="title"
             required
@@ -85,11 +147,6 @@ export default async function CalendarPage() {
           </select>
           <input
             type="date"
-            name="start_date"
-            className="rounded-xl border border-white/10 bg-obsidian/50 px-3 py-2.5 text-sm text-slate-300 focus:border-coral/50 focus:outline-none"
-          />
-          <input
-            type="date"
             name="due_date"
             className="rounded-xl border border-white/10 bg-obsidian/50 px-3 py-2.5 text-sm text-slate-300 focus:border-coral/50 focus:outline-none"
           />
@@ -103,56 +160,6 @@ export default async function CalendarPage() {
           </button>
         </form>
       </Card>
-
-      {/* plans */}
-      {planList.length === 0 ? (
-        <EmptyState
-          icon={<CalendarDays className="h-5 w-5" />}
-          title="Belum ada plan"
-          hint="Tambahkan plan untuk mulai melacak janji scale-up ke member."
-        />
-      ) : (
-        <Card className="p-0">
-          <ul className="divide-y divide-white/5">
-            {planList.map((p) => {
-              const member = (p.member as unknown as { business?: string; name?: string } | null) ?? null;
-              return (
-                <li key={p.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate font-medium text-slate-100">{p.title}</p>
-                      {p.phase && (
-                        <span className="rounded-full border border-coral/25 bg-coral/10 px-2 py-0.5 font-mono text-[0.62rem] text-coral">
-                          {p.phase}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">
-                      {member?.business || member?.name || "Umum"}
-                      {p.due_date ? ` · due ${new Date(p.due_date).toLocaleDateString("id-ID")}` : ""}
-                      {p.detail ? ` · ${p.detail}` : ""}
-                    </p>
-                  </div>
-                  <span className={cn("text-xs font-medium", planStatusStyle[p.status] ?? "text-slate-400")}>
-                    ●
-                  </span>
-                  <PlanStatusSelect id={p.id} status={p.status} />
-                  {user.perms.delete && (
-                    <form action={deletePlan.bind(null, p.id)}>
-                      <ConfirmSubmit
-                        message="Hapus plan ini?"
-                        className="inline-flex items-center rounded-md bg-bad/10 px-2 py-1.5 text-xs text-bad hover:bg-bad/20"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </ConfirmSubmit>
-                    </form>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      )}
     </>
   );
 }

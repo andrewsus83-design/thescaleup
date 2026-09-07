@@ -4,7 +4,8 @@
 export type Block =
   | { type: "p"; text: string }
   | { type: "h2"; text: string }
-  | { type: "ul"; items: string[] };
+  | { type: "ul"; items: string[] }
+  | { type: "img"; url: string; caption?: string };
 
 export type ArticleSource = "scaleup" | "client";
 
@@ -74,7 +75,15 @@ export function parseContentToBlocks(raw: string): Block[] {
       }
     };
     for (const l of lines) {
-      if (/^#{1,3}\s+/.test(l)) {
+      const img = l.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
+      if (img) {
+        flush();
+        blocks.push({
+          type: "img",
+          url: img[2],
+          ...(img[1] ? { caption: img[1] } : {}),
+        });
+      } else if (/^#{1,3}\s+/.test(l)) {
         flush();
         blocks.push({ type: "h2", text: l.replace(/^#{1,3}\s+/, "") });
       } else {
@@ -89,25 +98,21 @@ export function parseContentToBlocks(raw: string): Block[] {
 /** Block[] → editable raw text (inverse of parseContentToBlocks). */
 export function blocksToRaw(blocks: Block[]): string {
   return (blocks ?? [])
-    .map((b) =>
-      b.type === "h2"
-        ? `## ${b.text}`
-        : b.type === "ul"
-          ? b.items.map((i) => `- ${i}`).join("\n")
-          : b.text,
-    )
+    .map((b) => {
+      if (b.type === "h2") return `## ${b.text}`;
+      if (b.type === "ul") return b.items.map((i) => `- ${i}`).join("\n");
+      if (b.type === "img") return `![${b.caption ?? ""}](${b.url})`;
+      return b.text;
+    })
     .join("\n\n");
 }
 
 export function estimateReadMinutes(blocks: Block[]): number {
-  const words = (blocks ?? []).reduce(
-    (n, b) =>
-      n +
-      (b.type === "ul" ? b.items.join(" ") : b.text)
-        .split(/\s+/)
-        .filter(Boolean).length,
-    0,
-  );
+  const words = (blocks ?? []).reduce((n, b) => {
+    if (b.type === "ul") return n + b.items.join(" ").split(/\s+/).filter(Boolean).length;
+    if (b.type === "img") return n;
+    return n + b.text.split(/\s+/).filter(Boolean).length;
+  }, 0);
   return Math.max(1, Math.round(words / 200));
 }
 

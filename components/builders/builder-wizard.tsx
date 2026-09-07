@@ -4,11 +4,16 @@ import { useState, useTransition } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
+  ArrowDown,
   Check,
   Loader2,
   Sparkles,
   Save,
   Lock,
+  Plus,
+  Trash2,
+  Link2,
 } from "lucide-react";
 import type { BuilderConfig, BuilderField } from "@/lib/builders/wizard-types";
 import { saveBuilderProject } from "@/lib/admin/builder-actions";
@@ -217,6 +222,125 @@ function FieldView({
         </div>
       );
     }
+    case "stages": {
+      const arr: string[] =
+        Array.isArray(value) && value.length
+          ? (value as string[])
+          : (field.options ?? []).map((o) => o.label);
+      const commit = (next: string[]) => set(next);
+      const rename = (i: number, v: string) => {
+        const n = [...arr];
+        n[i] = v;
+        commit(n);
+      };
+      const move = (i: number, dir: number) => {
+        const j = i + dir;
+        if (j < 0 || j >= arr.length) return;
+        const n = [...arr];
+        [n[i], n[j]] = [n[j], n[i]];
+        commit(n);
+      };
+      const iconBtn =
+        "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:bg-white/5 disabled:opacity-30";
+      return (
+        <div>
+          {label}
+          <div className="space-y-2">
+            {arr.map((s, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2 rounded-xl border border-white/10 bg-obsidian/50 px-2.5 py-2"
+              >
+                <span className="w-14 shrink-0 font-mono text-[0.66rem] uppercase text-coral">
+                  Step {i + 1}
+                </span>
+                <input
+                  value={s}
+                  onChange={(e) => rename(i, e.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-mist focus:outline-none"
+                />
+                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className={iconBtn}>
+                  <ArrowUp className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" onClick={() => move(i, 1)} disabled={i === arr.length - 1} className={iconBtn}>
+                  <ArrowDown className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => commit(arr.filter((_, x) => x !== i))}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-bad/20 text-bad hover:bg-bad/10"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => commit([...arr, "Tahap baru"])}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-white/10"
+          >
+            <Plus className="h-3.5 w-3.5" /> Tambah tahap
+          </button>
+          {hint}
+        </div>
+      );
+    }
+    case "sourcelinks": {
+      const val =
+        value && typeof value === "object" && !Array.isArray(value)
+          ? (value as Record<string, string>)
+          : {};
+      const on = (v: string) => Object.prototype.hasOwnProperty.call(val, v);
+      const toggle = (v: string) => {
+        const n = { ...val };
+        if (on(v)) delete n[v];
+        else n[v] = "";
+        set(n);
+      };
+      return (
+        <div>
+          {label}
+          <div className="space-y-2">
+            {(field.options ?? []).map((o) => (
+              <div
+                key={o.value}
+                className="rounded-xl border border-white/10 bg-obsidian/50 p-2.5"
+              >
+                <button
+                  type="button"
+                  onClick={() => toggle(o.value)}
+                  className="flex w-full items-center gap-2.5 text-left"
+                >
+                  <span
+                    className={cn(
+                      "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border",
+                      on(o.value) ? "border-coral bg-coral text-white" : "border-white/15",
+                    )}
+                  >
+                    {on(o.value) && <Check className="h-3.5 w-3.5" />}
+                  </span>
+                  <span className="text-sm font-medium text-slate-200">{o.label}</span>
+                </button>
+                {on(o.value) && (
+                  <div className="mt-2 flex items-center gap-2 pl-7">
+                    <Link2 className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                    <input
+                      type="url"
+                      value={val[o.value] ?? ""}
+                      onChange={(e) => set({ ...val, [o.value]: e.target.value })}
+                      placeholder="Link akun / halaman / integrasi (opsional)"
+                      className="min-w-0 flex-1 rounded-lg border border-white/10 bg-obsidian/70 px-3 py-1.5 text-xs text-mist placeholder:text-slate-600 focus:border-coral/50 focus:outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          {hint}
+        </div>
+      );
+    }
     default:
       return (
         <label className="block">
@@ -239,11 +363,18 @@ export function BuilderWizard({
   memberName,
   config,
   initialData,
+  onSave,
 }: {
   memberId: string;
   memberName: string;
   config: BuilderConfig;
   initialData: Data;
+  onSave?: (
+    memberId: string,
+    builder: string,
+    data: Data,
+    status?: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [step, setStep] = useState(0);
   const [data, setData] = useState<Data>(initialData ?? {});
@@ -252,10 +383,11 @@ export function BuilderWizard({
   const total = config.steps.length;
   const current = config.steps[step];
   const set = (k: string, v: unknown) => setData((d) => ({ ...d, [k]: v }));
+  const doSave = onSave ?? saveBuilderProject;
 
   const save = (status: string) =>
     start(async () => {
-      const r = await saveBuilderProject(memberId, config.slug, data, status);
+      const r = await doSave(memberId, config.slug, data, status);
       if (!r.ok && r.error) window.alert(r.error);
       else setSavedAt(new Date().toLocaleTimeString("id-ID"));
     });

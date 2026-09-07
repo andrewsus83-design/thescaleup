@@ -9,6 +9,8 @@ export type BuilderFieldType =
   | "cards"
   | "multiselect"
   | "toggle"
+  | "stages"
+  | "sourcelinks"
   | "info";
 
 export type BuilderField = {

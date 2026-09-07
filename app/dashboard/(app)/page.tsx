@@ -10,6 +10,7 @@ import { requireClient } from "@/lib/client/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { Card, PageHeader, EmptyState } from "@/components/admin/ui";
 import { SuccessMeter } from "@/components/report/success-meter";
+import { ScoreRing } from "@/components/ui/score-ring";
 import { clientRequestUpdate } from "@/lib/client/actions";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,15 @@ export default async function ClientHome() {
   const done = items.filter((i) => i.status === "done").length;
   const pct = total ? Math.round((done / total) * 100) : 0;
 
+  const scores = (content.scores ?? {}) as Record<string, number | null>;
+  const pillars = [
+    { label: "CRO", v: scores.cro },
+    { label: "GEO / AI Search", v: scores.geo },
+    { label: "Social", v: scores.social },
+    { label: "Tech", v: scores.tech },
+  ];
+  const hasPillars = Object.values(scores).some((v) => v != null);
+
   return (
     <>
       <PageHeader
@@ -61,13 +71,25 @@ export default async function ClientHome() {
         />
       ) : (
         <>
-          {/* 3 KPI meter of success */}
-          <SuccessMeter content={content} compact />
-          <div className="mt-2 text-right">
-            <Link href="/dashboard/score" className="text-sm text-coral hover:text-coral-soft">
-              Detail score →
-            </Link>
-          </div>
+          {/* 3 KPI meter of success (score merged into dashboard) */}
+          <SuccessMeter content={content} />
+          {hasPillars && (
+            <Card className="mt-4">
+              <p className="mb-4 font-mono text-xs uppercase tracking-wider text-slate-500">
+                Detail 4 Pilar
+              </p>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                {pillars.map((p) => (
+                  <div key={p.label} className="flex flex-col items-center gap-2">
+                    <ScoreRing value={Number(p.v ?? 0)} size={92} stroke={8} />
+                    <span className="text-center text-xs text-slate-400">
+                      {p.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* revenue + progress */}
           <div className="mt-4 grid gap-4 lg:grid-cols-2">

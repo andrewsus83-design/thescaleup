@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Save, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, Save, CheckCircle2, AlertCircle, ImagePlus } from "lucide-react";
 import type { ArticleInput, ArticleSource } from "@/lib/scalehub/content";
 import { createArticle, updateArticle } from "@/lib/admin/article-actions";
 import { cn } from "@/lib/utils";
@@ -43,6 +43,16 @@ export function ArticleForm({
 
   const set = <K extends keyof ArticleInput>(k: K, v: ArticleInput[K]) =>
     setF((p) => ({ ...p, [k]: v }));
+
+  const insertImage = () => {
+    const url = window.prompt("URL gambar (https://...)");
+    if (!url) return;
+    const caption = window.prompt("Caption (opsional)") ?? "";
+    setF((p) => ({
+      ...p,
+      contentRaw: `${p.contentRaw}${p.contentRaw.trim() ? "\n\n" : ""}![${caption}](${url})\n`,
+    }));
+  };
 
   const submit = (status: "draft" | "published") => {
     setMsg(null);
@@ -127,14 +137,22 @@ export function ArticleForm({
 
         <label>
           <span className="mb-1.5 block text-xs text-slate-400">
-            Cover URL (opsional)
+            Cover / Hero image (opsional)
           </span>
           <input
             value={f.coverUrl}
             onChange={(e) => set("coverUrl", e.target.value)}
-            placeholder="https://..."
+            placeholder="https://…/hero.jpg"
             className={inputCls}
           />
+          {f.coverUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={f.coverUrl}
+              alt=""
+              className="mt-2 h-24 w-full rounded-lg border border-white/10 object-cover"
+            />
+          ) : null}
         </label>
 
         {f.authorType === "client" && (
@@ -173,21 +191,32 @@ export function ArticleForm({
         )}
       </div>
 
-      <label className="block">
-        <span className="mb-1.5 block text-xs text-slate-400">
-          Isi artikel — <span className="font-mono">## Judul bagian</span>,{" "}
-          <span className="font-mono">- poin</span>, baris kosong = paragraf baru
-        </span>
+      <div>
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs text-slate-400">
+            Isi artikel — <span className="font-mono">## Judul bagian</span>,{" "}
+            <span className="font-mono">- poin</span>,{" "}
+            <span className="font-mono">![caption](url)</span> untuk gambar di
+            tengah teks
+          </span>
+          <button
+            type="button"
+            onClick={insertImage}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-200 hover:bg-white/10"
+          >
+            <ImagePlus className="h-3.5 w-3.5" /> Sisipkan gambar
+          </button>
+        </div>
         <textarea
           value={f.contentRaw}
           onChange={(e) => set("contentRaw", e.target.value)}
-          rows={14}
+          rows={16}
           placeholder={
-            "Paragraf pembuka...\n\n## Sub-judul\nParagraf isi.\n\n- poin pertama\n- poin kedua"
+            "Paragraf pembuka...\n\n## Sub-judul\nParagraf isi.\n\n![Suasana toko](https://…/foto.jpg)\n\n- poin pertama\n- poin kedua"
           }
           className={cn(inputCls, "resize-y font-mono text-[0.8rem] leading-relaxed")}
         />
-      </label>
+      </div>
 
       <label className="flex items-center gap-2 text-sm text-slate-300">
         <input
