@@ -1,4 +1,11 @@
-import { newBlock, newPage, type WebBlock, type WebsiteDoc } from "./schema";
+import {
+  newBlock,
+  newPage,
+  type WebBlock,
+  type WebsiteDoc,
+  type SocialLinks,
+  type FooterCol,
+} from "./schema";
 
 // Ready-made, COMPLETE multi-page websites. Each template is content data;
 // buildDoc() assembles a FULL Home (hero, trust bar, stats, how-it-works,
@@ -31,6 +38,9 @@ export type WebsiteTemplate = {
   posts: Post[];
   contact: { title: string; email: string; address: string; hours: string };
   cta: { headline: string; text: string; buttonText: string };
+  tagline?: string;
+  socials?: SocialLinks;
+  footerCols?: FooterCol[];
 };
 
 const blk = (type: Parameters<typeof newBlock>[0], props: Record<string, unknown>): WebBlock => ({
@@ -49,8 +59,24 @@ export function buildDoc(t: WebsiteTemplate, brand: string): WebsiteDoc {
   const postsWithCover = t.posts.map((p) => ({ ...p, cover: p.cover || t.heroImage }));
   const pricingItems = t.pricing.items.map((it) => ({ ...it, ctaHref: it.ctaHref || wa }));
 
+  const socials: SocialLinks = t.socials ?? {
+    instagram: "https://instagram.com/",
+    tiktok: "https://tiktok.com/",
+    facebook: "https://facebook.com/",
+  };
+  const footerCols: FooterCol[] = t.footerCols ?? [
+    {
+      title: "Legal",
+      links: [
+        { label: "Syarat & Ketentuan", href: "#" },
+        { label: "Kebijakan Privasi", href: "#" },
+      ],
+    },
+  ];
+  const tagline = t.tagline ?? `${brand} — ${t.description}`;
+
   return {
-    theme: { primary: t.primary, brand, logo: "", whatsapp: t.whatsapp },
+    theme: { primary: t.primary, brand, logo: "", whatsapp: t.whatsapp, tagline, socials, footerCols },
     pages: [
       newPage("", "Home", [
         blk("hero", {
@@ -88,6 +114,7 @@ export function buildDoc(t: WebsiteTemplate, brand: string): WebsiteDoc {
       newPage("kontak", "Kontak", [
         blk("pageheader", { title: "Hubungi Kami", subtitle: "Kami siap membantu — hubungi kapan saja." }),
         blk("contact", { title: t.contact.title, whatsapp: t.whatsapp, email: t.contact.email, address: t.contact.address, hours: t.contact.hours }),
+        blk("social", { title: "Ikuti Kami", subtitle: "Terhubung & dapatkan update, promo, dan info terbaru dari kami.", ...socials }),
         cta,
       ]),
     ],
@@ -105,7 +132,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     aboutImage: "/templates/kuliner-hero.jpg",
     productLabel: "Menu",
     productSubtitle: "Menu favorit yang dibuat segar setiap hari.",
-    hero: { headline: "Kopi & Hidangan yang Bikin Kangen", subheadline: "Racikan biji pilihan dan menu rumahan, disajikan hangat setiap hari.", ctaText: "Pesan Sekarang" },
+    hero: { headline: "Kopi & Hidangan yang Bikin Kangen", subheadline: "Kedai kopi spesialti & dapur rumahan: biji arabika lokal pilihan, menu segar dimasak setiap hari, dan tempat nyaman untuk nongkrong maupun bekerja. Pesan antar cepat lewat WhatsApp.", ctaText: "Pesan Sekarang" },
     trust: ["100% Halal", "Bahan Segar Harian", "Antar Cepat", "Rating 4.9★"],
     stats: [
       { value: "5.000+", label: "Pelanggan puas" },
@@ -129,7 +156,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
         { title: "Pesan Antar", text: "Tinggal chat WhatsApp, pesanan diantar cepat.", note: "Gratis ongkir radius 3 km." },
       ],
     },
-    about: { title: "Tentang Kami", text: "Berawal dari kecintaan pada kopi dan masakan rumahan, kami hadir untuk menyajikan rasa yang jujur dengan harga bersahabat. Setiap sajian kami buat dengan sepenuh hati." },
+    about: { title: "Tentang Kami", text: "Berawal dari kecintaan pada kopi dan masakan rumahan, kami hadir menyajikan rasa yang jujur dengan harga bersahabat. Setiap cangkir kami seduh dari biji arabika lokal pilihan, dan setiap hidangan dimasak segar dari bahan berkualitas tanpa pengawet. Nikmati langsung di tempat yang nyaman, atau pesan antar ke rumah dan kantor Anda." },
     products: {
       title: "Menu Kami",
       items: [
@@ -181,7 +208,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     aboutImage: "/templates/fashion-hero.jpg",
     productLabel: "Produk",
     productSubtitle: "Koleksi terbaru yang bikin tampil beda.",
-    hero: { headline: "Tampil Beda dengan Koleksi Terbaru", subheadline: "Fashion berkualitas, harga bersahabat. Koleksi baru setiap bulan.", ctaText: "Belanja Sekarang" },
+    hero: { headline: "Tampil Beda dengan Koleksi Terbaru", subheadline: "Brand fashion lokal dengan bahan nyaman dan jahitan rapi yang tahan lama. Koleksi baru tiap bulan, harga bersahabat, gratis ongkir, dan checkout mudah lewat WhatsApp.", ctaText: "Belanja Sekarang" },
     trust: ["Gratis Ongkir", "Garansi Tukar", "COD Tersedia", "10.000+ Terjual"],
     stats: [
       { value: "10rb+", label: "Produk terjual" },
@@ -205,7 +232,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
         { title: "COD & Transfer", text: "Bayar dengan cara yang paling nyaman untuk Anda.", note: "QRIS juga bisa." },
       ],
     },
-    about: { title: "Cerita Brand Kami", text: "Kami percaya gaya tidak harus mahal. Setiap koleksi dirancang agar Anda tampil percaya diri setiap hari, dengan bahan nyaman dan jahitan rapi yang tahan lama." },
+    about: { title: "Cerita Brand Kami", text: "Kami percaya gaya tidak harus mahal. Setiap koleksi dirancang agar Anda tampil percaya diri setiap hari — dari kaos harian hingga outerwear andalan — dengan bahan pilihan yang adem dan jahitan yang awet. Ribuan pelanggan telah membuktikan kualitas dan pelayanan kami; kini giliran Anda." },
     products: {
       title: "Katalog Produk",
       items: [
@@ -256,7 +283,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     aboutImage: "/templates/jasa-about.jpg",
     productLabel: "Layanan",
     productSubtitle: "Layanan yang dirancang untuk hasil nyata.",
-    hero: { headline: "Solusi Profesional untuk Bisnis Anda", subheadline: "Kami bantu bisnis Anda tumbuh dengan strategi terukur dan hasil nyata.", ctaText: "Konsultasi Gratis" },
+    hero: { headline: "Solusi Profesional untuk Bisnis Anda", subheadline: "Konsultan & agensi pertumbuhan bisnis: kami bantu menaikkan penjualan lewat strategi berbasis data, eksekusi yang tuntas, dan laporan transparan tiap periode. Konsultasi awal gratis.", ctaText: "Konsultasi Gratis" },
     trust: ["Berpengalaman 10+ Tahun", "50+ Klien", "Hasil Terukur", "Garansi Kepuasan"],
     stats: [
       { value: "50+", label: "Klien ditangani" },
@@ -280,7 +307,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
         { title: "Laporan", text: "Progres transparan yang bisa Anda pantau tiap periode.", note: "Real-time." },
       ],
     },
-    about: { title: "Tentang Kami", text: "Tim kami telah membantu puluhan klien mencapai target mereka. Kami percaya hasil berbicara lebih dari janji — itulah kenapa klien kami bertahan lama bersama kami." },
+    about: { title: "Tentang Kami", text: "Selama lebih dari 10 tahun, tim kami telah membantu puluhan bisnis — dari UMKM hingga perusahaan — mencapai target pertumbuhan mereka. Kami percaya hasil berbicara lebih dari janji: setiap program dirancang dengan target dan timeline yang jelas, lalu kami kerjakan dan pertanggungjawabkan angkanya. Itulah kenapa klien kami bertahan lama bersama kami." },
     products: {
       title: "Layanan Kami",
       items: [
@@ -328,7 +355,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     aboutImage: "/templates/klinik-hero.jpg",
     productLabel: "Treatment",
     productSubtitle: "Perawatan aman dengan hasil yang terlihat.",
-    hero: { headline: "Rawat Diri, Tampil Percaya Diri", subheadline: "Perawatan aman oleh tenaga profesional dengan hasil yang terlihat.", ctaText: "Booking Sekarang" },
+    hero: { headline: "Rawat Diri, Tampil Percaya Diri", subheadline: "Klinik kecantikan & perawatan kulit dengan dokter serta terapis bersertifikat, produk berizin BPOM, dan alat steril. Hasil yang terlihat, aman untuk semua jenis kulit. Booking mudah via WhatsApp.", ctaText: "Booking Sekarang" },
     trust: ["Dokter Bersertifikat", "Produk Berizin BPOM", "Alat Steril", "Rating 4.9★"],
     stats: [
       { value: "8.000+", label: "Klien dirawat" },
@@ -352,7 +379,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
         { title: "Hasil Nyata", text: "Ribuan pelanggan puas dengan hasilnya.", note: "Terbukti." },
       ],
     },
-    about: { title: "Tentang Klinik Kami", text: "Kami berkomitmen menghadirkan perawatan yang aman, nyaman, dan efektif. Kesehatan dan kepercayaan diri Anda adalah prioritas kami." },
+    about: { title: "Tentang Klinik Kami", text: "Kami berkomitmen menghadirkan perawatan yang aman, nyaman, dan efektif untuk kulit dan tubuh Anda. Ditangani tenaga profesional bersertifikat dengan produk teruji dan berizin resmi BPOM, setiap treatment kami sesuaikan dengan kondisi dan kebutuhan Anda. Kesehatan dan kepercayaan diri Anda adalah prioritas kami." },
     products: {
       title: "Daftar Treatment",
       items: [
@@ -402,7 +429,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     aboutImage: "/templates/edukasi-hero.jpg",
     productLabel: "Kelas",
     productSubtitle: "Kelas praktis dengan mentor berpengalaman.",
-    hero: { headline: "Belajar Skill Baru, Buka Peluang Baru", subheadline: "Kelas praktis dengan mentor berpengalaman. Belajar dari mana saja.", ctaText: "Daftar Kelas" },
+    hero: { headline: "Belajar Skill Baru, Buka Peluang Baru", subheadline: "Kursus & kelas online praktis dengan mentor praktisi berpengalaman. Materi terstruktur dari dasar sampai mahir, proyek nyata untuk portofolio, plus sertifikat resmi. Belajar dari mana saja.", ctaText: "Daftar Kelas" },
     trust: ["Mentor Praktisi", "Bersertifikat", "1.000+ Alumni", "Akses Selamanya"],
     stats: [
       { value: "1.000+", label: "Alumni" },
@@ -426,7 +453,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
         { title: "Sertifikat", text: "Dapatkan sertifikat kelulusan resmi.", note: "Untuk portofolio." },
       ],
     },
-    about: { title: "Tentang Kami", text: "Kami hadir agar siapa pun bisa belajar skill yang relevan dengan dunia kerja. Ribuan alumni kami telah naik kelas dalam karier dan usaha mereka." },
+    about: { title: "Tentang Kami", text: "Kami hadir agar siapa pun bisa menguasai skill yang benar-benar dipakai di dunia kerja. Diajar langsung oleh praktisi, dengan materi bertahap yang mudah diikuti pemula dan proyek nyata di setiap kelas. Ribuan alumni kami telah naik kelas dalam karier maupun usaha mereka — dan Anda bisa jadi berikutnya." },
     products: {
       title: "Daftar Kelas",
       items: [
@@ -475,7 +502,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     aboutImage: "/templates/properti-hero.jpg",
     productLabel: "Listing",
     productSubtitle: "Pilihan properti terbaik untuk Anda.",
-    hero: { headline: "Temukan Hunian Impian Anda", subheadline: "Pilihan properti terbaik dengan lokasi strategis dan harga bersaing.", ctaText: "Lihat Listing" },
+    hero: { headline: "Temukan Hunian Impian Anda", subheadline: "Agen properti terpercaya untuk rumah, apartemen, tanah, dan ruko. Legalitas terverifikasi, bantuan KPR sampai approve, dan survey lokasi gratis. Temukan hunian atau investasi terbaik Anda.", ctaText: "Lihat Listing" },
     trust: ["Legalitas Aman", "Bantuan KPR", "Survey Gratis", "200+ Unit Terjual"],
     stats: [
       { value: "200+", label: "Unit terjual" },
@@ -499,7 +526,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
         { title: "Survey Gratis", text: "Antar-jemput lokasi tanpa biaya tambahan.", note: "Fleksibel." },
       ],
     },
-    about: { title: "Tentang Kami", text: "Kami agen properti terpercaya yang mengedepankan transparansi. Ratusan keluarga telah kami bantu menemukan hunian yang tepat dengan proses yang mudah." },
+    about: { title: "Tentang Kami", text: "Kami agen properti yang mengedepankan transparansi dan kemudahan. Setiap unit kami verifikasi legalitasnya, dan tim kami mendampingi Anda dari survey lokasi hingga akad — termasuk membantu proses KPR sampai disetujui. Ratusan keluarga telah kami bantu menemukan hunian yang tepat dengan proses yang mudah dan aman." },
     products: {
       title: "Listing Tersedia",
       items: [

@@ -1,5 +1,5 @@
 import type { WebBlock, WebsiteTheme } from "@/lib/builders/website/schema";
-import { postSlug } from "@/lib/builders/website/schema";
+import { postSlug, SOCIAL_PLATFORMS } from "@/lib/builders/website/schema";
 
 function s(props: Record<string, unknown>, key: string): string {
   const v = props[key];
@@ -205,18 +205,62 @@ export function BlockView({
         </section>
       );
 
-    case "logos":
+    case "logos": {
+      const radiusMap: Record<string, string> = { none: "0", md: "8px", lg: "14px", full: "9999px" };
+      const badgeRadius = radiusMap[s(p, "radius") || "full"] ?? "9999px";
+      const bg = s(p, "bg") || "#ffffff";
+      const border = s(p, "border") || "#e2e8f0";
+      const textColor = s(p, "text") || "#475569";
       return (
         <section className="border-y border-slate-100 bg-slate-50 px-6 py-6">
           <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-3">
             {list(p, "items").map((it, i) => (
-              <span key={i} className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600">
+              <span
+                key={i}
+                className="px-4 py-1.5 text-xs font-medium"
+                style={{ borderRadius: badgeRadius, backgroundColor: bg, border: `1px solid ${border}`, color: textColor }}
+              >
                 {it.text}
               </span>
             ))}
           </div>
         </section>
       );
+    }
+
+    case "social": {
+      const socials = SOCIAL_PLATFORMS
+        .map((sp) => ({ label: sp.label, url: safeHref(s(p, sp.key)) }))
+        .filter((x) => x.url && x.url !== "#");
+      return (
+        <section className="bg-white px-6 py-16 text-center">
+          <div className="mx-auto max-w-3xl">
+            {s(p, "title") && (
+              <h2 className={`font-display ${titleCls} font-bold text-slate-900`}>{s(p, "title")}</h2>
+            )}
+            {s(p, "subtitle") && <p className="mt-2 text-slate-600">{s(p, "subtitle")}</p>}
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              {socials.length === 0 ? (
+                <span className="text-sm text-slate-400">Tambahkan link sosial media di panel edit.</span>
+              ) : (
+                socials.map((soc, i) => (
+                  <a
+                    key={i}
+                    href={soc.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full border px-5 py-2 text-sm font-semibold"
+                    style={{ borderColor: primary, color: primary, backgroundColor: `${primary}0d` }}
+                  >
+                    {soc.label}
+                  </a>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+      );
+    }
 
     case "stats":
       return (

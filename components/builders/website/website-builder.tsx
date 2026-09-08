@@ -19,6 +19,7 @@ import {
   BLOCK_DEFS,
   blockDef,
   newBlock,
+  SOCIAL_PLATFORMS,
   type WebBlock,
   type WebBlockType,
   type WebsiteDoc,
@@ -56,8 +57,31 @@ export function WebsiteBuilder({
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [showPalette, setShowPalette] = useState(true);
   const [showInspector, setShowInspector] = useState(true);
+  const [footerOpen, setFooterOpen] = useState(false);
   const [pending, start] = useTransition();
   const [savedAt, setSavedAt] = useState<string | null>(null);
+
+  const setTheme = (patch: Partial<WebsiteDoc["theme"]>) =>
+    setDoc((d) => ({ ...d, theme: { ...d.theme, ...patch } }));
+  const setSocial = (key: string, url: string) =>
+    setDoc((d) => ({ ...d, theme: { ...d.theme, socials: { ...(d.theme.socials ?? {}), [key]: url } } }));
+  const colRaw = (i: number) =>
+    (doc.theme.footerCols?.[i]?.links ?? []).map((l) => `${l.label} | ${l.href}`).join("\n");
+  const parseLinks = (raw: string) =>
+    raw
+      .split("\n")
+      .map((line) => {
+        const [label, href] = line.split("|").map((x) => x.trim());
+        return label ? { label, href: href || "#" } : null;
+      })
+      .filter((x): x is { label: string; href: string } => x !== null);
+  const setCol = (i: number, patch: { title?: string; links?: { label: string; href: string }[] }) =>
+    setDoc((d) => {
+      const cols = [...(d.theme.footerCols ?? [])];
+      while (cols.length <= i) cols.push({ title: "", links: [] });
+      cols[i] = { ...cols[i], ...patch };
+      return { ...d, theme: { ...d.theme, footerCols: cols } };
+    });
 
   const page = doc.pages.find((p) => p.id === pageId) ?? doc.pages[0];
   const blocks = page?.blocks ?? [];
@@ -220,7 +244,7 @@ export function WebsiteBuilder({
       </div>
 
       {/* page tabs */}
-      <div className="mb-4 flex flex-wrap gap-1.5">
+      <div className="mb-4 flex flex-wrap items-center gap-1.5">
         {doc.pages.map((p) => (
           <button
             key={p.id}
@@ -233,7 +257,59 @@ export function WebsiteBuilder({
             {p.name || "Home"}
           </button>
         ))}
+        <button
+          onClick={() => setFooterOpen((v) => !v)}
+          className={cn(
+            "ml-auto rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors",
+            footerOpen ? "border-coral/50 bg-coral/10 text-coral" : "border-white/10 text-slate-400 hover:bg-white/5",
+          )}
+        >
+          ⚙ Footer &amp; Sosial
+        </button>
       </div>
+
+      {footerOpen && (
+        <div className="mb-4 space-y-4 rounded-2xl border border-white/8 bg-card/40 p-4">
+          <p className="font-mono text-[0.62rem] uppercase tracking-wider text-coral">Footer &amp; Sosial Media</p>
+          <label className="block">
+            <span className="mb-1 block text-xs text-slate-400">Tagline footer</span>
+            <input value={doc.theme.tagline ?? ""} onChange={(e) => setTheme({ tagline: e.target.value })} placeholder={`Website resmi ${doc.theme.brand}`} className={inputCls} />
+          </label>
+          <div>
+            <p className="mb-1.5 text-xs text-slate-400">Sosial media (tempel URL, kosongkan yang tidak dipakai)</p>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {SOCIAL_PLATFORMS.map((sp) => (
+                <input
+                  key={sp.key}
+                  value={doc.theme.socials?.[sp.key] ?? ""}
+                  onChange={(e) => setSocial(sp.key, e.target.value)}
+                  placeholder={`${sp.label} URL`}
+                  className={inputCls}
+                />
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-1.5 text-xs text-slate-400">
+              Kolom footer (mis. Legal, Perusahaan) — format tiap baris: <span className="font-mono">Label | https://url</span>
+            </p>
+            <div className="grid gap-3 lg:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="rounded-lg border border-white/8 bg-obsidian/40 p-2.5">
+                  <input value={doc.theme.footerCols?.[i]?.title ?? ""} onChange={(e) => setCol(i, { title: e.target.value })} placeholder={`Judul kolom ${i + 1}`} className={cn(inputCls, "mb-1.5")} />
+                  <textarea
+                    rows={4}
+                    value={colRaw(i)}
+                    onChange={(e) => setCol(i, { links: parseLinks(e.target.value) })}
+                    placeholder={"Syarat & Ketentuan | /terms\nKebijakan Privasi | /privacy"}
+                    className={cn(inputCls, "resize-y font-mono text-xs")}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={gridClass}>
         {/* palette */}
@@ -315,6 +391,17 @@ export function WebsiteBuilder({
                   <span className="mb-1 block text-xs text-slate-400">{f.label}</span>
                   {f.kind === "textarea" ? (
                     <textarea rows={3} value={String(sel.props[f.key] ?? "")} onChange={(e) => setProp(f.key, e.target.value)} className={cn(inputCls, "resize-none")} />
+                  ) : f.kind === "color" ? (
+                    <div className="flex items-center gap-2">
+                      <input type="color" value={String(sel.props[f.key] || "#000000")} onChange={(e) => setProp(f.key, e.target.value)} className="h-9 w-11 shrink-0 cursor-pointer rounded border border-white/10 bg-transparent" />
+                      <input value={String(sel.props[f.key] ?? "")} onChange={(e) => setProp(f.key, e.target.value)} placeholder="#ffffff" className={cn(inputCls, "font-mono")} />
+                    </div>
+                  ) : f.kind === "select" ? (
+                    <select value={String(sel.props[f.key] ?? "")} onChange={(e) => setProp(f.key, e.target.value)} className={inputCls}>
+                      {(f.options ?? []).map((o) => (
+                        <option key={o.value} value={o.value} className="bg-obsidian">{o.label}</option>
+                      ))}
+                    </select>
                   ) : (
                     <input value={String(sel.props[f.key] ?? "")} onChange={(e) => setProp(f.key, e.target.value)} placeholder={f.kind === "image" ? "https://…/gambar.jpg" : ""} className={inputCls} />
                   )}

@@ -16,6 +16,7 @@ export type WebBlockType =
   | "testimonials"
   | "faq"
   | "posts"
+  | "social"
   | "cta"
   | "contact"
   | "footer";
@@ -33,20 +34,44 @@ export type Page = {
   blocks: WebBlock[];
 };
 
+export type SocialLinks = Partial<
+  Record<"instagram" | "tiktok" | "youtube" | "facebook" | "linkedin" | "x" | "pinterest" | "website", string>
+>;
+export type FooterCol = { title: string; links: { label: string; href: string }[] };
+
 export type WebsiteTheme = {
   primary: string;
   brand: string;
   logo?: string;
   whatsapp?: string;
+  tagline?: string;
+  socials?: SocialLinks;
+  footerCols?: FooterCol[];
 };
+
+export const SOCIAL_PLATFORMS: { key: keyof SocialLinks; label: string }[] = [
+  { key: "instagram", label: "Instagram" },
+  { key: "tiktok", label: "TikTok" },
+  { key: "youtube", label: "YouTube" },
+  { key: "facebook", label: "Facebook" },
+  { key: "linkedin", label: "LinkedIn" },
+  { key: "x", label: "X" },
+  { key: "pinterest", label: "Pinterest" },
+  { key: "website", label: "Website" },
+];
 
 export type WebsiteDoc = {
   theme: WebsiteTheme;
   pages: Page[];
 };
 
-export type FieldKind = "text" | "textarea" | "image" | "url";
-export type FieldDef = { key: string; label: string; kind: FieldKind };
+export type FieldKind = "text" | "textarea" | "image" | "url" | "color" | "select";
+export type FieldDef = {
+  key: string;
+  label: string;
+  kind: FieldKind;
+  options?: { value: string; label: string }[];
+};
 export type ListDef = {
   key: string;
   label: string;
@@ -269,7 +294,22 @@ export const BLOCK_DEFS: BlockDef[] = [
     type: "logos",
     label: "Trust Bar",
     hint: "Deretan badge kepercayaan singkat (mis. Halal · Bergaransi · Rating 4.9).",
-    fields: [],
+    fields: [
+      {
+        key: "radius",
+        label: "Bentuk sudut badge",
+        kind: "select",
+        options: [
+          { value: "full", label: "Penuh (pill)" },
+          { value: "lg", label: "Membulat" },
+          { value: "md", label: "Sedang" },
+          { value: "none", label: "Kotak" },
+        ],
+      },
+      { key: "bg", label: "Warna isi badge", kind: "color" },
+      { key: "border", label: "Warna outline badge", kind: "color" },
+      { key: "text", label: "Warna teks badge", kind: "color" },
+    ],
     lists: [
       {
         key: "items",
@@ -280,6 +320,10 @@ export const BLOCK_DEFS: BlockDef[] = [
       },
     ],
     defaults: {
+      radius: "full",
+      bg: "#ffffff",
+      border: "#e2e8f0",
+      text: "#475569",
       items: [{ text: "Terpercaya" }, { text: "Bergaransi" }, { text: "Respon cepat" }, { text: "Rating 4.9★" }],
     },
   },
@@ -421,6 +465,29 @@ export const BLOCK_DEFS: BlockDef[] = [
     },
   },
   {
+    type: "social",
+    label: "Social Media",
+    hint: "Tombol follow/connect ke akun sosial media.",
+    fields: [
+      { key: "title", label: "Judul", kind: "text" },
+      { key: "subtitle", label: "Sub-teks", kind: "textarea" },
+      { key: "instagram", label: "Instagram URL", kind: "url" },
+      { key: "tiktok", label: "TikTok URL", kind: "url" },
+      { key: "youtube", label: "YouTube URL", kind: "url" },
+      { key: "facebook", label: "Facebook URL", kind: "url" },
+      { key: "linkedin", label: "LinkedIn URL", kind: "url" },
+      { key: "x", label: "X / Twitter URL", kind: "url" },
+      { key: "pinterest", label: "Pinterest URL", kind: "url" },
+      { key: "website", label: "Website URL", kind: "url" },
+    ],
+    lists: [],
+    defaults: {
+      title: "Ikuti Kami",
+      subtitle: "Terhubung & dapatkan update terbaru dari kami.",
+      instagram: "", tiktok: "", youtube: "", facebook: "", linkedin: "", x: "", pinterest: "", website: "",
+    },
+  },
+  {
     type: "footer",
     label: "Footer",
     hint: "Bagian penutup (biasanya otomatis).",
@@ -494,6 +561,9 @@ export function coerceDoc(data: unknown, brand: string): WebsiteDoc {
     brand: theme.brand || brand,
     logo: theme.logo || "",
     whatsapp: theme.whatsapp || "+62 812-0000-0000",
+    tagline: theme.tagline || "",
+    socials: theme.socials || {},
+    footerCols: Array.isArray(theme.footerCols) ? theme.footerCols : [],
   };
 
   // New multi-page format.
