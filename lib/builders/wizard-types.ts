@@ -10,6 +10,7 @@ export type BuilderFieldType =
   | "multiselect"
   | "toggle"
   | "stages"
+  | "taglist"
   | "sourcelinks"
   | "info";
 

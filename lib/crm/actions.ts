@@ -12,7 +12,13 @@ export type CrmContactInput = {
   stage: string;
   value?: string;
   notes?: string;
+  category?: string;
 };
+
+/** Trim + cap a free-text label so a badge can't be flooded with junk. */
+function label(v: unknown, max = 60): string | null {
+  return String(v ?? "").trim().slice(0, max) || null;
+}
 
 /** Only the owning client (session member) may manage their pipeline. */
 async function owner(memberId: string) {
@@ -38,6 +44,7 @@ export async function crmAddContact(
     stage: String(input.stage ?? "").trim(),
     value,
     notes: String(input.notes ?? "").trim() || null,
+    category: label(input.category),
   });
   if (error) return { ok: false, error: `${error.message} — pastikan migrasi 'crm_contacts' sudah dijalankan.` };
   revalidatePath("/dashboard/app/crm");
@@ -52,6 +59,22 @@ export async function crmMoveContact(
   if (!(await owner(memberId))) return { ok: false };
   const db = createSupabaseAdminClient();
   await db.from("crm_contacts").update({ stage: String(stage) }).eq("id", id).eq("member_id", memberId);
+  revalidatePath("/dashboard/app/crm");
+  return { ok: true };
+}
+
+export async function crmSetCategory(
+  memberId: string,
+  id: string,
+  category: string,
+): Promise<{ ok: boolean }> {
+  if (!(await owner(memberId))) return { ok: false };
+  const db = createSupabaseAdminClient();
+  await db
+    .from("crm_contacts")
+    .update({ category: label(category) })
+    .eq("id", id)
+    .eq("member_id", memberId);
   revalidatePath("/dashboard/app/crm");
   return { ok: true };
 }

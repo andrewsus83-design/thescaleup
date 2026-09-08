@@ -168,6 +168,20 @@ export const crm: BuilderConfig = {
           ],
         },
         {
+          type: "taglist",
+          label: "Kategori pelanggan (opsional)",
+          key: "customer_categories",
+          hint: "Segmen pelanggan yang bisa ditempel ke tiap kontak — mis. VIP, Reseller, Korporat. Klien memilih kategori (opsional) saat menambah/mengelola kontak di board. Kosongkan untuk pakai default ScaleUp.",
+          options: [
+            { value: "baru", label: "Pelanggan Baru" },
+            { value: "setia", label: "Pelanggan Setia" },
+            { value: "vip", label: "VIP" },
+            { value: "reseller", label: "Reseller / Grosir" },
+            { value: "korporat", label: "Korporat / B2B" },
+            { value: "tidak_aktif", label: "Tidak Aktif" },
+          ],
+        },
+        {
           type: "select",
           label: "Perkiraan jumlah kontak saat ini",
           key: "contact_volume",

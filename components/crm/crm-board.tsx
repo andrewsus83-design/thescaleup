@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Loader2, MessageCircle } from "lucide-react";
 import type { CrmContact } from "@/lib/crm/data";
-import { crmAddContact, crmMoveContact, crmDeleteContact } from "@/lib/crm/actions";
+import { crmAddContact, crmMoveContact, crmDeleteContact, crmSetCategory } from "@/lib/crm/actions";
 import { cn } from "@/lib/utils";
 
 const inputCls =
@@ -24,11 +24,13 @@ export function CrmBoard({
   memberId,
   stages,
   sources,
+  categories,
   contacts,
 }: {
   memberId: string;
   stages: string[];
   sources: string[];
+  categories: string[];
   contacts: CrmContact[];
 }) {
   const router = useRouter();
@@ -37,7 +39,7 @@ export function CrmBoard({
   const [overCol, setOverCol] = useState<string | null>(null);
   const [, start] = useTransition();
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ name: "", whatsapp: "", source: "", value: "", stage: stages[0] ?? "" });
+  const [form, setForm] = useState({ name: "", whatsapp: "", source: "", value: "", stage: stages[0] ?? "", category: "" });
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => setLocal(contacts), [contacts]);
@@ -56,6 +58,12 @@ export function CrmBoard({
     start(() => void crmDeleteContact(memberId, id));
   };
 
+  const setCategory = (id: string, category: string) => {
+    const next = category || null;
+    setLocal((prev) => prev.map((c) => (c.id === id ? { ...c, category: next } : c)));
+    start(() => void crmSetCategory(memberId, id, category));
+  };
+
   const add = () => {
     setErr(null);
     if (!form.name.trim()) { setErr("Nama wajib diisi."); return; }
@@ -64,7 +72,7 @@ export function CrmBoard({
       const r = await crmAddContact(memberId, { ...form });
       setAdding(false);
       if (!r.ok) { setErr(r.error ?? "Gagal menambah kontak."); return; }
-      setForm({ name: "", whatsapp: "", source: "", value: "", stage: stages[0] ?? "" });
+      setForm({ name: "", whatsapp: "", source: "", value: "", stage: stages[0] ?? "", category: "" });
       router.refresh();
     });
   };
@@ -74,12 +82,16 @@ export function CrmBoard({
       {/* add contact */}
       <div className="rounded-2xl border border-white/8 bg-card/40 p-4">
         <p className="mb-3 font-mono text-xs uppercase tracking-wider text-slate-500">Tambah kontak / lead</p>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
           <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Nama *" className={cn(inputCls, "lg:col-span-2")} />
           <input value={form.whatsapp} onChange={(e) => setForm((f) => ({ ...f, whatsapp: e.target.value }))} placeholder="No. WhatsApp" className={inputCls} />
           <select value={form.source} onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))} className={inputCls}>
             <option value="">Sumber…</option>
             {sources.map((s) => (<option key={s} value={s} className="bg-obsidian">{s}</option>))}
+          </select>
+          <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className={inputCls}>
+            <option value="">Kategori…</option>
+            {categories.map((c) => (<option key={c} value={c} className="bg-obsidian">{c}</option>))}
           </select>
           <input value={form.value} onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))} placeholder="Nilai (Rp)" className={inputCls} />
           <select value={form.stage} onChange={(e) => setForm((f) => ({ ...f, stage: e.target.value }))} className={inputCls}>
@@ -144,6 +156,9 @@ export function CrmBoard({
                       </button>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-[0.64rem]">
+                      {c.category && (
+                        <span className="rounded-full border border-coral/30 bg-coral/10 px-2 py-0.5 font-medium text-coral">{c.category}</span>
+                      )}
                       {c.source && (
                         <span className="rounded-full border border-white/15 px-2 py-0.5 font-mono uppercase text-slate-400">{c.source}</span>
                       )}
@@ -168,6 +183,18 @@ export function CrmBoard({
                       className="mt-2 w-full rounded-lg border border-white/8 bg-obsidian/60 px-2 py-1 text-[0.66rem] text-slate-400 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
                     >
                       {stages.map((s) => (<option key={s} value={s}>Pindah ke: {s}</option>))}
+                    </select>
+                    <select
+                      value={c.category ?? ""}
+                      onChange={(e) => setCategory(c.id, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-1.5 w-full rounded-lg border border-white/8 bg-obsidian/60 px-2 py-1 text-[0.66rem] text-slate-400 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+                    >
+                      <option value="">Kategori: —</option>
+                      {categories.map((cat) => (<option key={cat} value={cat}>Kategori: {cat}</option>))}
+                      {c.category && !categories.includes(c.category) && (
+                        <option value={c.category}>Kategori: {c.category}</option>
+                      )}
                     </select>
                   </div>
                 ))}

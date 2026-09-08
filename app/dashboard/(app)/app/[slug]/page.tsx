@@ -111,7 +111,7 @@ export default async function ClientAppPage({
           title={b.title}
           description="Pipeline drag-and-drop — seret kartu kontak antar tahap penjualan."
         />
-        <CrmBoard memberId={m.id} stages={crm.stages} sources={crm.sources} contacts={crm.contacts} />
+        <CrmBoard memberId={m.id} stages={crm.stages} sources={crm.sources} categories={crm.categories} contacts={crm.contacts} />
       </>
     );
   }

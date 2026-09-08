@@ -284,6 +284,52 @@ function FieldView({
         </div>
       );
     }
+    case "taglist": {
+      const arr: string[] =
+        Array.isArray(value) && value.length
+          ? (value as string[])
+          : (field.options ?? []).map((o) => o.label);
+      const commit = (next: string[]) => set(next);
+      return (
+        <div>
+          {label}
+          <div className="space-y-2">
+            {arr.map((s, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2 rounded-xl border border-white/10 bg-obsidian/50 px-2.5 py-2"
+              >
+                <input
+                  value={s}
+                  onChange={(e) => {
+                    const n = [...arr];
+                    n[i] = e.target.value;
+                    commit(n);
+                  }}
+                  placeholder="Nama kategori"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-mist focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => commit(arr.filter((_, x) => x !== i))}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-bad/20 text-bad hover:bg-bad/10"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => commit([...arr, ""])}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-white/10"
+          >
+            <Plus className="h-3.5 w-3.5" /> Tambah kategori
+          </button>
+          {hint}
+        </div>
+      );
+    }
     case "sourcelinks": {
       const val =
         value && typeof value === "object" && !Array.isArray(value)
