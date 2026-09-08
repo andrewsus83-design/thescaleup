@@ -12,6 +12,8 @@ import {
   ExternalLink,
   Monitor,
   Smartphone,
+  PanelLeft,
+  PanelRight,
 } from "lucide-react";
 import {
   BLOCK_DEFS,
@@ -52,6 +54,8 @@ export function WebsiteBuilder({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
+  const [showPalette, setShowPalette] = useState(true);
+  const [showInspector, setShowInspector] = useState(true);
   const [pending, start] = useTransition();
   const [savedAt, setSavedAt] = useState<string | null>(null);
 
@@ -59,6 +63,15 @@ export function WebsiteBuilder({
   const blocks = page?.blocks ?? [];
   const sel = blocks.find((b) => b.id === selected) ?? null;
   const selDef = sel ? blockDef(sel.type) : null;
+
+  const gridClass = cn(
+    "grid gap-4",
+    showPalette && showInspector && "lg:grid-cols-[180px_1fr_300px]",
+    showPalette && !showInspector && "lg:grid-cols-[180px_1fr]",
+    !showPalette && showInspector && "lg:grid-cols-[1fr_300px]",
+    !showPalette && !showInspector && "lg:grid-cols-1",
+  );
+  const SIZE_OPTS: [string, string][] = [["sm", "Kecil"], ["md", "Normal"], ["lg", "Besar"], ["xl", "XL"]];
 
   const setBlocks = (next: WebBlock[]) =>
     setDoc((d) => ({
@@ -179,6 +192,14 @@ export function WebsiteBuilder({
             <Smartphone className="h-4 w-4" />
           </button>
         </div>
+        <div className="inline-flex rounded-lg border border-white/10 p-0.5">
+          <button onClick={() => setShowPalette((v) => !v)} className={cn("rounded-md p-1.5", showPalette ? "text-coral" : "text-slate-500")} title="Sembunyikan / tampilkan panel kiri (blok)">
+            <PanelLeft className="h-4 w-4" />
+          </button>
+          <button onClick={() => setShowInspector((v) => !v)} className={cn("rounded-md p-1.5", showInspector ? "text-coral" : "text-slate-500")} title="Sembunyikan / tampilkan panel kanan (edit)">
+            <PanelRight className="h-4 w-4" />
+          </button>
+        </div>
         <div className="ml-auto flex items-center gap-2">
           {savedAt && <span className="text-xs text-good">Tersimpan {savedAt}</span>}
           <button
@@ -214,18 +235,20 @@ export function WebsiteBuilder({
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[180px_1fr_300px]">
+      <div className={gridClass}>
         {/* palette */}
-        <div className="rounded-2xl border border-white/8 bg-card/40 p-3">
-          <p className="mb-2 font-mono text-[0.62rem] uppercase tracking-wider text-slate-500">Tambah Blok</p>
-          <div className="flex flex-col gap-1.5">
-            {BLOCK_DEFS.map((d) => (
-              <button key={d.type} onClick={() => addBlock(d.type)} title={d.hint} className="flex items-center gap-2 rounded-lg border border-white/8 bg-obsidian/40 px-2.5 py-2 text-left text-xs text-slate-300 hover:border-coral/30 hover:text-white">
-                <Plus className="h-3.5 w-3.5 text-coral" /> {d.label}
-              </button>
-            ))}
+        {showPalette && (
+          <div className="rounded-2xl border border-white/8 bg-card/40 p-3">
+            <p className="mb-2 font-mono text-[0.62rem] uppercase tracking-wider text-slate-500">Tambah Blok</p>
+            <div className="flex flex-col gap-1.5">
+              {BLOCK_DEFS.map((d) => (
+                <button key={d.type} onClick={() => addBlock(d.type)} title={d.hint} className="flex items-center gap-2 rounded-lg border border-white/8 bg-obsidian/40 px-2.5 py-2 text-left text-xs text-slate-300 hover:border-coral/30 hover:text-white">
+                  <Plus className="h-3.5 w-3.5 text-coral" /> {d.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* canvas */}
         <div className="overflow-hidden rounded-2xl border border-white/8 bg-slate-200/5 p-4">
@@ -265,12 +288,28 @@ export function WebsiteBuilder({
         </div>
 
         {/* inspector */}
+        {showInspector && (
         <div className="rounded-2xl border border-white/8 bg-card/40 p-3">
           {!sel || !selDef ? (
             <p className="text-sm text-slate-500">Pilih blok di kanvas untuk mengedit.</p>
           ) : (
             <div className="space-y-3">
               <p className="font-mono text-[0.62rem] uppercase tracking-wider text-coral">Edit: {selDef.label}</p>
+              {/* text size */}
+              <div>
+                <span className="mb-1 block text-xs text-slate-400">Ukuran teks</span>
+                <div className="inline-flex rounded-lg border border-white/10 p-0.5">
+                  {SIZE_OPTS.map(([v, l]) => (
+                    <button
+                      key={v}
+                      onClick={() => setProp("size", v)}
+                      className={cn("rounded-md px-2.5 py-1 text-xs", String(sel.props.size ?? "md") === v ? "bg-coral text-white" : "text-slate-400 hover:text-white")}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {selDef.fields.map((f) => (
                 <label key={f.key} className="block">
                   <span className="mb-1 block text-xs text-slate-400">{f.label}</span>
@@ -310,6 +349,7 @@ export function WebsiteBuilder({
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

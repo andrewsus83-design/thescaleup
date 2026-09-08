@@ -26,6 +26,20 @@ function safeImg(u: string): string {
   return v.startsWith("/") || /^https?:\/\//i.test(v) ? v : "";
 }
 
+// Per-block text size (set from the inspector: props.size = sm|md|lg|xl).
+const HERO_SIZE: Record<string, string> = {
+  sm: "text-3xl sm:text-4xl",
+  md: "text-4xl sm:text-5xl",
+  lg: "text-5xl sm:text-6xl",
+  xl: "text-6xl sm:text-7xl",
+};
+const TITLE_SIZE: Record<string, string> = {
+  sm: "text-2xl",
+  md: "text-3xl",
+  lg: "text-4xl",
+  xl: "text-5xl",
+};
+
 /** Renders one website block as real (light-theme) site markup. Shared by the
  *  builder canvas and the public /site renderer. */
 export function BlockView({
@@ -41,6 +55,9 @@ export function BlockView({
   const primary = theme.primary || "#FF5733";
   const pvq = ctx?.preview ? "?preview=1" : "";
   const blogBase = ctx?.memberId ? `/site/${ctx.memberId}/blog` : "#";
+  const size = s(p, "size") || "md";
+  const heroCls = HERO_SIZE[size] ?? HERO_SIZE.md;
+  const titleCls = TITLE_SIZE[size] ?? TITLE_SIZE.md;
 
   switch (block.type) {
     case "pageheader":
@@ -50,7 +67,7 @@ export function BlockView({
           style={{ background: `linear-gradient(135deg, ${primary}18, #ffffff)` }}
         >
           <div className="mx-auto max-w-3xl">
-            <h1 className="font-display text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+            <h1 className={`font-display ${titleCls} font-extrabold tracking-tight text-slate-900`}>
               {s(p, "title")}
             </h1>
             {s(p, "subtitle") && (
@@ -65,7 +82,7 @@ export function BlockView({
         <section className="bg-white px-6 py-16">
           <div className="mx-auto max-w-3xl">
             {s(p, "title") && (
-              <h2 className="mb-8 text-center font-display text-3xl font-bold text-slate-900">
+              <h2 className={`mb-8 text-center font-display ${titleCls} font-bold text-slate-900`}>
                 {s(p, "title")}
               </h2>
             )}
@@ -90,7 +107,7 @@ export function BlockView({
         <section className="bg-white px-6 py-16">
           <div className="mx-auto max-w-5xl">
             {s(p, "title") && (
-              <h2 className="mb-10 text-center font-display text-3xl font-bold text-slate-900">
+              <h2 className={`mb-10 text-center font-display ${titleCls} font-bold text-slate-900`}>
                 {s(p, "title")}
               </h2>
             )}
@@ -139,7 +156,7 @@ export function BlockView({
         >
           <div className="mx-auto max-w-3xl">
             <h1
-              className={`font-display text-4xl font-extrabold tracking-tight sm:text-5xl ${heroImg ? "text-white" : "text-slate-900"}`}
+              className={`font-display ${heroCls} font-extrabold tracking-tight ${heroImg ? "text-white" : "text-slate-900"}`}
             >
               {s(p, "headline")}
             </h1>
@@ -167,7 +184,7 @@ export function BlockView({
         <section className="bg-white px-6 py-16">
           <div className="mx-auto max-w-5xl">
             {s(p, "title") && (
-              <h2 className="mb-10 text-center font-display text-3xl font-bold text-slate-900">
+              <h2 className={`mb-10 text-center font-display ${titleCls} font-bold text-slate-900`}>
                 {s(p, "title")}
               </h2>
             )}
@@ -228,7 +245,7 @@ export function BlockView({
           <div className="mx-auto max-w-5xl">
             <div className="mb-10 text-center">
               {s(p, "title") && (
-                <h2 className="font-display text-3xl font-bold text-slate-900">{s(p, "title")}</h2>
+                <h2 className={`font-display ${titleCls} font-bold text-slate-900`}>{s(p, "title")}</h2>
               )}
               {s(p, "subtitle") && <p className="mt-2 text-slate-600">{s(p, "subtitle")}</p>}
             </div>
@@ -252,7 +269,7 @@ export function BlockView({
         <section className="bg-white px-6 py-16">
           <div className="mx-auto max-w-5xl">
             {s(p, "title") && (
-              <h2 className="mb-8 text-center font-display text-3xl font-bold text-slate-900">{s(p, "title")}</h2>
+              <h2 className={`mb-8 text-center font-display ${titleCls} font-bold text-slate-900`}>{s(p, "title")}</h2>
             )}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {list(p, "items").map((it, i) =>
@@ -275,7 +292,7 @@ export function BlockView({
           <div className="mx-auto max-w-5xl">
             <div className="mb-10 text-center">
               {s(p, "title") && (
-                <h2 className="font-display text-3xl font-bold text-slate-900">{s(p, "title")}</h2>
+                <h2 className={`font-display ${titleCls} font-bold text-slate-900`}>{s(p, "title")}</h2>
               )}
               {s(p, "subtitle") && <p className="mt-2 text-slate-600">{s(p, "subtitle")}</p>}
             </div>
@@ -329,7 +346,7 @@ export function BlockView({
         <section className="bg-white px-6 py-16">
           <div className="mx-auto max-w-5xl">
             {s(p, "title") && (
-              <h2 className="mb-10 text-center font-display text-3xl font-bold text-slate-900">{s(p, "title")}</h2>
+              <h2 className={`mb-10 text-center font-display ${titleCls} font-bold text-slate-900`}>{s(p, "title")}</h2>
             )}
             <div className="grid gap-6 sm:grid-cols-3">
               {list(p, "items").map((it, i) => (
@@ -350,7 +367,7 @@ export function BlockView({
         <section className="bg-white px-6 py-16">
           <div className="mx-auto grid max-w-5xl items-center gap-10 md:grid-cols-2">
             <div>
-              <h2 className="font-display text-3xl font-bold text-slate-900">{s(p, "title")}</h2>
+              <h2 className={`font-display ${titleCls} font-bold text-slate-900`}>{s(p, "title")}</h2>
               <p className="mt-4 whitespace-pre-wrap leading-relaxed text-slate-600">{s(p, "text")}</p>
             </div>
             <div className="aspect-video overflow-hidden rounded-2xl bg-slate-100">
@@ -372,7 +389,7 @@ export function BlockView({
         <section className="bg-slate-50 px-6 py-16">
           <div className="mx-auto max-w-5xl">
             {s(p, "title") && (
-              <h2 className="mb-10 text-center font-display text-3xl font-bold text-slate-900">
+              <h2 className={`mb-10 text-center font-display ${titleCls} font-bold text-slate-900`}>
                 {s(p, "title")}
               </h2>
             )}
@@ -417,7 +434,7 @@ export function BlockView({
       return (
         <section id="kontak" className="px-6 py-16" style={{ backgroundColor: `${primary}12` }}>
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="font-display text-3xl font-bold text-slate-900">{s(p, "headline")}</h2>
+            <h2 className={`font-display ${titleCls} font-bold text-slate-900`}>{s(p, "headline")}</h2>
             <p className="mt-3 text-slate-600">{s(p, "text")}</p>
             {s(p, "buttonText") && (
               <a
@@ -436,7 +453,7 @@ export function BlockView({
       return (
         <section className="bg-white px-6 py-16">
           <div className="mx-auto max-w-3xl text-center">
-            <h2 className="font-display text-3xl font-bold text-slate-900">{s(p, "title")}</h2>
+            <h2 className={`font-display ${titleCls} font-bold text-slate-900`}>{s(p, "title")}</h2>
             <div className="mt-6 flex flex-col items-center gap-2 text-slate-600">
               {s(p, "whatsapp") && <p>WhatsApp: {s(p, "whatsapp")}</p>}
               {s(p, "email") && <p>Email: {s(p, "email")}</p>}
