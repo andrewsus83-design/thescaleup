@@ -205,6 +205,50 @@ export function BlockView({
         </section>
       );
 
+    case "custom": {
+      const els = list(p, "elements");
+      const alignText: Record<string, string> = { left: "text-left", center: "text-center", right: "text-right" };
+      const alignItems: Record<string, string> = { left: "items-start", center: "items-center", right: "items-end" };
+      const hSize: Record<string, string> = { sm: "text-xl", md: "text-2xl", lg: "text-3xl", xl: "text-4xl" };
+      const tSize: Record<string, string> = { sm: "text-sm", md: "text-base", lg: "text-lg", xl: "text-xl" };
+      const imgW: Record<string, string> = { sm: "max-w-xs", md: "max-w-md", lg: "max-w-2xl", full: "w-full" };
+      return (
+        <section className="bg-white px-6 py-12">
+          <div className="mx-auto flex max-w-4xl flex-col gap-5">
+            {els.length === 0 && (
+              <p className="text-center text-sm text-slate-400">Blok kosong — tambah teks atau gambar di panel edit.</p>
+            )}
+            {els.map((el, i) => {
+              const a = el.align || "left";
+              if (el.type === "image") {
+                const src = safeImg(el.value ?? "");
+                if (!src) return null;
+                return (
+                  <figure key={i} className={`flex flex-col ${alignItems[a]}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt={el.caption ?? ""} className={`rounded-xl ${imgW[el.width || "md"]}`} />
+                    {el.caption && <figcaption className="mt-1.5 text-xs text-slate-500">{el.caption}</figcaption>}
+                  </figure>
+                );
+              }
+              if (el.type === "heading") {
+                return (
+                  <h2 key={i} className={`font-display font-bold text-slate-900 ${hSize[el.size || "lg"]} ${alignText[a]}`}>
+                    {el.value}
+                  </h2>
+                );
+              }
+              return (
+                <p key={i} className={`whitespace-pre-wrap leading-relaxed text-slate-700 ${tSize[el.size || "md"]} ${alignText[a]}`}>
+                  {el.value}
+                </p>
+              );
+            })}
+          </div>
+        </section>
+      );
+    }
+
     case "logos": {
       const radiusMap: Record<string, string> = { none: "0", md: "8px", lg: "14px", full: "9999px" };
       const badgeRadius = radiusMap[s(p, "radius") || "full"] ?? "9999px";

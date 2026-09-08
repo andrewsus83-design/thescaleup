@@ -187,6 +187,27 @@ export function WebsiteBuilder({
     setProp(key, listItems(key).map((it, i) => (i === idx ? { ...it, [itemKey]: value } : it)));
   };
 
+  // Custom block: freeform text/heading/image elements arranged manually.
+  const customEls = (): Record<string, string>[] =>
+    Array.isArray(sel?.props.elements) ? (sel!.props.elements as Record<string, string>[]) : [];
+  const setCustomEls = (next: Record<string, string>[]) => setProp("elements", next);
+  const addEl = (type: string) =>
+    setCustomEls([
+      ...customEls(),
+      { type, value: type === "image" ? "" : type === "heading" ? "Judul Baru" : "Tulis teks di sini...", align: "left", size: "md", width: "md", caption: "" },
+    ]);
+  const updEl = (i: number, patch: Record<string, string>) =>
+    setCustomEls(customEls().map((e, idx) => (idx === i ? { ...e, ...patch } : e)));
+  const moveEl = (i: number, dir: number) => {
+    const arr = customEls();
+    const j = i + dir;
+    if (j < 0 || j >= arr.length) return;
+    const next = [...arr];
+    [next[i], next[j]] = [next[j], next[i]];
+    setCustomEls(next);
+  };
+  const delEl = (i: number) => setCustomEls(customEls().filter((_, idx) => idx !== i));
+
   const save = (status: string) =>
     start(async () => {
       const r = await onSave(memberId, "website", { ...doc, website_url: `/site/${memberId}` }, status);
@@ -515,6 +536,61 @@ export function WebsiteBuilder({
                   </button>
                 </div>
               ))}
+
+              {sel.type === "custom" && (
+                <div className="space-y-2 border-t border-white/8 pt-3">
+                  <p className="text-xs font-semibold text-slate-300">Elemen (teks &amp; gambar)</p>
+                  {customEls().map((el, i) => (
+                    <div key={i} className="space-y-1.5 rounded-lg border border-white/8 bg-obsidian/40 p-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[0.62rem] uppercase tracking-wider text-slate-500">
+                          {el.type === "image" ? "Gambar" : el.type === "heading" ? "Judul" : "Teks"}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <button onClick={() => moveEl(i, -1)} disabled={i === 0} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-slate-400 hover:bg-white/5 disabled:opacity-30"><ArrowUp className="h-3 w-3" /></button>
+                          <button onClick={() => moveEl(i, 1)} disabled={i === customEls().length - 1} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-slate-400 hover:bg-white/5 disabled:opacity-30"><ArrowDown className="h-3 w-3" /></button>
+                          <button onClick={() => delEl(i)} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-bad/20 text-bad hover:bg-bad/10"><Trash2 className="h-3 w-3" /></button>
+                        </span>
+                      </div>
+                      {el.type === "image" ? (
+                        <>
+                          <input value={el.value ?? ""} onChange={(e) => updEl(i, { value: e.target.value })} placeholder="https://…/gambar.jpg" className={inputCls} />
+                          <input value={el.caption ?? ""} onChange={(e) => updEl(i, { caption: e.target.value })} placeholder="Caption (opsional)" className={inputCls} />
+                        </>
+                      ) : (
+                        <textarea rows={2} value={el.value ?? ""} onChange={(e) => updEl(i, { value: e.target.value })} className={cn(inputCls, "resize-y")} />
+                      )}
+                      <div className="flex gap-2">
+                        <select value={el.align ?? "left"} onChange={(e) => updEl(i, { align: e.target.value })} className={cn(inputCls, "text-xs")}>
+                          <option value="left" className="bg-obsidian">Kiri</option>
+                          <option value="center" className="bg-obsidian">Tengah</option>
+                          <option value="right" className="bg-obsidian">Kanan</option>
+                        </select>
+                        {el.type === "image" ? (
+                          <select value={el.width ?? "md"} onChange={(e) => updEl(i, { width: e.target.value })} className={cn(inputCls, "text-xs")}>
+                            <option value="sm" className="bg-obsidian">Kecil</option>
+                            <option value="md" className="bg-obsidian">Sedang</option>
+                            <option value="lg" className="bg-obsidian">Besar</option>
+                            <option value="full" className="bg-obsidian">Penuh</option>
+                          </select>
+                        ) : (
+                          <select value={el.size ?? "md"} onChange={(e) => updEl(i, { size: e.target.value })} className={cn(inputCls, "text-xs")}>
+                            <option value="sm" className="bg-obsidian">Kecil</option>
+                            <option value="md" className="bg-obsidian">Normal</option>
+                            <option value="lg" className="bg-obsidian">Besar</option>
+                            <option value="xl" className="bg-obsidian">XL</option>
+                          </select>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex flex-wrap gap-1.5">
+                    <button onClick={() => addEl("heading")} className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-white/10"><Plus className="h-3 w-3" /> Judul</button>
+                    <button onClick={() => addEl("text")} className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-white/10"><Plus className="h-3 w-3" /> Teks</button>
+                    <button onClick={() => addEl("image")} className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-white/10"><Plus className="h-3 w-3" /> Gambar</button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

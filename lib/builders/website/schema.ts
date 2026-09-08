@@ -4,6 +4,7 @@
 export type WebBlockType =
   | "hero"
   | "pageheader"
+  | "custom"
   | "logos"
   | "stats"
   | "steps"
@@ -120,6 +121,14 @@ export const BLOCK_DEFS: BlockDef[] = [
     ],
     lists: [],
     defaults: { title: "Judul Halaman", subtitle: "Deskripsi singkat halaman ini." },
+  },
+  {
+    type: "custom",
+    label: "Blok Kustom (teks & gambar)",
+    hint: "Blok kosong — tambah teks, judul, dan gambar; atur urutan & posisi (kiri/tengah/kanan) sendiri.",
+    fields: [],
+    lists: [],
+    defaults: { elements: [] },
   },
   {
     type: "features",
