@@ -47,6 +47,7 @@ export type WebsiteTheme = {
   tagline?: string;
   socials?: SocialLinks;
   footerCols?: FooterCol[];
+  navAlign?: "left" | "center" | "right";
 };
 
 export const SOCIAL_PLATFORMS: { key: keyof SocialLinks; label: string }[] = [
@@ -564,6 +565,7 @@ export function coerceDoc(data: unknown, brand: string): WebsiteDoc {
     tagline: theme.tagline || "",
     socials: theme.socials || {},
     footerCols: Array.isArray(theme.footerCols) ? theme.footerCols : [],
+    navAlign: theme.navAlign || "center",
   };
 
   // New multi-page format.

@@ -19,6 +19,7 @@ import {
   BLOCK_DEFS,
   blockDef,
   newBlock,
+  newPage,
   SOCIAL_PLATFORMS,
   type WebBlock,
   type WebBlockType,
@@ -58,6 +59,7 @@ export function WebsiteBuilder({
   const [showPalette, setShowPalette] = useState(true);
   const [showInspector, setShowInspector] = useState(true);
   const [footerOpen, setFooterOpen] = useState(false);
+  const [pagesOpen, setPagesOpen] = useState(false);
   const [pending, start] = useTransition();
   const [savedAt, setSavedAt] = useState<string | null>(null);
 
@@ -108,6 +110,44 @@ export function WebsiteBuilder({
     const pg = doc.pages.find((p) => p.id === id);
     setSelected(pg?.blocks[0]?.id ?? null);
   };
+  const slugify = (str: string) =>
+    str.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-").replace(/-+/g, "-").slice(0, 40);
+  const uniqueSlug = (name: string) => {
+    const base = slugify(name) || "halaman";
+    const taken = new Set(doc.pages.map((p) => p.slug));
+    let out = base, i = 2;
+    while (taken.has(out)) out = `${base}-${i++}`;
+    return out;
+  };
+  const addPage = () => {
+    const name = window.prompt("Nama halaman / menu baru:", "Halaman Baru");
+    if (!name || !name.trim()) return;
+    const pg = newPage(uniqueSlug(name.trim()), name.trim(), [newBlock("pageheader"), newBlock("cta")]);
+    setDoc((d) => ({ ...d, pages: [...d.pages, pg] }));
+    setPageId(pg.id);
+    setSelected(pg.blocks[0]?.id ?? null);
+  };
+  const renamePage = (id: string, name: string) =>
+    setDoc((d) => ({ ...d, pages: d.pages.map((p) => (p.id === id ? { ...p, name } : p)) }));
+  const deletePage = (id: string) => {
+    if (doc.pages.length <= 1 || !window.confirm("Hapus halaman ini beserta isinya?")) return;
+    const first = doc.pages.find((p) => p.id !== id);
+    setDoc((d) => ({ ...d, pages: d.pages.filter((p) => p.id !== id) }));
+    if (pageId === id) {
+      setPageId(first?.id ?? "");
+      setSelected(first?.blocks[0]?.id ?? null);
+    }
+  };
+  const movePage = (id: string, dir: number) =>
+    setDoc((d) => {
+      const idx = d.pages.findIndex((p) => p.id === id);
+      const j = idx + dir;
+      if (idx < 0 || j < 0 || j >= d.pages.length) return d;
+      const pages = [...d.pages];
+      [pages[idx], pages[j]] = [pages[j], pages[idx]];
+      return { ...d, pages };
+    });
+
   const applyTemplate = (id: string) => {
     if (!id) return;
     if (!window.confirm("Ganti semua halaman dengan template ini? Isi saat ini akan ditimpa.")) return;
@@ -257,16 +297,58 @@ export function WebsiteBuilder({
             {p.name || "Home"}
           </button>
         ))}
-        <button
-          onClick={() => setFooterOpen((v) => !v)}
-          className={cn(
-            "ml-auto rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors",
-            footerOpen ? "border-coral/50 bg-coral/10 text-coral" : "border-white/10 text-slate-400 hover:bg-white/5",
-          )}
-        >
-          ⚙ Footer &amp; Sosial
+        <button onClick={addPage} className="rounded-full border border-dashed border-white/15 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-coral/40 hover:text-coral" title="Tambah halaman / menu baru">
+          + Halaman
         </button>
+        <span className="ml-auto flex items-center gap-1.5">
+          <button
+            onClick={() => setPagesOpen((v) => !v)}
+            className={cn(
+              "rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors",
+              pagesOpen ? "border-coral/50 bg-coral/10 text-coral" : "border-white/10 text-slate-400 hover:bg-white/5",
+            )}
+          >
+            ⚙ Halaman
+          </button>
+          <button
+            onClick={() => setFooterOpen((v) => !v)}
+            className={cn(
+              "rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors",
+              footerOpen ? "border-coral/50 bg-coral/10 text-coral" : "border-white/10 text-slate-400 hover:bg-white/5",
+            )}
+          >
+            ⚙ Footer &amp; Sosial
+          </button>
+        </span>
       </div>
+
+      {pagesOpen && (
+        <div className="mb-4 space-y-3 rounded-2xl border border-white/8 bg-card/40 p-4">
+          <p className="font-mono text-[0.62rem] uppercase tracking-wider text-coral">Kelola Halaman &amp; Menu</p>
+          <label className="block max-w-xs">
+            <span className="mb-1 block text-xs text-slate-400">Posisi menu (nav)</span>
+            <select value={doc.theme.navAlign ?? "center"} onChange={(e) => setTheme({ navAlign: e.target.value as "left" | "center" | "right" })} className={inputCls}>
+              <option value="left" className="bg-obsidian">Kiri</option>
+              <option value="center" className="bg-obsidian">Tengah</option>
+              <option value="right" className="bg-obsidian">Kanan</option>
+            </select>
+          </label>
+          <div className="space-y-2">
+            {doc.pages.map((p, i) => (
+              <div key={p.id} className="flex items-center gap-2 rounded-lg border border-white/8 bg-obsidian/40 px-2.5 py-2">
+                <input value={p.name} onChange={(e) => renamePage(p.id, e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-mist focus:outline-none" />
+                <span className="shrink-0 font-mono text-[0.6rem] text-slate-600">/{p.slug || "home"}</span>
+                <button onClick={() => movePage(p.id, -1)} disabled={i === 0} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:bg-white/5 disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
+                <button onClick={() => movePage(p.id, 1)} disabled={i === doc.pages.length - 1} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:bg-white/5 disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
+                <button onClick={() => deletePage(p.id)} disabled={doc.pages.length <= 1} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-bad/20 text-bad hover:bg-bad/10 disabled:opacity-30"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
+            ))}
+          </div>
+          <button onClick={addPage} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/10">
+            <Plus className="h-3.5 w-3.5" /> Tambah Halaman
+          </button>
+        </div>
+      )}
 
       {footerOpen && (
         <div className="mb-4 space-y-4 rounded-2xl border border-white/8 bg-card/40 p-4">

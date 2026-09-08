@@ -45,6 +45,9 @@ export function SiteChrome({
     .map((sp) => ({ label: sp.label, url: safeHref(doc.theme.socials?.[sp.key]) }))
     .filter((x) => x.url !== "#");
   const footerCols = doc.theme.footerCols?.filter((c) => c && c.title && c.links?.length) ?? [];
+  const align = doc.theme.navAlign || "center";
+  const navExtra = align === "left" ? "ml-6" : align === "center" ? "mx-auto" : "ml-auto";
+  const ctaExtra = align === "left" ? "ml-auto" : align === "right" ? "ml-3" : "";
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -62,7 +65,7 @@ export function SiteChrome({
               <span style={{ color: primary }}>{brand}</span>
             )}
           </a>
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav className={`hidden items-center gap-1 md:flex ${navExtra}`}>
             {doc.pages.map((pg) => {
               const active = pg.slug === activeSlug;
               return (
@@ -82,7 +85,7 @@ export function SiteChrome({
               href={wa}
               target="_blank"
               rel="noreferrer"
-              className="rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm"
+              className={`rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm ${ctaExtra}`}
               style={{ backgroundColor: primary }}
             >
               Hubungi
