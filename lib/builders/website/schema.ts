@@ -4,10 +4,16 @@
 export type WebBlockType =
   | "hero"
   | "pageheader"
+  | "logos"
+  | "stats"
+  | "steps"
   | "features"
   | "about"
   | "products"
+  | "gallery"
+  | "pricing"
   | "testimonial"
+  | "testimonials"
   | "faq"
   | "posts"
   | "cta"
@@ -102,8 +108,9 @@ export const BLOCK_DEFS: BlockDef[] = [
         itemFields: [
           { key: "title", label: "Judul", kind: "text" },
           { key: "text", label: "Deskripsi", kind: "textarea" },
+          { key: "note", label: "Catatan kecil (opsional)", kind: "text" },
         ],
-        itemDefault: { title: "Keunggulan", text: "Penjelasan singkat." },
+        itemDefault: { title: "Keunggulan", text: "Penjelasan singkat.", note: "" },
       },
     ],
     defaults: {
@@ -256,6 +263,161 @@ export const BLOCK_DEFS: BlockDef[] = [
       email: "halo@brand.com",
       address: "Jl. Contoh No. 1, Jakarta",
       hours: "Senin - Sabtu, 09.00 - 18.00",
+    },
+  },
+  {
+    type: "logos",
+    label: "Trust Bar",
+    hint: "Deretan badge kepercayaan singkat (mis. Halal · Bergaransi · Rating 4.9).",
+    fields: [],
+    lists: [
+      {
+        key: "items",
+        label: "Badge",
+        itemLabel: "Badge",
+        itemFields: [{ key: "text", label: "Teks", kind: "text" }],
+        itemDefault: { text: "Terpercaya" },
+      },
+    ],
+    defaults: {
+      items: [{ text: "Terpercaya" }, { text: "Bergaransi" }, { text: "Respon cepat" }, { text: "Rating 4.9★" }],
+    },
+  },
+  {
+    type: "stats",
+    label: "Statistik / Angka",
+    hint: "Band angka besar yang membangun kredibilitas.",
+    fields: [{ key: "intro", label: "Kalimat pengantar", kind: "textarea" }],
+    lists: [
+      {
+        key: "items",
+        label: "Angka",
+        itemLabel: "Angka",
+        itemFields: [
+          { key: "value", label: "Angka", kind: "text" },
+          { key: "label", label: "Keterangan", kind: "text" },
+        ],
+        itemDefault: { value: "100+", label: "Pelanggan puas" },
+      },
+    ],
+    defaults: {
+      intro: "",
+      items: [
+        { value: "5.000+", label: "Pelanggan" },
+        { value: "4.9★", label: "Rating" },
+        { value: "10 th", label: "Pengalaman" },
+      ],
+    },
+  },
+  {
+    type: "steps",
+    label: "How It Works / Langkah",
+    hint: "Proses bernomor (1-2-3).",
+    fields: [
+      { key: "title", label: "Judul bagian", kind: "text" },
+      { key: "subtitle", label: "Sub-judul", kind: "textarea" },
+    ],
+    lists: [
+      {
+        key: "items",
+        label: "Langkah",
+        itemLabel: "Langkah",
+        itemFields: [
+          { key: "title", label: "Judul", kind: "text" },
+          { key: "text", label: "Penjelasan", kind: "textarea" },
+        ],
+        itemDefault: { title: "Langkah", text: "Penjelasan langkah." },
+      },
+    ],
+    defaults: {
+      title: "Cara Kerjanya",
+      subtitle: "Tiga langkah mudah untuk memulai.",
+      items: [
+        { title: "Hubungi Kami", text: "Chat via WhatsApp atau isi form." },
+        { title: "Konsultasi", text: "Kami bantu tentukan kebutuhan Anda." },
+        { title: "Selesai", text: "Nikmati hasil/layanannya." },
+      ],
+    },
+  },
+  {
+    type: "gallery",
+    label: "Galeri Foto",
+    hint: "Grid foto (portofolio, dokumentasi, produk).",
+    fields: [{ key: "title", label: "Judul bagian", kind: "text" }],
+    lists: [
+      {
+        key: "items",
+        label: "Foto",
+        itemLabel: "Foto",
+        itemFields: [
+          { key: "image", label: "Gambar", kind: "image" },
+          { key: "caption", label: "Caption", kind: "text" },
+        ],
+        itemDefault: { image: "", caption: "" },
+      },
+    ],
+    defaults: { title: "Galeri", items: [] },
+  },
+  {
+    type: "pricing",
+    label: "Harga / Paket",
+    hint: "Kartu paket harga (biasanya 3 tier).",
+    fields: [
+      { key: "title", label: "Judul bagian", kind: "text" },
+      { key: "subtitle", label: "Sub-judul", kind: "textarea" },
+    ],
+    lists: [
+      {
+        key: "items",
+        label: "Paket",
+        itemLabel: "Paket",
+        itemFields: [
+          { key: "name", label: "Nama paket", kind: "text" },
+          { key: "price", label: "Harga", kind: "text" },
+          { key: "period", label: "Satuan (mis. /bln)", kind: "text" },
+          { key: "features", label: "Fitur (satu per baris)", kind: "textarea" },
+          { key: "cta", label: "Teks tombol", kind: "text" },
+          { key: "ctaHref", label: "Link tombol", kind: "url" },
+          { key: "highlight", label: "Unggulan? (isi 'ya')", kind: "text" },
+        ],
+        itemDefault: { name: "Paket", price: "Rp 0", period: "", features: "Fitur 1\nFitur 2", cta: "Pilih", ctaHref: "", highlight: "" },
+      },
+    ],
+    defaults: {
+      title: "Pilihan Paket",
+      subtitle: "Pilih yang paling sesuai kebutuhan Anda.",
+      items: [
+        { name: "Basic", price: "Rp 0", period: "", features: "Fitur dasar\nSupport standar", cta: "Mulai", ctaHref: "", highlight: "" },
+        { name: "Populer", price: "Rp 0", period: "", features: "Semua di Basic\nFitur premium", cta: "Pilih", ctaHref: "", highlight: "ya" },
+        { name: "Pro", price: "Custom", period: "", features: "Semua di Populer\nPrioritas", cta: "Hubungi", ctaHref: "", highlight: "" },
+      ],
+    },
+  },
+  {
+    type: "testimonials",
+    label: "Testimoni (banyak)",
+    hint: "Beberapa kutipan pelanggan dalam grid.",
+    fields: [{ key: "title", label: "Judul bagian", kind: "text" }],
+    lists: [
+      {
+        key: "items",
+        label: "Testimoni",
+        itemLabel: "Testimoni",
+        itemFields: [
+          { key: "quote", label: "Kutipan", kind: "textarea" },
+          { key: "author", label: "Nama", kind: "text" },
+          { key: "role", label: "Keterangan", kind: "text" },
+        ],
+        itemDefault: { quote: "Pelayanan luar biasa!", author: "Pelanggan", role: "" },
+      },
+    ],
+    defaults: {
+      title: "Kata Mereka",
+      items: [
+        { quote: "Pelayanan memuaskan, hasilnya bagus!", author: "Andi", role: "Pelanggan" },
+        { quote: "Cepat dan profesional. Recommended.", author: "Sari", role: "Pelanggan" },
+        { quote: "Harga bersaing, kualitas juara.", author: "Budi", role: "Pelanggan" },
+      ],
     },
   },
   {

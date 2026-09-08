@@ -180,6 +180,164 @@ export function BlockView({
                   />
                   <h3 className="font-semibold text-slate-900">{it.title}</h3>
                   <p className="mt-1.5 text-sm text-slate-600">{it.text}</p>
+                  {it.note && <p className="mt-2 text-xs italic text-slate-400">{it.note}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      );
+
+    case "logos":
+      return (
+        <section className="border-y border-slate-100 bg-slate-50 px-6 py-6">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-3">
+            {list(p, "items").map((it, i) => (
+              <span key={i} className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600">
+                {it.text}
+              </span>
+            ))}
+          </div>
+        </section>
+      );
+
+    case "stats":
+      return (
+        <section className="px-6 py-16" style={{ background: `linear-gradient(135deg, ${primary}0d, #ffffff)` }}>
+          <div className="mx-auto max-w-4xl text-center">
+            {s(p, "intro") && (
+              <p className="mx-auto mb-10 max-w-2xl text-lg text-slate-600">{s(p, "intro")}</p>
+            )}
+            <div className="grid grid-cols-3 gap-6">
+              {list(p, "items").map((it, i) => (
+                <div key={i}>
+                  <p className="font-display text-3xl font-extrabold sm:text-5xl" style={{ color: primary }}>
+                    {it.value}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">{it.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      );
+
+    case "steps":
+      return (
+        <section className="bg-white px-6 py-16">
+          <div className="mx-auto max-w-5xl">
+            <div className="mb-10 text-center">
+              {s(p, "title") && (
+                <h2 className="font-display text-3xl font-bold text-slate-900">{s(p, "title")}</h2>
+              )}
+              {s(p, "subtitle") && <p className="mt-2 text-slate-600">{s(p, "subtitle")}</p>}
+            </div>
+            <div className="grid gap-6 sm:grid-cols-3">
+              {list(p, "items").map((it, i) => (
+                <div key={i} className="rounded-2xl border border-slate-100 bg-slate-50 p-6">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full font-display text-lg font-bold text-white" style={{ backgroundColor: primary }}>
+                    {i + 1}
+                  </span>
+                  <h3 className="mt-4 font-semibold text-slate-900">{it.title}</h3>
+                  <p className="mt-1.5 text-sm text-slate-600">{it.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      );
+
+    case "gallery":
+      return (
+        <section className="bg-white px-6 py-16">
+          <div className="mx-auto max-w-5xl">
+            {s(p, "title") && (
+              <h2 className="mb-8 text-center font-display text-3xl font-bold text-slate-900">{s(p, "title")}</h2>
+            )}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {list(p, "items").map((it, i) =>
+                safeImg(it.image ?? "") ? (
+                  <figure key={i} className="overflow-hidden rounded-xl bg-slate-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={safeImg(it.image ?? "")} alt={it.caption ?? ""} className="aspect-square w-full object-cover" />
+                    {it.caption && <figcaption className="p-2 text-center text-xs text-slate-500">{it.caption}</figcaption>}
+                  </figure>
+                ) : null,
+              )}
+            </div>
+          </div>
+        </section>
+      );
+
+    case "pricing":
+      return (
+        <section className="bg-slate-50 px-6 py-16">
+          <div className="mx-auto max-w-5xl">
+            <div className="mb-10 text-center">
+              {s(p, "title") && (
+                <h2 className="font-display text-3xl font-bold text-slate-900">{s(p, "title")}</h2>
+              )}
+              {s(p, "subtitle") && <p className="mt-2 text-slate-600">{s(p, "subtitle")}</p>}
+            </div>
+            <div className="grid gap-6 sm:grid-cols-3">
+              {list(p, "items").map((it, i) => {
+                const featured = String(it.highlight ?? "").trim().length > 0;
+                const feats = String(it.features ?? "").split("\n").map((x) => x.trim()).filter(Boolean);
+                return (
+                  <div
+                    key={i}
+                    className="flex flex-col rounded-2xl border bg-white p-6"
+                    style={featured ? { borderColor: primary, boxShadow: `0 10px 30px ${primary}22` } : { borderColor: "#e2e8f0" }}
+                  >
+                    {featured && (
+                      <span className="mb-2 inline-block self-start rounded-full px-2.5 py-0.5 text-[0.62rem] font-semibold text-white" style={{ backgroundColor: primary }}>
+                        PALING POPULER
+                      </span>
+                    )}
+                    <p className="font-semibold text-slate-900">{it.name}</p>
+                    <p className="mt-1 font-display text-3xl font-extrabold text-slate-900">
+                      {it.price}
+                      {it.period && <span className="text-sm font-normal text-slate-400"> {it.period}</span>}
+                    </p>
+                    <ul className="mt-4 flex-1 space-y-2 text-sm text-slate-600">
+                      {feats.map((f, j) => (
+                        <li key={j} className="flex items-start gap-2">
+                          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: primary }} />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                    {it.cta && (
+                      <a
+                        href={safeHref(it.ctaHref ?? "")}
+                        className="mt-6 rounded-full px-4 py-2.5 text-center text-sm font-semibold"
+                        style={featured ? { backgroundColor: primary, color: "#fff" } : { border: `1px solid ${primary}`, color: primary }}
+                      >
+                        {it.cta}
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      );
+
+    case "testimonials":
+      return (
+        <section className="bg-white px-6 py-16">
+          <div className="mx-auto max-w-5xl">
+            {s(p, "title") && (
+              <h2 className="mb-10 text-center font-display text-3xl font-bold text-slate-900">{s(p, "title")}</h2>
+            )}
+            <div className="grid gap-6 sm:grid-cols-3">
+              {list(p, "items").map((it, i) => (
+                <div key={i} className="rounded-2xl border border-slate-100 bg-slate-50 p-6">
+                  <p className="text-3xl leading-none" style={{ color: primary }}>“</p>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-700">{it.quote}</p>
+                  <p className="mt-4 text-sm font-semibold text-slate-900">{it.author}</p>
+                  {it.role && <p className="text-xs text-slate-500">{it.role}</p>}
                 </div>
               ))}
             </div>
