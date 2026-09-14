@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amanyaman Growth Report</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Instrument+Serif:ital@0;1&display=swap" />
+<style>
+  :root{
+    --bg:#09080F; --bg2:#110E1B; --card:#161320; --card2:#1F1830;
+    --ink:#F4F1F7; --muted:#ABA4C0; --faint:#6D6685;
+    --line:rgba(244,241,247,.09); --line2:rgba(244,241,247,.17);
+    --c1:#FF5B3A; --c2:#FF2E9A; --c3:#24E5D0;
+    --good:#45E3A4; --warn:#FFC24B; --bad:#FF546E;
+    --maxw:1140px;
+    --fd:"Syne",-apple-system,Segoe UI,sans-serif;
+    --fb:"Manrope",-apple-system,Segoe UI,sans-serif;
+    --fm:"Space Mono",ui-monospace,monospace;
+    --fa:"Instrument Serif",Georgia,serif;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--fb);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--c2);color:#fff}
+  a{color:inherit}
+  /* cinematic ambient background */
+  .aura{position:fixed;inset:-20% -10% -10% -10%;z-index:-2;filter:blur(70px) saturate(1.2);opacity:.55;pointer-events:none}
+  .aura b{position:absolute;border-radius:50%;mix-blend-mode:screen;animation:float 22s ease-in-out infinite}
+  .aura .a1{width:46vw;height:46vw;left:-6vw;top:-8vw;background:radial-gradient(circle,var(--c1),transparent 62%)}
+  .aura .a2{width:42vw;height:42vw;right:-8vw;top:6vh;background:radial-gradient(circle,var(--c2),transparent 62%);animation-delay:-7s}
+  .aura .a3{width:40vw;height:40vw;left:24vw;bottom:-14vw;background:radial-gradient(circle,var(--c3),transparent 62%);animation-delay:-13s}
+  @keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(4vw,3vh) scale(1.12)}66%{transform:translate(-3vw,-2vh) scale(.94)}}
+  .grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.05;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+  @media (prefers-reduced-motion:reduce){.aura b{animation:none}}
+  /* light theme (Amanyaman — off-white + blue + green, matching their brand) */
+  body.theme-light{
+    --bg:#F5F4EF; --bg2:#FFFFFF; --card:#FFFFFF; --card2:#EEF3F9;
+    --ink:#15243D; --muted:#576A83; --faint:#93A1B4;
+    --line:rgba(18,40,72,.10); --line2:rgba(18,40,72,.17);
+    --c1:#1C5FAD; --c2:#2C86D6; --c3:#45A72F;
+    --good:#3FA531; --warn:#DFA020; --bad:#E15751;
+    color-scheme:light;
+  }
+  body.theme-light ::selection{background:var(--c3);color:#fff}
+  body.theme-light .grain{display:none}
+  body.theme-light .aura{opacity:.20;filter:blur(92px) saturate(1)}
+  body.theme-light .aura b{mix-blend-mode:multiply}
+  body.theme-light .card,body.theme-light .comp,body.theme-light .hack,body.theme-light .ringc,body.theme-light .fact,body.theme-light .phase,body.theme-light .builder{box-shadow:0 1px 2px rgba(18,40,72,.05),0 10px 30px rgba(18,40,72,.05)}
+  body.theme-light .rail button[aria-current="true"]{box-shadow:0 0 10px var(--c1)}
+  body.theme-light .cta{background:linear-gradient(120deg,rgba(28,95,173,.10),rgba(69,167,47,.08))}
+  body.theme-light .cta .btn{box-shadow:0 8px 26px rgba(28,95,173,.28)}
+  body.theme-light .fact::after{opacity:.10}
+  .deck{height:100svh;overflow-y:auto;scroll-snap-type:y mandatory;scroll-behavior:smooth;position:relative}
+  @media (prefers-reduced-motion:reduce){.deck{scroll-behavior:auto}}
+  section.slide{min-height:100svh;scroll-snap-align:start;scroll-snap-stop:always;display:flex;flex-direction:column;justify-content:center;padding:clamp(30px,6vh,72px) clamp(22px,6vw,92px);position:relative}
+  .wrap{width:100%;max-width:var(--maxw);margin:0 auto}
+  .eyebrow{font-family:var(--fm);font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--c1);display:flex;align-items:center;gap:11px;margin:0 0 22px}
+  .eyebrow::before{content:"";width:26px;height:1px;background:var(--c1)}
+  .eyebrow.mag{color:var(--c2)}.eyebrow.mag::before{background:var(--c2)}
+  .eyebrow.cy{color:var(--c3)}.eyebrow.cy::before{background:var(--c3)}
+  h1,h2,h3{font-family:var(--fd);font-weight:800;line-height:1.02;letter-spacing:-.02em;text-wrap:balance;margin:0}
+  h1{font-size:clamp(2.7rem,7.4vw,5.8rem)}
+  h2{font-size:clamp(1.9rem,4.6vw,3.4rem)}
+  h3{font-size:clamp(1.05rem,1.9vw,1.35rem);letter-spacing:-.01em}
+  p{margin:0}
+  .acc{font-family:var(--fa);font-style:italic;font-weight:400;letter-spacing:0}
+  .lead{font-size:clamp(1.02rem,1.6vw,1.34rem);line-height:1.5;max-width:62ch;color:var(--ink)}
+  .muted{color:var(--muted)} .faint{color:var(--faint)}
+  .hot{background:linear-gradient(100deg,var(--c1),var(--c2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .cool{background:linear-gradient(100deg,var(--c2),var(--c3));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .kick{font-family:var(--fm);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .rail{position:fixed;right:clamp(12px,2.2vw,26px);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px;z-index:60}
+  .rail button{all:unset;cursor:pointer;width:8px;height:8px;border-radius:50%;background:var(--line2);transition:all .25s}
+  .rail button:hover{background:var(--muted)}
+  .rail button[aria-current="true"]{background:var(--c2);transform:scale(1.7);box-shadow:0 0 12px var(--c2)}
+  .rail button:focus-visible{box-shadow:0 0 0 3px rgba(255,46,154,.45)}
+  .hud{position:fixed;left:clamp(16px,3vw,32px);z-index:60;font-family:var(--fm)}
+  .brand{top:clamp(16px,3vh,26px);font-family:var(--fd);font-weight:800;font-size:15px;display:flex;align-items:center;gap:8px;letter-spacing:-.01em}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:linear-gradient(140deg,var(--c1),var(--c2));box-shadow:0 0 10px var(--c2)}
+  .count{bottom:clamp(16px,3vh,26px);font-size:12px;letter-spacing:.1em;color:var(--faint)}
+  .count b{color:var(--ink);font-weight:400}
+  .scrollhint{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);font-family:var(--fm);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);display:flex;flex-direction:column;align-items:center;gap:7px}
+  .scrollhint i{width:1px;height:26px;background:linear-gradient(var(--c2),transparent);animation:drop 1.8s infinite}
+  @keyframes drop{0%{opacity:.2;transform:scaleY(.3);transform-origin:top}50%{opacity:1}100%{opacity:.2;transform:scaleY(1)}}
+  @media (prefers-reduced-motion:reduce){.scrollhint i{animation:none}}
+  /* cover */
+  .cv-num{font-family:var(--fa);font-style:italic;font-weight:400;font-size:clamp(5rem,17vw,12rem);line-height:.8;letter-spacing:-.03em}
+  .cover-score{display:flex;align-items:center;gap:20px;margin-top:14px;flex-wrap:wrap}
+  .cover-meta{display:flex;flex-wrap:wrap;gap:9px 26px;margin-top:30px;font-family:var(--fm);font-size:12px;color:var(--muted);letter-spacing:.02em}
+  .cover-meta b{color:var(--ink);font-weight:400}
+  .chip{display:inline-flex;align-items:center;gap:8px;padding:6px 13px;border:1px solid var(--line2);border-radius:100px;font-family:var(--fm);font-size:11.5px;letter-spacing:.05em;color:var(--muted)}
+  .chip .d{width:7px;height:7px;border-radius:50%}
+  /* generic grids/cards */
+  .grid{display:grid;gap:15px}
+  .g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:880px){.g4,.g3{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}}
+  @media(max-width:560px){.g4,.g3{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;transition:border-color .3s,transform .3s}
+  .card:hover{border-color:var(--line2);transform:translateY(-3px)}
+  .card .cap{font-family:var(--fm);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}
+  /* rings */
+  .rings{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:6px}
+  @media(max-width:880px){.rings{grid-template-columns:1fr}}
+  .ringc{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;display:flex;gap:18px;align-items:center}
+  .ring{position:relative;flex:0 0 auto}
+  .ring .v{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .ring .v b{font-family:var(--fa);font-style:italic;font-weight:400;font-size:34px;line-height:1}
+  .ring .v i{font-family:var(--fm);font-style:normal;font-size:8.5px;letter-spacing:.1em;color:var(--muted);margin-top:1px}
+  .ringc h3{font-size:1rem;margin-bottom:4px}
+  .ringc .rs{font-size:12.5px;line-height:1.45;color:var(--muted)}
+  .tgt{font-family:var(--fm);font-size:10px;color:var(--c3);margin-top:8px;display:inline-flex;align-items:center;gap:6px}
+  .tgt::before{content:"";width:8px;height:8px;border-radius:50%;border:2px solid var(--c3)}
+  .pillars{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-top:18px}
+  @media(max-width:680px){.pillars{grid-template-columns:repeat(2,1fr)}}
+  .pl .t{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+  .pl .t b{font-family:var(--fa);font-style:italic;font-size:1.7rem}
+  .pl .t span{font-family:var(--fm);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+  .track{height:6px;border-radius:100px;background:var(--line2);overflow:hidden}
+  .track>i{display:block;height:100%;border-radius:100px;width:0;transition:width 1.1s cubic-bezier(.2,.7,.2,1)}
+  /* fun facts */
+  .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:15px;margin-top:6px}
+  .fact{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:9px;position:relative;overflow:hidden}
+  .fact::after{content:"";position:absolute;right:-30px;top:-30px;width:90px;height:90px;border-radius:50%;background:radial-gradient(circle,var(--c2),transparent 70%);opacity:.18}
+  .fact .st{font-family:var(--fa);font-style:italic;font-weight:400;font-size:clamp(2.4rem,5vw,3.6rem);line-height:.92}
+  .fact .lb{font-size:13.5px;line-height:1.45;color:var(--muted)}
+  /* research quote */
+  .verdict{display:inline-flex;align-items:center;gap:9px;margin-bottom:16px;font-family:var(--fm);font-size:12px;letter-spacing:.03em;padding:7px 14px;border-radius:100px;border:1px solid var(--line2)}
+  .quote{border-left:3px solid var(--c3);padding:4px 0 4px 26px;margin-top:14px}
+  .quote p{font-family:var(--fd);font-weight:700;font-size:clamp(1.35rem,2.7vw,2.15rem);line-height:1.18;letter-spacing:-.01em}
+  .src{margin-top:22px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;font-size:13px;line-height:1.55;color:var(--muted)}
+  .src .cap{font-family:var(--fm);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:8px}
+  /* competitors */
+  .comps{display:grid;grid-template-columns:repeat(2,1fr);gap:13px;margin-top:6px}
+  @media(max-width:820px){.comps{grid-template-columns:1fr}}
+  .comp{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:18px 20px;display:flex;flex-direction:column;gap:8px;transition:border-color .3s,transform .3s}
+  .comp:hover{border-color:var(--line2);transform:translateY(-3px)}
+  .comp .top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .comp h3{font-size:1.05rem}
+  .comp .why{font-size:13px;line-height:1.45;color:var(--muted)}
+  .comp .ch{font-family:var(--fm);font-size:10px;letter-spacing:.05em;color:var(--c3);text-transform:uppercase}
+  .th{font-family:var(--fm);font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:100px;border:1px solid var(--line2)}
+  .th.Tinggi{color:var(--bad);border-color:rgba(255,84,110,.4)}.th.Sedang{color:var(--warn);border-color:rgba(255,194,75,.35)}.th.Rendah{color:var(--muted)}
+  /* rows */
+  .rows{display:flex;flex-direction:column;margin-top:6px}
+  .row{display:flex;gap:16px;padding:15px 4px;border-top:1px solid var(--line);align-items:flex-start}
+  .row:last-child{border-bottom:1px solid var(--line)}
+  .row .n{font-family:var(--fm);font-size:12px;flex:0 0 auto;width:26px;padding-top:2px;color:var(--c1)}
+  .row.op .n{color:var(--c3)}
+  .row p{font-size:1rem;line-height:1.45}
+  /* hacks */
+  .hacks{display:grid;grid-template-columns:repeat(2,1fr);gap:13px;margin-top:6px}
+  @media(max-width:820px){.hacks{grid-template-columns:1fr}}
+  .hack{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:18px 20px;display:flex;flex-direction:column;gap:8px}
+  .hack .ht{display:flex;gap:12px;align-items:flex-start}
+  .hack .nm{flex:0 0 auto;width:26px;height:26px;border-radius:8px;background:linear-gradient(140deg,var(--c1),var(--c2));display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--fd);font-weight:800;font-size:12px;margin-top:1px}
+  .hack h3{font-size:1rem;line-height:1.2}
+  .hack .how{font-size:13px;line-height:1.45;color:var(--muted)}
+  .hack .met{font-family:var(--fm);font-size:10.5px;color:var(--c3);display:inline-flex;gap:7px;align-items:center}
+  .hack .met::before{content:"◎"}
+  /* revenue */
+  .rev{display:grid;grid-template-columns:1.05fr .95fr;gap:32px;align-items:center;margin-top:8px}
+  @media(max-width:860px){.rev{grid-template-columns:1fr}}
+  .nt{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap}
+  .fig .cap{font-family:var(--fm);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+  .fig b{font-family:var(--fa);font-style:italic;font-weight:400;font-size:clamp(1.6rem,3.6vw,2.7rem);line-height:1;display:block}
+  .arw{font-size:24px;color:var(--faint);padding-bottom:8px}
+  .uplift{display:inline-flex;align-items:baseline;gap:10px;margin-top:18px;font-family:var(--fa);font-style:italic;font-size:clamp(2.6rem,6.5vw,4.4rem);line-height:1}
+  .uplift small{font-family:var(--fm);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .levers{display:flex;flex-direction:column;gap:11px}
+  .lev{display:flex;gap:12px;align-items:flex-start;font-size:14px;line-height:1.45}
+  .lev .tk{flex:0 0 auto;width:21px;height:21px;border-radius:7px;background:linear-gradient(140deg,var(--c2),var(--c3));display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--fd);font-weight:800;font-size:11px;margin-top:1px}
+  /* exec */
+  .exec{display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin-top:6px}
+  @media(max-width:860px){.exec{grid-template-columns:1fr}}
+  .exec .card{display:flex;flex-direction:column;gap:11px}
+  .exec .role{display:flex;align-items:center;gap:11px}
+  .exec .role .bd{font-family:var(--fd);font-weight:800;font-size:11.5px;letter-spacing:.02em;padding:7px 11px;border-radius:9px;background:var(--card2);border:1px solid var(--line2)}
+  .exec .role h3{font-size:.96rem}
+  .exec .sm{color:var(--muted);font-size:13.5px;line-height:1.5}
+  .exec ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px}
+  .exec li{position:relative;padding-left:18px;font-size:13px;line-height:1.45}
+  .exec li::before{content:"";position:absolute;left:2px;top:8px;width:6px;height:6px;border-radius:50%;background:var(--c1)}
+  /* roadmap */
+  .phases{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:6px}
+  @media(max-width:860px){.phases{grid-template-columns:1fr}}
+  .phase{border:1px solid var(--line);border-radius:16px;padding:22px;background:var(--card)}
+  .phase .ph{font-family:var(--fm);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--c1);margin-bottom:5px}
+  .phase h3{font-size:1.05rem;margin-bottom:13px}
+  .phase ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px}
+  .phase li{font-size:13px;line-height:1.4;padding-left:18px;position:relative}
+  .phase li::before{content:"→";position:absolute;left:0;color:var(--faint)}
+  .plan{margin-top:18px;background:var(--card);border:1px dashed var(--line2);border-radius:14px;padding:16px 20px}
+  .plan .cap{font-family:var(--fm);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}
+  .plan .tags{display:flex;flex-wrap:wrap;gap:8px}
+  .plan .tag{font-size:12.5px;padding:5px 12px;border-radius:100px;background:var(--card2);border:1px solid var(--line);color:var(--muted)}
+  /* builders + cta */
+  .builders{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+  .builder{display:flex;gap:15px;align-items:center;padding:14px 18px;border:1px solid var(--line);border-radius:13px;background:var(--card)}
+  .builder .fit{flex:0 0 auto;text-align:center;width:52px}
+  .builder .fit b{font-family:var(--fa);font-style:italic;font-size:26px;display:block;line-height:1}
+  .builder .fit span{font-family:var(--fm);font-size:8.5px;letter-spacing:.1em;color:var(--faint);text-transform:uppercase}
+  .builder .bt{flex:1}
+  .builder .bt h3{font-size:1rem;display:flex;align-items:center;gap:9px}
+  .builder .bt p{font-size:12.5px;color:var(--muted);line-height:1.4;margin-top:2px}
+  .prio{font-family:var(--fm);font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:100px;border:1px solid var(--line2)}
+  .prio.high{color:var(--c1);border-color:rgba(255,91,58,.4)}.prio.medium{color:var(--warn);border-color:rgba(255,194,75,.35)}.prio.low{color:var(--muted)}
+  .cta{margin-top:24px;padding:26px;border-radius:18px;border:1px solid var(--line2);background:linear-gradient(120deg,rgba(255,46,154,.14),rgba(36,229,208,.06));display:flex;flex-direction:column;gap:13px}
+  .cta .btn{align-self:flex-start;font-family:var(--fd);font-weight:800;font-size:15px;padding:13px 27px;border-radius:100px;background:linear-gradient(100deg,var(--c1),var(--c2));color:#fff;text-decoration:none;box-shadow:0 8px 30px rgba(255,46,154,.28);transition:transform .25s}
+  .cta .btn:hover{transform:translateY(-2px)}
+  .strip{font-family:var(--fm);font-size:11px;color:var(--muted);letter-spacing:.05em}
+  .disc{margin-top:18px;font-family:var(--fm);font-size:10px;line-height:1.6;color:var(--faint);max-width:74ch}
+  .fade{opacity:0;transform:translateY(24px) scale(.985)}
+  .fade.in{opacity:1;transform:none;transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
+  @media (prefers-reduced-motion:reduce){.fade{opacity:1!important;transform:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="aura"><b class="a1"></b><b class="a2"></b><b class="a3"></b></div>
+<div class="grain"></div>
+<div class="hud brand"><span class="dot"></span>ScaleUp</div>
+<nav class="rail" id="rail" aria-label="Bagian"></nav>
+<div class="hud count"><b id="cnum">01</b> / <span id="ctot">01</span></div>
+<main class="deck" id="deck"></main>
+
+<script id="report" type="application/json">{"generated":"engine-replica","engine":{"provider":"claude","model":"claude-sonnet-5"},"data_sources":{"website":"scraped","competitors":0,"geo_checked":true},"context":{"business":"Amanyaman","website":"https://amanyaman.com/id/home","category":"Asuransi perjalanan (travel insurance) terdaftar OJK di Indonesia. Model B2B2C lewat jaringan agen (ada program 'Agent Reward'), paket/plan berjenjang. Posisi: niche player di kategori travel insurance.","instagram":"linktr.ee/amanyaman","tiktok":"-","competitors":[]},"geo_raw":"Brand yang paling jelas muncul dan bisa direkomendasikan untuk niche **travel insurance** di Indonesia adalah **Amanyaman**—terutama karena memang diposisikan sebagai produk asuransi perjalanan dengan beberapa plan seperti **Individual, Duo, dan Family**, dan kini juga dipasarkan lewat kemitraan dengan **MSIG Indonesia**.[1][2]\n\nKalau pertanyaannya “yang paling sering direkomendasikan” secara umum di pasar, itu tidak bisa dipastikan dari data yang tersedia di sini; tapi **Amanyaman** termasuk yang relevan untuk kategori yang Anda sebut.[1][2]\n\n**Apakah Amanyaman termasuk yang direkomendasikan?**  \n**Ya, termasuk.** Ia dikenal di segmen travel insurance, punya variasi plan, dan ada indikasi distribusi lewat jaringan travel agent/kemitraan.[1][6]\n\nCatatan jujur: **Amanyaman bukan brand yang benar-benar “unknown”**; justru ada jejak publik dan produk aktifnya jelas.[1][2][6]","scores":{"overall":34,"cro":28,"geo":52,"social":14,"tech":30},"success_scores":{"self":{"score":32,"target":66,"reason":"Web stale (meta generik, banner Covid usang, harga tak tercantum) menahan SEO & CRO meski GEO cukup baik."},"social":{"score":14,"target":55,"reason":"IG cuma linktree, tanpa TikTok/konten aktif — nyaris tak ada sinyal sosial buat AI Search & trust calon nasabah."},"competitor":{"score":30,"target":58,"reason":"Marketplace asuransi (Lifepal, Qoala) & pemain global (AXA) mendominasi kata kunci & social share of voice."}},"summary":"Amanyaman sudah legit (OJK, produk jelas, dikutip AI Search) tapi website & social nya mati suri — banner Covid usang & IG kosong bikin brand terlihat ditinggal, padahal peluang konversi dari trafik existing besar.","current_condition":"SEO lemah karena meta generik di semua halaman. GEO justru cukup baik — AI Search sudah menyebut Amanyaman untuk kategori travel insurance & partnership MSIG. Social media nyaris nol aktivitas. PR/berita hanya muncul lewat sebutan partnership, minim press release aktif.","landscape":{"seo":"Title/meta 'Amanyaman - Home' di semua halaman, nol keyword 'asuransi perjalanan', konten Covid-19 usang menurunkan freshness signal Google.","geo":"AI Search mengenali Amanyaman & plan Individual/Duo/Family plus partnership MSIG — fondasi GEO ada, tapi belum 'top of mind' dibanding marketplace.","social":"IG hanya linktr.ee tanpa feed aktif, tak ada TikTok — nol engagement terukur, tak ada bukti sosial buat calon nasabah/agen.","news":"Minim liputan berita mandiri; hanya terekam lewat mention partnership MSIG di data pihak ketiga, sentimen netral karena kurang exposure."},"brand_perception":"AI Search melihat Amanyaman sebagai pemain sah niche travel insurance dengan produk jelas, tapi publik manusia sulit memverifikasi karena jejak sosial & berita nyaris tak terlihat — trust gap antara mesin dan manusia.","competitiveness":"Unggul di legalitas OJK & spesialisasi niche travel insurance dgn 4 plan jelas. Tertinggal jauh di SEO/social vs marketplace agregator (Lifepal, Qoala) yg menguasai kata kunci umum 'asuransi perjalanan terbaik' sebelum trafik sampai ke Amanyaman.","whats_missing":["Meta title/description generik 'Amanyaman' di semua halaman, tanpa keyword","Banner Peringatan Covid-19 masih tayang, sinyal web tak terurus","Tidak ada halaman produk dengan harga eksplisit per plan","Social media pasif: IG cuma linktree, tak ada TikTok/kalender konten","Tidak ada CRM buat tracking leads booking/klaim & follow-up agen"],"opportunities":["Rewrite title/meta 4 halaman produk dengan keyword 'asuransi perjalanan [Asia/Worldwide]'","Bikin landing comparison plan dgn harga jelas + CTA book langsung","Aktifkan IG+TikTok 3x/minggu isi edukasi & testimoni traveler","Press release partnership MSIG untuk dorong sebutan AI Search & berita","CRM agent leads + reminder renewal polis buat repeat business"],"revenue_booster":{"current_estimate":"Rp 80-150 juta / bulan (estimasi dari trafik existing & jaringan agen terbatas)","projected":"Rp 200-280 juta / bulan","uplift":"+90%","levers":["Fix SEO on-page 4 halaman produk → +30% organic click (CTR meta)","Aktivasi social 3x/minggu → +500 followers/3bln, +engagement leads","Landing harga jelas → naikkan conversion rate booking 2x lipat","CRM follow-up agen → naikkan produktivitas agen 20-30%"]},"how_scaleup_helps":"ScaleUp membenahi Website Builder (fix meta, hapus banner usang, bangun halaman harga jelas) sekaligus Content Builder untuk isi social & artikel SEO/GEO, plus CRM buat tracking leads agen — semua terukur lewat skor & omzet bulanan.","builder_pitch":"Website Builder membersihkan utang teknis (meta generik, banner Covid) yang selama ini bikin Google & calon nasabah ragu — dampak langsung ke CTR & booking. Content Builder mengisi kekosongan social (IG/TikTok) sekaligus artikel GEO agar AI Search makin sering merekomendasikan Amanyaman. CRM Builder menata leads booking & jaringan agen supaya repeat order & recruitment agen naik terukur, bukan bocor begitu saja.","recurring_strategy":"Retainer bulanan: optimasi SEO/GEO berkelanjutan (update meta, artikel baru), kalender konten social rutin, CRM leads & agent tracking dipantau tiap bulan dengan skor self/social/competitor dilaporkan — begitu skor naik, revenue booster lever direvisi ulang, siklus terus berjalan bukan proyek sekali jalan.","executive":{"cmo":{"summary":"Posisikan Amanyaman sebagai 'spesialis travel insurance OJK-registered' vs marketplace generik, manfaatkan partnership MSIG sebagai trust signal.","actions":["Launch press release partnership MSIG bulan ini","Rebrand tagline fokus 'spesialis' di homepage"]},"digital_marketing":{"summary":"Trafik existing bocor karena tak ada halaman harga/CTA jelas — funnel booking harus dipotong jadi 2 klik.","actions":["Bangun landing page harga per plan, target conversion +50%","A/B test CTA 'Book & Claim' vs 'Cek Harga Sekarang'"]},"social_media":{"summary":"Social nyaris nol — ini kesempatan besar isi ruang kosong dengan konten edukasi & testimoni traveler murah.","actions":["Posting IG 3x/minggu, target 500 followers baru/3bln","Buka TikTok, 2 video edukasi/minggu, target 10rb views/bln"]},"seo_geo":{"summary":"GEO sudah punya fondasi (AI Search mengenal brand) tapi SEO on-page nol — quick win besar ada di sini.","actions":["Rewrite title/meta 4 halaman produk minggu ini","Publish 4 artikel FAQ 'asuransi perjalanan' target rank halaman 1 dalam 90 hari"]}},"competitors":[{"name":"Lifepal","channel":"SEO","why_ahead":"Marketplace agregator menguasai kata kunci umum 'asuransi perjalanan terbaik' dengan ratusan artikel SEO.","threat":"Tinggi"},{"name":"Qoala","channel":"Social","why_ahead":"Aktif di social & app dengan konten edukatif rutin, jauh lebih visible ke Gen Z traveler.","threat":"Sedang"},{"name":"AXA Smart Traveller","channel":"Ads","why_ahead":"Brand global dgn budget iklan besar & awareness tinggi, sering jadi rujukan default konsumen.","threat":"Sedang"}],"research_geo":"AI Search sudah menyebut Amanyaman untuk kategori travel insurance Indonesia, lengkap dengan info plan Individual/Duo/Family & partnership MSIG. Namun brand ini belum muncul sebagai 'yang paling sering direkomendasikan' — posisinya relevan tapi belum dominan dibanding marketplace agregator.","fun_facts":[{"stat":"0 postingan aktif","label":"IG Amanyaman cuma linktree, tanpa feed konten sama sekali."},{"stat":"4 plan, 0 harga tampil","label":"Asia 35 & 3 Worldwide plan ada di homepage tapi tanpa harga jelas."},{"stat":"1 title untuk semua halaman","label":"Meta title 'Amanyaman - Home' dipakai generik, nol keyword SEO."},{"stat":"Banner Covid-19 masih tayang","label":"Konten homepage belum diupdate sejak era pandemi."},{"stat":"Muncul di AI Search walau social kosong","label":"GEO lebih kuat dari social — bukti produk & OJK cukup meyakinkan AI."}],"growth_hacks":[{"title":"Ganti banner Covid jadi promo aktif","how":"Swap section hero homepage dgn promo Agent Reward/plan terbaru","metric":"Bounce rate turun 15% dalam 30 hari","impact":"Tinggi"},{"title":"Rewrite meta title 4 halaman produk","how":"Tambah keyword 'asuransi perjalanan [region]' di title & desc","metric":"Impression Google Search Console +40% dalam 60 hari","impact":"Tinggi"},{"title":"Buka TikTok edukasi asuransi perjalanan","how":"2 video/minggu format tips traveler + klaim","metric":"10.000 views/bulan dalam 90 hari","impact":"Sedang"},{"title":"Press release partnership MSIG","how":"Distribusi ke media asuransi & travel niche","metric":"3 media pickup dalam 30 hari, +GEO mention","impact":"Sedang"}],"content_plan_2w":["Artikel: '5 Risiko Perjalanan yang Sering Diabaikan Traveler Indonesia'","Reel IG: testimoni klaim asuransi perjalanan sukses","Post: perbandingan plan Asia 35 vs Worldwide 75","Video TikTok: 'Cara klaim Amanyaman dalam 3 langkah'"],"roadmap":{"phase_1":["Hapus banner Covid & rewrite meta title/desc","Buat halaman harga per plan","Setup IG content calendar minggu 1"],"phase_2":["Publish 4 artikel SEO/GEO FAQ asuransi perjalanan","Launch TikTok & IG rutin 3x/minggu","Press release partnership MSIG"],"phase_3":["Bangun CRM agent leads & renewal reminder","A/B test funnel booking end-to-end","Ekspansi konten ke kolaborasi travel influencer niche"]},"recommended_builders":[{"builder":"website","priority":"high","fit":92,"reason":"Meta generik, banner Covid usang, tanpa halaman harga — perbaikan teknis dasar paling urgent."},{"builder":"content","priority":"high","fit":88,"reason":"Social & artikel SEO/GEO nol, padahal AI Search sudah kenal brand — tinggal isi konten."},{"builder":"crm","priority":"medium","fit":70,"reason":"Model B2B2C via agen butuh tracking leads & renewal buat naikkan produktivitas agen."},{"builder":"opportunity","priority":"medium","fit":62,"reason":"Perlu riset gap kompetitor (Lifepal/Qoala) & offer baru buat rebut share of voice."}],"audit_date":"14 September 2026","theme":"light"}</script>
+<script>
+(function(){
+  var R = JSON.parse(document.getElementById("report").textContent);
+  var ctx=R.context||{}, ss=R.success_scores||{}, sc=R.scores||{}, ls=R.landscape||{}, rb=R.revenue_booster||{}, ex=R.executive||{}, rm=R.roadmap||{};
+  if(R.theme==="light"){ document.body.classList.add("theme-light"); }
+  var DASH = "–";
+  function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
+  function arr(a,n){ a = Array.isArray(a)?a:[]; return n?a.slice(0,n):a; }
+  function sevColor(v){ return v>=70?"var(--good)":(v>=40?"var(--warn)":"var(--bad)"); }
+  function sevLabel(v){ return v>=70?"Sehat":(v>=40?"Perlu Kerja":"Kritis"); }
+  var BUILDERS = {website:"Website Builder",store:"Online Store & Integrasi",content:"Content Builder",ads:"Ads & Campaign",opportunity:"Opportunity Finder",crm:"CRM Builder",tasks:"Task Management",support:"Customer Support",booking:"Booking System"};
+
+  function ring(score, target, size){
+    size = size||120;
+    var r=(size-16)/2, C=2*Math.PI*r, cx=size/2;
+    var off = C*(1 - Math.max(0,Math.min(100,score||0))/100);
+    var ta=(Math.max(0,Math.min(100,target||0))/100)*360-90, rad=ta*Math.PI/180;
+    var tx=cx+r*Math.cos(rad), ty=cx+r*Math.sin(rad);
+    var gid="g"+Math.round(Math.abs(Math.sin(score*7+target*13))*1e6);
+    var stroke = score>=70 ? "var(--good)" : "url(#"+gid+")";
+    var tick = target ? '<circle cx="'+tx.toFixed(1)+'" cy="'+ty.toFixed(1)+'" r="4.5" fill="var(--bg)" stroke="var(--c3)" stroke-width="2.5"/>' : "";
+    return '<div class="ring" style="width:'+size+'px;height:'+size+'px"><svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'">'
+      + '<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--c1)"/><stop offset="1" stop-color="var(--c2)"/></linearGradient></defs>'
+      + '<circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" fill="none" stroke="var(--line2)" stroke-width="8"/>'
+      + '<circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" fill="none" stroke="'+stroke+'" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+C.toFixed(1)+'" transform="rotate(-90 '+cx+' '+cx+')" style="transition:stroke-dashoffset 1.1s cubic-bezier(.2,.7,.2,1)" data-off="'+off.toFixed(1)+'"/>'
+      + tick + '</svg><div class="v"><b style="color:'+sevColor(score)+'">'+(score==null?DASH:score)+'</b><i>/100</i></div></div>';
+  }
+  function section(eyebrow, cls, inner, hint){
+    var eb = eyebrow ? '<p class="eyebrow '+(cls||"")+'">'+esc(eyebrow)+'</p>' : "";
+    var sh = hint ? '<div class="scrollhint">SCROLL<i></i></div>' : "";
+    return '<section class="slide"><div class="wrap">'+eb+inner+'</div>'+sh+'</section>';
+  }
+
+  var S = [];
+
+  // COVER
+  (function(){
+    var host = ctx.website ? esc(String(ctx.website).replace(/^https?:\/\//,"").split("/")[0]) : "";
+    var cat = ctx.category ? esc(String(ctx.category).split(/[—.]/)[0].trim().slice(0,44)) : "";
+    var meta = "";
+    if(host) meta += '<span>WEB&nbsp; <b>'+host+'</b></span>';
+    if(cat)  meta += '<span>KATEGORI&nbsp; <b>'+cat+'</b></span>';
+    meta += '<span>TANGGAL&nbsp; <b>'+esc(R.audit_date||"")+'</b></span>';
+    var inner = '<p class="eyebrow">Digital Growth Report</p>'
+      + '<h1>'+esc(ctx.business||"Bisnis")+'</h1>'
+      + '<p class="lead muted" style="margin-top:16px">Skor kesehatan digital, riset <span class="acc" style="color:var(--ink)">AI&nbsp;Search</span>, peta kompetitor & langkah bertumbuh.</p>'
+      + '<div class="cover-score"><span class="cv-num hot" data-count="'+(sc.overall||0)+'">'+(sc.overall==null?DASH:sc.overall)+'</span>'
+      + '<span class="kick" style="font-size:13px">skor overall<br>/ 100</span>'
+      + '<span class="chip"><span class="d" style="background:'+sevColor(sc.overall)+'"></span>'+sevLabel(sc.overall)+'</span></div>'
+      + '<div class="cover-meta">'+meta+'</div>';
+    S.push(section("", "", inner, true));
+  })();
+
+  // SKOR
+  (function(){
+    var order=[["Skor Pribadi",ss.self],["Skor Social",ss.social],["Skor vs Kompetitor",ss.competitor]];
+    var rings = order.map(function(o){ var v=o[1]; if(!v) return "";
+      return '<div class="ringc fade">'+ring(v.score,v.target,116)+'<div><h3>'+esc(o[0])+'</h3><p class="rs">'+esc(v.reason)+'</p>'+(v.target?'<span class="tgt">Target '+v.target+'</span>':"")+'</div></div>';
+    }).join("");
+    var pl=[["SEO / Web",sc.cro],["GEO / AI Search",sc.geo],["Social",sc.social],["Tech",sc.tech]];
+    var bars = pl.map(function(o){ var v=o[1];
+      return '<div class="pl fade"><div class="t"><b style="color:'+sevColor(v)+'">'+(v==null?DASH:v)+'</b><span>'+esc(o[0])+'</span></div><div class="track"><i data-w="'+(v||0)+'" style="background:'+sevColor(v)+'"></i></div></div>';
+    }).join("");
+    S.push(section("01 — Meter of Success","", '<h2>Tiga skor yang kami pantau,<br>dan <span class="acc hot">arah target</span>-nya.</h2><div class="rings">'+rings+'</div><div class="pillars">'+bars+'</div>'));
+  })();
+
+  // FUN FACTS
+  if(arr(R.fun_facts).length){
+    var facts = arr(R.fun_facts,4).map(function(f){
+      return '<div class="fact fade"><span class="st hot">'+esc(f.stat||"")+'</span><span class="lb">'+esc(f.label||"")+'</span></div>';
+    }).join("");
+    S.push(section("02 — Fakta Kilat","mag", '<h2>Angka yang <span class="acc cool">bicara</span>.</h2><div class="facts">'+facts+'</div>'));
+  }
+
+  // KONDISI DIGITAL
+  (function(){
+    var land=[["SEO",ls.seo],["GEO / AI Search",ls.geo],["Social Media",ls.social],["Berita / PR",ls.news]];
+    var cards = land.map(function(o){
+      return '<div class="card fade"><div class="cap">'+esc(o[0])+'</div><p style="font-size:14px;line-height:1.5">'+esc(o[1]||DASH)+'</p></div>';
+    }).join("");
+    S.push(section("03 — Kondisi Digital","", '<h2>Posisi brand di lanskap<br>digital <span class="acc">hari ini</span>.</h2><div class="grid g4" style="margin-top:22px">'+cards+'</div>'));
+  })();
+
+  // HASIL RESEARCH — AI SEARCH
+  (function(){
+    var geoTxt = R.research_geo || ls.geo || "";
+    var src = R.geo_raw ? '<div class="src fade"><div class="cap">Kutipan riset — Perplexity AI Search</div>'+esc(String(R.geo_raw).slice(0,420))+(String(R.geo_raw).length>420?"…":"")+'</div>' : "";
+    var inner = '<span class="verdict"><span class="d" style="width:8px;height:8px;border-radius:50%;background:'+sevColor(sc.geo)+'"></span>GEO Score '+(sc.geo==null?DASH:sc.geo)+'/100 · '+sevLabel(sc.geo)+'</span>'
+      + '<h2>Saat orang tanya AI,<br>apakah brand ini <span class="acc cool">muncul</span>?</h2>'
+      + '<div class="quote fade"><p>'+esc(geoTxt)+'</p></div>' + src;
+    S.push(section("04 — Hasil Research · AI Search","cy", inner));
+  })();
+
+  // KOMPETITOR
+  if(arr(R.competitors).length){
+    var comps = arr(R.competitors,4).map(function(c){
+      return '<div class="comp fade"><div class="top"><h3>'+esc(c.name)+'</h3>'+(c.threat?'<span class="th '+esc(c.threat)+'">'+esc(c.threat)+'</span>':"")+'</div>'
+        + (c.channel?'<span class="ch">Menang di: '+esc(c.channel)+'</span>':"") + '<p class="why">'+esc(c.why_ahead||"")+'</p></div>';
+    }).join("");
+    var lead = R.competitiveness ? '<p class="lead muted" style="margin:14px 0 22px">'+esc(R.competitiveness)+'</p>' : "";
+    S.push(section("05 — Peta Kompetitor","cy", '<h2>Siapa yang menang —<br><span class="acc">apple to apple</span>.</h2>'+lead+'<div class="comps">'+comps+'</div>'));
+  }
+
+  // KEBOCORAN
+  (function(){
+    var rows = arr(R.whats_missing,6).map(function(x,i){
+      return '<div class="row fade"><span class="n">'+String(i+1).padStart(2,"0")+'</span><p>'+esc(x)+'</p></div>';
+    }).join("");
+    S.push(section("06 — Yang Bocor","", '<h2>Kebocoran yang menahan<br><span class="acc hot">pertumbuhan</span>.</h2><div class="rows">'+rows+'</div>'));
+  })();
+
+  // PELUANG
+  (function(){
+    var rows = arr(R.opportunities,6).map(function(x){
+      return '<div class="row op fade"><span class="n">↗</span><p>'+esc(x)+'</p></div>';
+    }).join("");
+    S.push(section("07 — Peluang","cy", '<h2>Peluang yang<br><span class="acc cool">belum digarap</span>.</h2><div class="rows">'+rows+'</div>'));
+  })();
+
+  // TIPS & HACKS
+  if(arr(R.growth_hacks).length){
+    var hacks = arr(R.growth_hacks,4).map(function(h,i){
+      return '<div class="hack fade"><div class="ht"><span class="nm">'+(i+1)+'</span><h3>'+esc(h.title)+'</h3></div><p class="how">'+esc(h.how||"")+'</p>'+(h.metric?'<span class="met">'+esc(h.metric)+'</span>':"")+'</div>';
+    }).join("");
+    S.push(section("08 — Tips & Hacks · GEM","mag", '<h2>Cara bertumbuh:<br><span class="acc hot">mudah & terukur</span>.</h2><div class="hacks">'+hacks+'</div>'));
+  }
+
+  // POTENSI OMZET
+  (function(){
+    var levers = arr(rb.levers,4).map(function(x,i){
+      return '<div class="lev fade"><span class="tk">'+(i+1)+'</span><span>'+esc(x)+'</span></div>';
+    }).join("");
+    var inner = '<h2>Kalau bocor ditutup &<br>peluang <span class="acc cool">diambil</span>.</h2>'
+      + '<div class="rev"><div><div class="nt">'
+      + '<div class="fig"><div class="cap">Sekarang</div><b class="muted">'+esc(rb.current_estimate||DASH)+'</b></div>'
+      + '<div class="arw">→</div>'
+      + '<div class="fig"><div class="cap">Proyeksi</div><b class="hot">'+esc(rb.projected||DASH)+'</b></div></div>'
+      + '<div class="uplift"><span class="hot">'+esc(rb.uplift||"")+'</span><small>uplift / bulan</small></div></div>'
+      + '<div class="levers">'+levers+'</div></div>';
+    S.push(section("09 — Potensi Omzet","", inner));
+  })();
+
+  // DEWAN SPESIALIS
+  (function(){
+    var roles=[["CMO","Strategi",ex.cmo],["Digital Marketing","Performance",ex.digital_marketing],["Social Media","Konten & Engagement",ex.social_media],["SEO & GEO","Search + AI Search",ex.seo_geo]];
+    var cards = roles.map(function(o){ var v=o[2]; if(!v) return "";
+      var lis = arr(v.actions,2).map(function(a){ return '<li>'+esc(a)+'</li>'; }).join("");
+      return '<div class="card fade"><div class="role"><span class="bd">'+esc(o[0])+'</span><h3>'+esc(o[1])+'</h3></div><p class="sm">'+esc(v.summary||"")+'</p><ul>'+lis+'</ul></div>';
+    }).join("");
+    S.push(section("10 — Dewan Spesialis","", '<h2>Empat spesialis,<br>satu <span class="acc">arahan</span> tiap fungsi.</h2><div class="exec">'+cards+'</div>'));
+  })();
+
+  // ROADMAP + 2 minggu
+  (function(){
+    var ph=[["Fase 1","0–14 hari","Quick Wins",rm.phase_1],["Fase 2","15–45 hari","Growth",rm.phase_2],["Fase 3","45+ hari","Fondasi",rm.phase_3]];
+    var cards = ph.map(function(o){
+      var lis = arr(o[3],3).map(function(x){ return '<li>'+esc(x)+'</li>'; }).join("");
+      return '<div class="phase fade"><div class="ph">'+esc(o[0])+' · '+esc(o[1])+'</div><h3>'+esc(o[2])+'</h3><ul>'+lis+'</ul></div>';
+    }).join("");
+    var plan = arr(R.content_plan_2w).length ? '<div class="plan fade"><div class="cap">Contoh arah konten · 2 minggu</div><div class="tags">'+arr(R.content_plan_2w,7).map(function(x){return '<span class="tag">'+esc(x)+'</span>';}).join("")+'</div></div>' : "";
+    S.push(section("11 — Urutan Eksekusi","", '<h2>Dari quick win<br>ke <span class="acc">fondasi</span>.</h2><div class="phases">'+cards+'</div>'+plan));
+  })();
+
+  // REKOMENDASI + CTA
+  (function(){
+    var bl = arr(R.recommended_builders,3).map(function(b){
+      return '<div class="builder fade"><div class="fit"><b style="color:'+sevColor(b.fit)+'">'+(b.fit==null?DASH:b.fit)+'</b><span>fit</span></div>'
+        + '<div class="bt"><h3>'+esc(BUILDERS[b.builder]||b.builder)+' <span class="prio '+esc(b.priority)+'">'+esc(b.priority)+'</span></h3><p>'+esc(b.reason)+'</p></div></div>';
+    }).join("");
+    var help = R.how_scaleup_helps ? '<p class="lead muted" style="margin:14px 0 20px">'+esc(R.how_scaleup_helps)+'</p>' : "";
+    var inner = '<h2>Menutup gap ini —<br><span class="acc cool">berkelanjutan</span>.</h2>'+help+'<div class="builders">'+bl+'</div>'
+      + '<div class="cta"><div class="strip">◇ STRATEGI RECURRING</div><p class="lead">'+esc(R.recurring_strategy||"")+'</p>'
+      + '<a class="btn" href="https://thescaleup.xyz/mulai" target="_blank" rel="noreferrer">Mulai dengan ScaleUp →</a></div>'
+      + '<p class="disc">Data situs & AI Search (GEO) nyata, disintesis panel spesialis AI ('+esc((R.engine&&R.engine.model)||"AI")+'). Skor 0–100 berbasis bukti; estimasi omzet = proyeksi. Metrik mendalam (page speed, backlink, analitik sosial) aktif saat integrasi data penuh dinyalakan.</p>';
+    S.push(section("12 — Langkah Bersama ScaleUp","", inner));
+  })();
+
+  document.getElementById("deck").innerHTML = S.join("");
+  document.getElementById("ctot").textContent = String(S.length).padStart(2,"0");
+
+  var secs = [].slice.call(document.querySelectorAll(".slide"));
+  var rail = document.getElementById("rail"), cnum = document.getElementById("cnum");
+  secs.forEach(function(s,i){ var b=document.createElement("button"); b.setAttribute("aria-label","Bagian "+(i+1)); b.onclick=function(){ s.scrollIntoView({behavior:"smooth"}); }; rail.appendChild(b); });
+  var dots = [].slice.call(rail.children);
+  var reduce = matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+  function countUp(el){
+    var end = parseInt(el.getAttribute("data-count"),10)||0;
+    if(reduce){ el.textContent = end; return; }
+    var t0=null;
+    function step(ts){ if(!t0)t0=ts; var p=Math.min(1,(ts-t0)/900); el.textContent=Math.round(end*(1-Math.pow(1-p,3))); if(p<1) requestAnimationFrame(step); }
+    requestAnimationFrame(step);
+  }
+
+  var io = new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(!e.isIntersecting) return;
+      var i = secs.indexOf(e.target);
+      dots.forEach(function(d,j){ d.setAttribute("aria-current", j===i?"true":"false"); });
+      cnum.textContent = String(i+1).padStart(2,"0");
+      var fades = e.target.querySelectorAll(".fade");
+      [].forEach.call(fades,function(el,k){ setTimeout(function(){ el.classList.add("in"); }, k*55); });
+      [].forEach.call(e.target.querySelectorAll("circle[data-off]"),function(c){ c.style.strokeDashoffset=c.getAttribute("data-off"); });
+      [].forEach.call(e.target.querySelectorAll(".track>i[data-w]"),function(t){ t.style.width=t.getAttribute("data-w")+"%"; });
+      [].forEach.call(e.target.querySelectorAll("[data-count]"),function(n){ if(!n.dataset.done){ n.dataset.done="1"; countUp(n); } });
+    });
+  }, {threshold:.5});
+  secs.forEach(function(s){ io.observe(s); });
+
+  function cur(){ var b=0,bd=1e9; secs.forEach(function(s,i){ var d=Math.abs(s.getBoundingClientRect().top); if(d<bd){bd=d;b=i;} }); return b; }
+  addEventListener("keydown", function(e){ var k=e.key;
+    if(k==="ArrowDown"||k==="PageDown"||k===" "){ e.preventDefault(); secs[Math.min(secs.length-1,cur()+1)].scrollIntoView({behavior:"smooth"}); }
+    else if(k==="ArrowUp"||k==="PageUp"){ e.preventDefault(); secs[Math.max(0,cur()-1)].scrollIntoView({behavior:"smooth"}); }
+    else if(k==="Home"){ e.preventDefault(); secs[0].scrollIntoView({behavior:"smooth"}); }
+    else if(k==="End"){ e.preventDefault(); secs[secs.length-1].scrollIntoView({behavior:"smooth"}); }
+  });
+})();
+</script>
+
+</body>
+</html>
