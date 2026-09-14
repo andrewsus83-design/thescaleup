@@ -11,6 +11,7 @@ export type ApiKeys = {
   perplexity?: string;
   firecrawl?: string;
   apify?: string;
+  dataforseo?: string;
   serp?: string;
 };
 
@@ -41,6 +42,7 @@ export async function getApiKeys(): Promise<ApiKeys> {
     perplexity: pick("perplexity", process.env.PERPLEXITY_API_KEY),
     firecrawl: pick("firecrawl", process.env.FIRECRAWL_API_KEY),
     apify: pick("apify", process.env.APIFY_API_KEY),
+    dataforseo: pick("dataforseo", process.env.DATAFORSEO_API_KEY),
     serp: pick("serp", process.env.SERP_API_KEY),
   };
 }
