@@ -101,7 +101,8 @@ export const API_PROVIDERS: { key: string; label: string; hint: string }[] = [
   { key: "perplexity", label: "Perplexity", hint: "pplx-..." },
   { key: "apify", label: "Apify", hint: "apify_api_..." },
   { key: "firecrawl", label: "Firecrawl", hint: "fc-..." },
-  { key: "dataforseo", label: "DataForSEO", hint: "login:password (Basic auth) — untuk SEO/SERP/backlink data" },
+  { key: "dataforseo_login", label: "DataForSEO Login", hint: "email/login akun DataForSEO" },
+  { key: "dataforseo", label: "DataForSEO Password", hint: "password / API key DataForSEO (Basic auth)" },
   { key: "serp", label: "SERP API", hint: "serp api key" },
   { key: "zernio", label: "Zernio", hint: "zernio token / webhook" },
 ];
