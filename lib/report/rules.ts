@@ -5,6 +5,8 @@ import type { ReportRule, ReportCustomParam } from "@/lib/report/types";
 const RULES_KEY = "report_rules";
 const TEMPLATE_KEY = "report_template_name";
 const CUSTOM_KEY = "report_custom_params";
+const TPL_FILE_KEY = "report_template_file";
+const TPL_FILE_NAME_KEY = "report_template_filename";
 
 /** Read the global report rules (stored as JSON in app_settings). */
 export async function getReportRules(): Promise<ReportRule[]> {
@@ -67,4 +69,43 @@ export async function saveCustomParams(params: ReportCustomParam[]): Promise<voi
   await db
     .from("app_settings")
     .upsert({ key: CUSTOM_KEY, value: JSON.stringify(params), updated_at: new Date().toISOString() }, { onConflict: "key" });
+}
+
+/** Uploaded default template file (xlsx, base64) + its filename. */
+export async function getTemplateFile(): Promise<{ filename: string; base64: string } | null> {
+  if (!isSupabaseAdminConfigured()) return null;
+  try {
+    const db = createSupabaseAdminClient();
+    const { data } = await db.from("app_settings").select("key, value").in("key", [TPL_FILE_KEY, TPL_FILE_NAME_KEY]);
+    const map: Record<string, string> = {};
+    for (const r of data ?? []) if (r.key && r.value) map[r.key as string] = r.value as string;
+    if (!map[TPL_FILE_KEY]) return null;
+    return { filename: map[TPL_FILE_NAME_KEY] ?? "template.xlsx", base64: map[TPL_FILE_KEY] };
+  } catch {
+    return null;
+  }
+}
+
+export async function saveTemplateFile(filename: string, base64: string): Promise<void> {
+  if (!isSupabaseAdminConfigured()) return;
+  const db = createSupabaseAdminClient();
+  const now = new Date().toISOString();
+  await db.from("app_settings").upsert(
+    [
+      { key: TPL_FILE_KEY, value: base64, updated_at: now },
+      { key: TPL_FILE_NAME_KEY, value: filename, updated_at: now },
+    ],
+    { onConflict: "key" },
+  );
+}
+
+export async function getTemplateFilename(): Promise<string | null> {
+  if (!isSupabaseAdminConfigured()) return null;
+  try {
+    const db = createSupabaseAdminClient();
+    const { data } = await db.from("app_settings").select("value").eq("key", TPL_FILE_NAME_KEY).maybeSingle();
+    return (data?.value as string) ?? null;
+  } catch {
+    return null;
+  }
 }

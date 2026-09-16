@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { ArrowLeft, FileSpreadsheet, SlidersHorizontal, Plus, Trash2, Trophy, Sparkles } from "lucide-react";
+import { ArrowLeft, FileSpreadsheet, SlidersHorizontal, Plus, Trash2, Trophy, Sparkles, Upload } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
-import { getReportRules, getTemplateName, getCustomParams } from "@/lib/report/rules";
-import { saveReportRule, deleteReportRule, saveReportTemplate, saveCustomParam, deleteCustomParam } from "@/lib/report/actions";
-import { RULE_METRICS, CUSTOM_PARAM_TYPES, type ReportRule, type ReportCustomParam } from "@/lib/report/types";
+import { getReportRules, getTemplateName, getCustomParams, getTemplateFilename } from "@/lib/report/rules";
+import { saveReportRule, deleteReportRule, saveReportTemplate, saveCustomParam, deleteCustomParam, uploadReportTemplate } from "@/lib/report/actions";
+import { RULE_METRICS, CUSTOM_PARAM_TYPES, REPORT_TEMPLATE_TYPES, DEFAULT_TEMPLATE_TYPE, type ReportRule, type ReportCustomParam } from "@/lib/report/types";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +87,12 @@ function RuleForm({ rule }: { rule?: ReportRule }) {
 
 export default async function ReportSettingsPage() {
   await requireAdmin();
-  const [rules, templateName, customParams] = await Promise.all([getReportRules(), getTemplateName(), getCustomParams()]);
+  const [rules, templateName, customParams, templateFilename] = await Promise.all([
+    getReportRules(),
+    getTemplateName(),
+    getCustomParams(),
+    getTemplateFilename(),
+  ]);
 
   return (
     <div className="mx-auto max-w-4xl px-5 py-8 sm:px-8">
@@ -110,20 +115,56 @@ export default async function ReportSettingsPage() {
           <FileSpreadsheet className="h-4 w-4" /> Template Report (Excel)
         </div>
         <p className="mb-4 text-sm text-slate-500">
-          Format “Post Master - IG” (seperti file Cap Gajah): header Engagement / Actions / Impressions / Reach /
-          Total Interaction, blok TOTAL &amp; AVERAGE, dan peringkat JUARA. Export Excel memakai format ini +
-          rumus di bawah.
+          Pilih tipe report. Default = <strong>Post Master - IG (Cap Gajah)</strong> — format file yang Anda upload.
+          Export Excel “Tarik Report” memakai tipe ini + rumus di bawah.
         </p>
         <form action={saveReportTemplate} className="flex flex-wrap items-end gap-2">
           <label className="flex-1">
-            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400">Nama template</span>
-            <input name="template_name" defaultValue={templateName || "Post Master - IG"}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#2A2870]" />
+            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400">Tipe template</span>
+            <select name="template_name" defaultValue={templateName || DEFAULT_TEMPLATE_TYPE}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#2A2870]">
+              {REPORT_TEMPLATE_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
           </label>
           <button type="submit" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
             Simpan
           </button>
         </form>
+        <div className="mt-3 space-y-1 text-xs text-slate-400">
+          {REPORT_TEMPLATE_TYPES.map((t) => (
+            <p key={t.value}><b className="text-slate-500">{t.label}:</b> {t.desc}</p>
+          ))}
+        </div>
+
+        {/* upload default template */}
+        <div className="mt-5 border-t border-slate-100 pt-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <Upload className="h-4 w-4" /> Upload Template Default (.xlsx)
+          </div>
+          <p className="mb-3 text-xs text-slate-500">
+            Upload file Excel Anda (mis. Post Master Cap Gajah) sebagai template default. Saat “Tarik Report”,
+            data ditulis ke dalam template ini. {templateFilename ? "" : "Belum ada file."}
+          </p>
+          {templateFilename && (
+            <p className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
+              <FileSpreadsheet className="h-3.5 w-3.5" /> {templateFilename}
+            </p>
+          )}
+          <form action={uploadReportTemplate} className="flex flex-wrap items-center gap-2">
+            <input
+              type="file"
+              name="template_file"
+              accept=".xlsx,.xls"
+              required
+              className="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-[#2A2870] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#211f5c]"
+            />
+            <button type="submit" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              Upload
+            </button>
+          </form>
+        </div>
       </div>
 
       {/* rules */}

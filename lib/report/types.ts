@@ -153,6 +153,14 @@ export type ReportRule = {
   note?: string;
 };
 
+/** Report/Excel template types. Default = the uploaded "Post Master - IG" (Cap Gajah). */
+export const REPORT_TEMPLATE_TYPES: { value: string; label: string; desc: string }[] = [
+  { value: "post_master", label: "Post Master - IG (Cap Gajah)", desc: "Format bawaan: header Engagement/Actions/Impressions/Reach + JUARA. Default." },
+  { value: "uploaded", label: "Template Upload", desc: "Pakai file .xlsx yang Anda upload sebagai template report." },
+  { value: "ringkas", label: "Ringkas / Summary", desc: "Satu halaman ringkasan metrik + top post." },
+];
+export const DEFAULT_TEMPLATE_TYPE = "post_master";
+
 /** A custom AI parameter — Claude Opus analyzes the report data against this. */
 export type ReportCustomParam = {
   id: string;

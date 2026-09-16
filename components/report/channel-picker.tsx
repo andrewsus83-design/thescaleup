@@ -36,10 +36,17 @@ export function ChannelPicker({
     const s = q.toString();
     router.push(`/report/admin${s ? `?${s}` : ""}`);
   }
+  const allAcc = clients.flatMap((c) => c.accounts);
   function toggleAcc(id: string) {
-    const s = new Set(accountIds);
-    s.has(id) ? s.delete(id) : s.add(id);
-    go([...s], webIds);
+    if (accountIds.includes(id)) {
+      go(accountIds.filter((x) => x !== id), webIds);
+      return;
+    }
+    // only one platform per selection — picking a different platform replaces the set
+    const plat = allAcc.find((a) => a.id === id)?.platform;
+    const currentPlat = allAcc.find((a) => a.id === accountIds[0])?.platform;
+    if (currentPlat && plat !== currentPlat) go([id], webIds);
+    else go([...accountIds, id], webIds);
   }
   function toggleWeb(id: string) {
     const w = new Set(webIds);
@@ -48,7 +55,6 @@ export function ChannelPicker({
   }
 
   const totalSel = accountIds.length + webIds.length;
-  const allAcc = clients.flatMap((c) => c.accounts);
   const label =
     totalSel === 0
       ? "Pilih channel"

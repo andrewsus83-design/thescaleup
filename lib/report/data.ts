@@ -130,19 +130,21 @@ export async function getChannelFlags(): Promise<Record<string, { web: boolean; 
 export async function getLatestSnapshot(clientId: string, accountId?: string): Promise<ReportSnapshot | null> {
   if (!isSupabaseAdminConfigured()) return null;
   try {
-    const run = async (withAccount: boolean) => {
+    const run = async (mode: "account" | "legacy" | "any") => {
       let q = db()
         .from("report_snapshots")
         .select("id, client_id, period, data, source, created_at")
         .eq("client_id", clientId);
-      if (withAccount && accountId) q = q.eq("data->account->>id", accountId);
+      if (mode === "account" && accountId) q = q.eq("data->account->>id", accountId);
+      if (mode === "legacy") q = q.is("data->account->>id", null);
       const { data } = await q.order("created_at", { ascending: false }).limit(1).maybeSingle();
       return data;
     };
-    // prefer the account-tagged snapshot; fall back to the client's latest
-    // (older snapshots have no account id, so the filtered query misses them)
-    let data = accountId ? await run(true) : await run(false);
-    if (!data && accountId) data = await run(false);
+    // prefer the account-tagged snapshot; fall back ONLY to legacy (untagged)
+    // snapshots — never to a DIFFERENT account's data (so an un-pulled TikTok
+    // account shows "no report yet" instead of the Instagram snapshot).
+    let data = accountId ? await run("account") : await run("any");
+    if (!data && accountId) data = await run("legacy");
     if (!data) return null;
     return {
       id: String(data.id),

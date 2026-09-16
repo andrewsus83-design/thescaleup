@@ -6,7 +6,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { fetchZernioMetrics, listZernioAccounts, type ZernioAccount } from "@/lib/report/zernio";
 import { CLIENT_PROVIDERS } from "@/lib/report/config";
-import { getReportRules, saveReportRules, saveTemplateName, getCustomParams, saveCustomParams } from "@/lib/report/rules";
+import { getReportRules, saveReportRules, saveTemplateName, getCustomParams, saveCustomParams, saveTemplateFile } from "@/lib/report/rules";
 import { analyzeReportWithClaude } from "@/lib/report/ai";
 import type { ReportRule, ReportCustomParam } from "@/lib/report/types";
 
@@ -76,6 +76,21 @@ export async function deleteReportRule(formData: FormData): Promise<void> {
 export async function saveReportTemplate(formData: FormData): Promise<void> {
   await requireAdmin();
   await saveTemplateName(String(formData.get("template_name") ?? "").trim());
+  revalidatePath("/report/admin/report-settings");
+}
+
+/** Upload the default report template file (.xlsx) — stored base64 in app_settings. */
+export async function uploadReportTemplate(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const file = formData.get("template_file");
+  if (!(file instanceof File) || file.size === 0) return;
+  if (file.size > 2_000_000) return; // 2MB cap
+  const name = file.name || "template.xlsx";
+  if (!/\.xlsx?$/i.test(name)) return;
+  const buf = Buffer.from(await file.arrayBuffer());
+  await saveTemplateFile(name, buf.toString("base64"));
+  // switch the active template type to the uploaded file
+  await saveTemplateName("uploaded");
   revalidatePath("/report/admin/report-settings");
 }
 
