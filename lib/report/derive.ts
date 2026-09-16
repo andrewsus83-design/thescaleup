@@ -150,10 +150,13 @@ function moverReasonDown(m: Mover, avg: number): string {
   return bits.join(" · ");
 }
 
-/** Top posts driving results up vs underperformers dragging them down. */
-export function topMovers(posts: PostMetric[], n = 3): Movers {
+/** Top posts driving results up vs underperformers dragging them down.
+ *  How many each way scales with post count: ≤5 → 1, ≤10 → 2, >10 → 3
+ *  (override with an explicit `n`). */
+export function topMovers(posts: PostMetric[], n?: number): Movers {
   const valid = posts.filter((p) => (p.reach ?? 0) > 0);
   if (valid.length < 2) return null;
+  const k = n ?? (valid.length <= 5 ? 1 : valid.length <= 10 ? 2 : 3);
   const totalReach = valid.reduce((s, p) => s + (p.reach ?? 0), 0);
   const avgReach = totalReach / valid.length;
   const enrich = (p: PostMetric): Mover => {
@@ -162,12 +165,12 @@ export function topMovers(posts: PostMetric[], n = 3): Movers {
     return { post: p, reach, ti, er: reach ? ti / reach : null, shareOfReach: totalReach ? reach / totalReach : 0, reason: "" };
   };
   const byReach = valid.map(enrich).sort((a, b) => b.reach - a.reach);
-  const up = byReach.slice(0, n).map((m) => ({ ...m, reason: moverReasonUp(m, avgReach) }));
+  const up = byReach.slice(0, k).map((m) => ({ ...m, reason: moverReasonUp(m, avgReach) }));
   const upSet = new Set(up.map((m) => m.post));
   // drags = below-average posts NOT already counted as drivers, worst first
   const down = byReach
     .filter((m) => !upSet.has(m.post) && m.reach < avgReach)
-    .slice(-n)
+    .slice(-k)
     .reverse()
     .map((m) => ({ ...m, reason: moverReasonDown(m, avgReach) }));
   return { up, down, avgReach };
