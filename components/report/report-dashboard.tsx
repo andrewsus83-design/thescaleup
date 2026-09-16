@@ -1,8 +1,10 @@
-import { Sparkles, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Sparkles, TrendingUp, TrendingDown, Minus, Info } from "lucide-react";
 import type { ReportMetrics, PostMetric } from "@/lib/report/types";
+import { METRIC_INFO, type MetricInfo } from "@/lib/report/metric-info";
 import {
   efficiency,
   computeDeltas,
+  pctChange,
   qualityScore,
   bestDayTime,
   reelRows,
@@ -54,10 +56,66 @@ const CT_LABEL: Record<string, string> = {
   STORY: "Story",
 };
 
-function Tile({ label, value, accent, hint }: { label: string; value: string; accent?: string; hint?: string }) {
+/** Pure-CSS hover tooltip: description + rumus + industry benchmark + relation. */
+function InfoDot({ id, info }: { id?: string; info?: MetricInfo }) {
+  const m = info ?? (id ? METRIC_INFO[id] : undefined);
+  if (!m) return null;
+  return (
+    <span className="group/info relative inline-flex align-middle">
+      <Info className="h-3 w-3 cursor-help text-slate-300 transition-colors hover:text-slate-500" />
+      <span className="pointer-events-none absolute left-1/2 top-5 z-40 hidden w-64 -translate-x-1/2 whitespace-normal rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-normal normal-case leading-relaxed tracking-normal text-slate-600 shadow-xl group-hover/info:block">
+        <b className="text-slate-800">{m.label}</b>
+        <span className="mt-1 block text-slate-600">{m.desc}</span>
+        {m.rumus && (
+          <span className="mt-1.5 block">
+            <b className="text-slate-500">Rumus:</b> <code className="rounded bg-slate-100 px-1 text-slate-700">{m.rumus}</code>
+          </span>
+        )}
+        {m.benchmark && (
+          <span className="mt-1 block">
+            <b className="text-emerald-600">Patokan bagus:</b> {m.benchmark}
+          </span>
+        )}
+        {m.relation && <span className="mt-1 block text-slate-400">↔ {m.relation}</span>}
+      </span>
+    </span>
+  );
+}
+
+/** Section heading with an optional info tooltip. */
+function SectionTitle({ children, info }: { children: React.ReactNode; info?: string }) {
+  return (
+    <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+      {children}
+      {info && <InfoDot id={info} />}
+    </p>
+  );
+}
+
+function Tile({
+  label,
+  value,
+  accent,
+  hint,
+  info,
+  delta,
+}: {
+  label: string;
+  value: string;
+  accent?: string;
+  hint?: string;
+  info?: string;
+  delta?: number | null;
+}) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
+      <div className="flex items-start justify-between gap-1">
+        <p className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+          {label}
+          {info && <InfoDot id={info} />}
+        </p>
+        {delta != null && <DeltaBadge d={delta} />}
+      </div>
       <p className="mt-1 text-2xl font-bold" style={{ color: accent ?? "#1B2A4A" }}>
         {value}
       </p>
@@ -205,6 +263,11 @@ export function ReportDashboard({
   const followersBase = metrics.account?.followers ?? null;
   const eff = efficiency(t, followersBase, posts.length);
   const deltas = computeDeltas(t, metrics.comparison);
+  // rate deltas (from the previous window's raw values) for the corner indicators
+  const cmp = metrics.comparison;
+  const prevRate = (n?: number | null, d?: number | null) => (cmp && n != null && d != null && d > 0 ? n / d : null);
+  const savesRateDelta = pctChange(eff.savesRate, prevRate(cmp?.saved, cmp?.reach));
+  const sharesRateDelta = pctChange(eff.sharesRate, prevRate(cmp?.shares, cmp?.reach));
   const qScore = qualityScore(posts);
   const bestTime = bestDayTime(posts);
   const reels = reelRows(posts);
@@ -263,45 +326,46 @@ export function ReportDashboard({
 
       {/* top-line tiles */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        <Tile label="Reach" value={fmt(t?.reach)} accent={brandColor} />
-        <Tile label="Impressions" value={fmt(t?.impressions)} />
-        <Tile label="Total Interaksi" value={fmt(t?.totalInteractions)} accent={accentColor} />
-        <Tile label="ER (Reach)" value={pct(t?.erReach)} />
-        <Tile label="Accounts Engaged" value={fmt(t?.accountsEngaged)} />
-        <Tile label="Likes" value={fmt(t?.likes)} />
-        <Tile label="Komentar" value={fmt(t?.comments)} />
-        <Tile label="Shares" value={fmt(t?.shares)} />
-        <Tile label="Saved" value={fmt(t?.saved)} />
-        <Tile label="Follows" value={fmt(t?.follows)} />
-        <Tile label="Web Clicks" value={fmt(t?.webClicks)} />
-        <Tile label="Jumlah Post" value={fmt(t?.posts)} />
+        <Tile label="Reach" value={fmt(t?.reach)} accent={brandColor} info="reach" delta={deltas?.reach} />
+        <Tile label="Impressions" value={fmt(t?.impressions)} info="impressions" />
+        <Tile label="Total Interaksi" value={fmt(t?.totalInteractions)} accent={accentColor} info="totalInteractions" delta={deltas?.totalInteractions} />
+        <Tile label="ER (Reach)" value={pct(t?.erReach)} info="erReach" delta={deltas?.erReach} />
+        <Tile label="Accounts Engaged" value={fmt(t?.accountsEngaged)} info="accountsEngaged" />
+        <Tile label="Likes" value={fmt(t?.likes)} info="likes" delta={deltas?.likes} />
+        <Tile label="Komentar" value={fmt(t?.comments)} info="comments" delta={deltas?.comments} />
+        <Tile label="Shares" value={fmt(t?.shares)} info="shares" delta={deltas?.shares} />
+        <Tile label="Saved" value={fmt(t?.saved)} info="saved" delta={deltas?.saved} />
+        <Tile label="Follows" value={fmt(t?.follows)} info="follows" />
+        <Tile label="Web Clicks" value={fmt(t?.webClicks)} info="webClicks" />
+        <Tile label="Jumlah Post" value={fmt(t?.posts)} info="posts" />
       </div>
 
       {/* CMO: efficiency + profile-action funnel + quality (derived, shared with Excel) */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5">
         <p className="mb-3 text-sm font-semibold text-slate-700">Efisiensi, Funnel & Kualitas</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <Tile label="Reach Rate" value={times(eff.reachRate)} accent={brandColor} hint="reach ÷ followers" />
-          <Tile label="ER (Reach)" value={pct1(eff.erReach)} hint="interaksi ÷ reach" />
-          <Tile label="Content Quality Score" value={qScore != null ? qScore.toFixed(1) : "—"} accent={accentColor} hint="engagement berbobot / 1k reach" />
-          <Tile label="Saves Rate" value={pct1(eff.savesRate)} hint="saved ÷ reach · sinyal simpan" />
-          <Tile label="Shares Rate" value={pct1(eff.sharesRate)} hint="shares ÷ reach · viralitas" />
-          <Tile label="Profile Visit Rate" value={pct1(eff.pvRate)} hint="profil ÷ reach" />
-          <Tile label="Follow Rate" value={pct1(eff.followRate)} hint="follows ÷ reach" />
+          <Tile label="Reach Rate" value={times(eff.reachRate)} accent={brandColor} hint="reach ÷ followers" info="reachRate" />
+          <Tile label="ER (Reach)" value={pct1(eff.erReach)} hint="interaksi ÷ reach" info="erReach" delta={deltas?.erReach} />
+          <Tile label="Content Quality Score" value={qScore != null ? qScore.toFixed(1) : "—"} accent={accentColor} hint="engagement berbobot / 1k reach" info="qualityScore" />
+          <Tile label="Saves Rate" value={pct1(eff.savesRate)} hint="saved ÷ reach · sinyal simpan" info="savesRate" delta={savesRateDelta} />
+          <Tile label="Shares Rate" value={pct1(eff.sharesRate)} hint="shares ÷ reach · viralitas" info="sharesRate" delta={sharesRateDelta} />
+          <Tile label="Profile Visit Rate" value={pct1(eff.pvRate)} hint="profil ÷ reach" info="pvRate" />
+          <Tile label="Follow Rate" value={pct1(eff.followRate)} hint="follows ÷ reach" info="followRate" />
           <Tile
             label="Net Follower Growth"
             value={netGrowth != null ? (netGrowth >= 0 ? "+" : "") + fmt(netGrowth) : "—"}
             accent={netGrowth != null && netGrowth < 0 ? "#DC2626" : brandColor}
             hint={growthRate != null ? `${pct1(growthRate)} dari basis` : "gained − lost"}
+            info="netGrowth"
           />
-          <Tile label="Avg Reach / Post" value={fmt(eff.avgReach != null ? Math.round(eff.avgReach) : null)} hint="rata-rata jangkauan" />
+          <Tile label="Avg Reach / Post" value={fmt(eff.avgReach != null ? Math.round(eff.avgReach) : null)} hint="rata-rata jangkauan" info="avgReach" />
         </div>
       </div>
 
       {/* CMO: period-over-period comparison */}
       {deltas && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <p className="mb-3 text-sm font-semibold text-slate-700">Perbandingan vs Periode Sebelumnya</p>
+          <SectionTitle info="comparison">Perbandingan vs Periode Sebelumnya</SectionTitle>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
             {[
               ["Reach", deltas.reach],
@@ -327,7 +391,7 @@ export function ReportDashboard({
       {/* CMO: best day / time to post */}
       {bestTime && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <p className="mb-3 text-sm font-semibold text-slate-700">Waktu Terbaik Posting (WIB)</p>
+          <SectionTitle info="bestTime">Waktu Terbaik Posting (WIB)</SectionTitle>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Tile label="Hari Terbaik" value={bestTime.day} accent={brandColor} hint={`avg reach ${fmt(bestTime.dayAvgReach)}`} />
             <Tile label="Jam Terbaik" value={`${String(bestTime.hour).padStart(2, "0")}:00`} accent={accentColor} hint={`avg reach ${fmt(bestTime.hourAvgReach)}`} />
@@ -339,7 +403,7 @@ export function ReportDashboard({
       {/* CMO: performance per content pillar (needs AI-suggested pillars) */}
       {pillarRoll.length > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <p className="mb-3 text-sm font-semibold text-slate-700">Performa per Pillar Konten</p>
+          <SectionTitle info="pillar">Performa per Pillar Konten</SectionTitle>
           <div className="space-y-2.5">
             {pillarRoll.map((p) => (
               <div key={p.name}>
@@ -385,7 +449,7 @@ export function ReportDashboard({
         {/* discovery split */}
         {disc && discTotal > 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <p className="mb-3 text-sm font-semibold text-slate-700">Jangkauan: Followers vs Non-followers</p>
+            <SectionTitle info="discovery">Jangkauan: Followers vs Non-followers</SectionTitle>
             <div className="flex h-4 overflow-hidden rounded-full">
               <div style={{ width: `${((disc.followers ?? 0) / discTotal) * 100}%`, backgroundColor: brandColor }} />
               <div style={{ width: `${((disc.nonFollowers ?? 0) / discTotal) * 100}%`, backgroundColor: accentColor }} />
@@ -409,7 +473,7 @@ export function ReportDashboard({
         {/* content type breakdown */}
         {ct.length > 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <p className="mb-3 text-sm font-semibold text-slate-700">Reach per Jenis Konten</p>
+            <SectionTitle info="contentType">Reach per Jenis Konten</SectionTitle>
             <div className="space-y-2.5">
               {ct
                 .sort((a, b) => (b.reach ?? 0) - (a.reach ?? 0))
@@ -435,7 +499,10 @@ export function ReportDashboard({
       {(metrics.followerSeries?.length || metrics.followersGained != null) && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-slate-700">Pertumbuhan Follower</p>
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+              Pertumbuhan Follower
+              <InfoDot id="followerGrowth" />
+            </p>
             <div className="flex gap-4 text-sm">
               {metrics.followersGained != null && (
                 <span className="text-emerald-600">+{fmt(metrics.followersGained)} gained</span>
@@ -473,7 +540,7 @@ export function ReportDashboard({
       {/* reels / video performance */}
       {metrics.reels && metrics.reels.count > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <p className="mb-3 text-sm font-semibold text-slate-700">Performa Reels / Video</p>
+          <SectionTitle info="completion">Performa Reels / Video</SectionTitle>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Tile label="Jumlah Video" value={fmt(metrics.reels.count)} />
             <Tile label="Total Views" value={fmt(metrics.reels.totalViews)} accent={accentColor} />
@@ -486,7 +553,10 @@ export function ReportDashboard({
       {/* CMO: per-Reel retention detail */}
       {reels.length > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white">
-          <p className="px-4 pt-4 text-sm font-semibold text-slate-700">Retensi Reels per Video</p>
+          <p className="flex items-center gap-1.5 px-4 pt-4 text-sm font-semibold text-slate-700">
+            Retensi Reels per Video
+            <InfoDot id="viewRate" />
+          </p>
           <div className="mt-2 overflow-x-auto">
             <table className="w-full min-w-[720px] text-xs">
               <thead>
@@ -561,7 +631,10 @@ export function ReportDashboard({
       {/* CMO: audience overlap — who follows vs who actually engages */}
       {(genderOverlap.length > 0 || ageOverlap.length > 0) && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <p className="mb-1 text-sm font-semibold text-slate-700">Overlap Audiens: Followers vs yang Berinteraksi</p>
+          <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+            Overlap Audiens: Followers vs yang Berinteraksi
+            <InfoDot id="overlap" />
+          </p>
           <p className="mb-4 text-[11px] text-slate-400">
             Gap positif = segmen itu <b>lebih aktif</b> berinteraksi dibanding porsinya di followers.
           </p>

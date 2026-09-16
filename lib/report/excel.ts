@@ -2,6 +2,7 @@ import "server-only";
 import ExcelJS from "exceljs";
 import type { ReportClient, ReportMetrics, ReportRule, PostMetric } from "@/lib/report/types";
 import { efficiency, computeDeltas, qualityScore, bestDayTime, reelRows, overlapRows, totalInteraction } from "@/lib/report/derive";
+import { infoNote } from "@/lib/report/metric-info";
 
 function argb(hex: string) {
   return "FF" + hex.replace("#", "").toUpperCase().padStart(6, "0").slice(0, 6);
@@ -196,6 +197,7 @@ function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: Re
   // sub headers (row 3)
   const sub = ["Date", "Content", "Pillar", "Followers on this period", "Likes", "Comments", "ER", "Follows", "Profile Visits", "Shared", "Saved", "Web Click", "Others", "Total", "Total", "ER", "Total"];
   const subFill = ["", "", "", "", C.ENG, C.ENG, C.ENG, C.ACT, C.ACT, C.ACT, C.ACT, C.ACT, C.ACT, C.IMP, C.REACH, C.REACH, ""];
+  const subInfo = ["", "", "pillar", "followerGrowth", "likes", "comments", "erReach", "follows", "pvRate", "shares", "saved", "webClicks", "", "impressions", "reach", "erReach", "totalInteractions"];
   sub.forEach((h, i) => {
     const cell = ws.getCell(3, i + 1);
     cell.value = h;
@@ -203,6 +205,8 @@ function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: Re
     if (subFill[i]) cell.fill = fill(subFill[i]);
     cell.alignment = { horizontal: "center", wrapText: true, vertical: "middle" };
     cell.border = { bottom: thin };
+    const n = subInfo[i] ? infoNote(subInfo[i]) : null;
+    if (n) cell.note = n;
   });
   ws.getRow(3).height = 30;
 
@@ -318,16 +322,23 @@ function buildInsights(wb: ExcelJS.Workbook, metrics: ReportMetrics) {
   const deltaS = (n: number | null | undefined) => (n == null ? "—" : (n >= 0 ? "+" : "") + (n * 100).toFixed(0) + "%");
 
   let row = 1;
-  const section = (label: string, color: string) => {
+  const note = (c: ExcelJS.Cell, id?: string) => {
+    const n = id ? infoNote(id) : null;
+    if (n) c.note = n;
+  };
+  const section = (label: string, color: string, id?: string) => {
     ws.mergeCells(row, 1, row, 6);
     const c = ws.getCell(row, 1);
     c.value = label;
     c.font = { bold: true, size: 12, color: { argb: "FF1A1A1A" } };
     c.fill = fill(color);
+    note(c, id);
     row++;
   };
-  const kv = (label: string, value: string | number | null, bold = true) => {
-    ws.getCell(row, 1).value = label;
+  const kv = (label: string, value: string | number | null, id?: string, bold = true) => {
+    const lc = ws.getCell(row, 1);
+    lc.value = label;
+    note(lc, id);
     const c = ws.getCell(row, 2);
     c.value = (value ?? "—") as ExcelJS.CellValue;
     if (bold) c.font = { bold: true };
@@ -346,25 +357,25 @@ function buildInsights(wb: ExcelJS.Workbook, metrics: ReportMetrics) {
   // 1) Efficiency, funnel & quality
   const eff = efficiency(t, followers, posts.length);
   section("EFISIENSI, FUNNEL & KUALITAS", "#B6D7A8");
-  kv("Reach Rate (reach ÷ followers)", timesS(eff.reachRate));
-  kv("ER (Reach)", pctS(eff.erReach));
-  kv("Content Quality Score (/1k reach)", qualityScore(posts)?.toFixed(1) ?? "—");
-  kv("Saves Rate (saved ÷ reach)", pctS(eff.savesRate));
-  kv("Shares Rate (shares ÷ reach)", pctS(eff.sharesRate));
-  kv("Profile Visit Rate", pctS(eff.pvRate));
-  kv("Follow Rate", pctS(eff.followRate));
-  kv("Avg Reach / Post", eff.avgReach != null ? Math.round(eff.avgReach) : "—");
+  kv("Reach Rate (reach ÷ followers)", timesS(eff.reachRate), "reachRate");
+  kv("ER (Reach)", pctS(eff.erReach), "erReach");
+  kv("Content Quality Score (/1k reach)", qualityScore(posts)?.toFixed(1) ?? "—", "qualityScore");
+  kv("Saves Rate (saved ÷ reach)", pctS(eff.savesRate), "savesRate");
+  kv("Shares Rate (shares ÷ reach)", pctS(eff.sharesRate), "sharesRate");
+  kv("Profile Visit Rate", pctS(eff.pvRate), "pvRate");
+  kv("Follow Rate", pctS(eff.followRate), "followRate");
+  kv("Avg Reach / Post", eff.avgReach != null ? Math.round(eff.avgReach) : "—", "avgReach");
   const netGrowth =
     metrics.followersGained != null || metrics.followersLost != null
       ? (metrics.followersGained ?? 0) - (metrics.followersLost ?? 0)
       : null;
-  kv("Net Follower Growth", netGrowth != null ? (netGrowth >= 0 ? "+" : "") + netGrowth : "—");
+  kv("Net Follower Growth", netGrowth != null ? (netGrowth >= 0 ? "+" : "") + netGrowth : "—", "netGrowth");
   row++;
 
   // 2) Period-over-period
   const deltas = computeDeltas(t, metrics.comparison);
   if (deltas) {
-    section("PERBANDINGAN vs PERIODE SEBELUMNYA", "#CFE2F3");
+    section("PERBANDINGAN vs PERIODE SEBELUMNYA", "#CFE2F3", "comparison");
     headerRow(["Metrik", "Δ %"]);
     ([
       ["Reach", deltas.reach],
@@ -381,7 +392,7 @@ function buildInsights(wb: ExcelJS.Workbook, metrics: ReportMetrics) {
   // 3) Best day / time
   const bt = bestDayTime(posts);
   if (bt) {
-    section("WAKTU TERBAIK POSTING (WIB)", "#FCE5CD");
+    section("WAKTU TERBAIK POSTING (WIB)", "#FCE5CD", "bestTime");
     kv("Hari Terbaik", `${bt.day} (avg reach ${bt.dayAvgReach.toLocaleString("id-ID")})`);
     kv("Jam Terbaik", `${String(bt.hour).padStart(2, "0")}:00 (avg reach ${bt.hourAvgReach.toLocaleString("id-ID")})`);
     row++;
@@ -398,7 +409,7 @@ function buildInsights(wb: ExcelJS.Workbook, metrics: ReportMetrics) {
     pillarMap.set(p.pillar, e);
   }
   if (pillarMap.size) {
-    section("PERFORMA PER PILLAR KONTEN", "#EAD1DC");
+    section("PERFORMA PER PILLAR KONTEN", "#EAD1DC", "pillar");
     headerRow(["Pillar", "Post", "Reach", "Interaksi"]);
     [...pillarMap.entries()].sort((a, b) => b[1].reach - a[1].reach).forEach(([name, v]) => {
       ws.getCell(row, 1).value = name;
@@ -414,7 +425,7 @@ function buildInsights(wb: ExcelJS.Workbook, metrics: ReportMetrics) {
   // 5) Reels retention
   const reels = reelRows(posts);
   if (reels.length) {
-    section("RETENSI REELS PER VIDEO", "#D9EAD3");
+    section("RETENSI REELS PER VIDEO", "#D9EAD3", "viewRate");
     headerRow(["Tanggal", "Views", "Reach", "View Rate", "Avg Watch (dtk)", "Completion"]);
     for (const v of reels) {
       ws.getCell(row, 1).value = v.date;
@@ -432,7 +443,7 @@ function buildInsights(wb: ExcelJS.Workbook, metrics: ReportMetrics) {
   // 6) Audience overlap (followers vs engaged)
   const ov = (title: string, rows: { name: string; follower: number; engaged: number; gap: number }[]) => {
     if (!rows.length) return;
-    section(`OVERLAP AUDIENS — ${title}`, "#FFF2CC");
+    section(`OVERLAP AUDIENS — ${title}`, "#FFF2CC", "overlap");
     headerRow(["Segmen", "Followers %", "Interaksi %", "Gap"]);
     for (const rr of rows.slice(0, 8)) {
       ws.getCell(row, 1).value = rr.name;
