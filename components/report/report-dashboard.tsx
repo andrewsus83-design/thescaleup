@@ -122,7 +122,8 @@ export function ReportDashboard({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm text-slate-500">
-            {metrics.account?.username ? `@${metrics.account.username}` : "Akun terhubung"} · {metrics.period ?? "periode"}
+            {metrics.platform ? <span className="font-semibold capitalize">{metrics.platform}</span> : "Akun"} ·{" "}
+            {metrics.account?.username ? `@${metrics.account.username}` : "terhubung"} · {metrics.period ?? "periode"}
           </p>
           <p className="text-lg font-bold" style={{ color: brandColor }}>
             {fmt(metrics.account?.followers)} followers
@@ -234,6 +235,52 @@ export function ReportDashboard({
               <BarList title="Gender" items={metrics.demographics.genders} color={accentColor} />
               <BarList title="Kota" items={metrics.demographics.cities} color={brandColor} />
               <BarList title="Negara" items={metrics.demographics.countries} color={accentColor} />
+            </div>
+          </div>
+        )}
+
+      {/* reels / video performance */}
+      {metrics.reels && metrics.reels.count > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="mb-3 text-sm font-semibold text-slate-700">Performa Reels / Video</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Tile label="Jumlah Video" value={fmt(metrics.reels.count)} />
+            <Tile label="Total Views" value={fmt(metrics.reels.totalViews)} accent={accentColor} />
+            <Tile label="Avg Watch Time" value={metrics.reels.avgWatchTimeSec != null ? `${metrics.reels.avgWatchTimeSec.toFixed(1)} dtk` : "—"} />
+            <Tile label="Completion Rate" value={pct(metrics.reels.avgCompletion)} accent={brandColor} />
+          </div>
+        </div>
+      )}
+
+      {/* instagram stories */}
+      {metrics.stories && metrics.stories.count > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="mb-3 text-sm font-semibold text-slate-700">Instagram Stories ({metrics.stories.count})</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+            <Tile label="Views" value={fmt(metrics.stories.views)} accent={brandColor} />
+            <Tile label="Reach" value={fmt(metrics.stories.reach)} />
+            <Tile label="Replies" value={fmt(metrics.stories.replies)} />
+            <Tile label="Taps Fwd" value={fmt(metrics.stories.tapsForward)} />
+            <Tile label="Taps Back" value={fmt(metrics.stories.tapsBack)} />
+            <Tile label="Exits" value={fmt(metrics.stories.exits)} />
+            <Tile label="Profile Visits" value={fmt(metrics.stories.profileVisits)} />
+            <Tile label="Follows" value={fmt(metrics.stories.follows)} />
+          </div>
+        </div>
+      )}
+
+      {/* engaged-audience demographics */}
+      {metrics.engagedDemographics &&
+        ((metrics.engagedDemographics.ages?.length ?? 0) > 0 ||
+          (metrics.engagedDemographics.cities?.length ?? 0) > 0 ||
+          (metrics.engagedDemographics.genders?.length ?? 0) > 0) && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <p className="mb-4 text-sm font-semibold text-slate-700">Audiens yang Berinteraksi</p>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <BarList title="Umur" items={metrics.engagedDemographics.ages} color={brandColor} />
+              <BarList title="Gender" items={metrics.engagedDemographics.genders} color={accentColor} />
+              <BarList title="Kota" items={metrics.engagedDemographics.cities} color={brandColor} />
+              <BarList title="Negara" items={metrics.engagedDemographics.countries} color={accentColor} />
             </div>
           </div>
         )}

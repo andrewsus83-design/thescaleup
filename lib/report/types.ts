@@ -34,7 +34,44 @@ export type PostMetric = {
   views?: number | null;
   totalInteractions?: number | null;
   engagementRate?: number | null; // percent (e.g. 3.4)
+  avgWatchTime?: number | null; // ms
+  completionRate?: number | null; // fraction 0..1
+  skipRate?: number | null; // fraction 0..1
   url?: string | null;
+};
+
+/** Aggregate video/Reels performance. */
+export type ReelsSummary = {
+  count: number;
+  totalViews: number | null;
+  avgWatchTimeSec: number | null;
+  avgCompletion: number | null; // fraction 0..1
+};
+
+/** One story with its insights. */
+export type StoryItem = {
+  date: string;
+  mediaType: string;
+  views: number | null;
+  reach: number | null;
+  replies: number | null;
+  exits: number | null;
+  tapsForward: number | null;
+  tapsBack: number | null;
+  profileVisits: number | null;
+  follows: number | null;
+};
+export type StoriesSummary = {
+  count: number;
+  views: number | null;
+  reach: number | null;
+  replies: number | null;
+  exits: number | null;
+  tapsForward: number | null;
+  tapsBack: number | null;
+  profileVisits: number | null;
+  follows: number | null;
+  items: StoryItem[];
 };
 
 /** Reach split by whether it came from followers vs discovery (non-followers). */
@@ -87,7 +124,11 @@ export type ReportMetrics = {
   followersGained?: number | null;
   followersLost?: number | null;
   contactButtons?: { type: string; value: number }[] | null; // profile-tap breakdown
-  demographics?: Demographics | null; // audience breakdown
+  demographics?: Demographics | null; // follower audience breakdown
+  engagedDemographics?: Demographics | null; // engaged-audience breakdown
+  reels?: ReelsSummary | null; // video/Reels performance
+  stories?: StoriesSummary | null; // Instagram Stories insights
+  platform?: string; // instagram | tiktok
   fetchedAt?: string;
 };
 

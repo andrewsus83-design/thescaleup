@@ -134,6 +134,140 @@ export async function listZernioAccounts(apiKey: string): Promise<{ ok: boolean;
   }
 }
 
+/** Map a unified /v1/analytics posts payload to PostMetric[] (IG + TikTok). */
+function mapPosts(postsJson: Record<string, unknown> | null): PostMetric[] {
+  const posts: PostMetric[] = [];
+  if (postsJson && Array.isArray(postsJson.posts)) {
+    for (const p of postsJson.posts as Record<string, unknown>[]) {
+      const a = (p.analytics ?? {}) as Record<string, unknown>;
+      const likes = num(a.likes), comments = num(a.comments), shares = num(a.shares), saves = num(a.saves);
+      const ti = [likes, comments, shares, saves].some((x) => x !== null)
+        ? (likes ?? 0) + (comments ?? 0) + (shares ?? 0) + (saves ?? 0)
+        : null;
+      const watch = num(a.igReelsAvgWatchTime);
+      const isVideo = watch != null || num(a.videoDurationSeconds) != null || num(a.completionRate) != null;
+      posts.push({
+        date: String(p.publishedAt ?? p.scheduledFor ?? "").slice(0, 10),
+        caption: String(p.content ?? "").replace(/\s+/g, " ").trim(),
+        format: isVideo ? "Reels / Video" : "Post",
+        reach: num(a.reach),
+        impressions: num(a.impressions),
+        likes, comments, shares, saved: saves,
+        views: num(a.views),
+        follows: num(a.follows),
+        profileVisits: num(a.profileViews),
+        webClicks: num(a.clicks),
+        totalInteractions: ti,
+        engagementRate: num(a.engagementRate),
+        avgWatchTime: watch,
+        completionRate: num(a.completionRate),
+        skipRate: num(a.reelsSkipRate),
+        url: null,
+      });
+    }
+    posts.sort((x, y) => (y.date || "").localeCompare(x.date || ""));
+  }
+  return posts;
+}
+
+/** Aggregate video/Reels performance from the post list. */
+function computeReels(posts: PostMetric[]) {
+  const vids = posts.filter((p) => p.avgWatchTime != null || p.completionRate != null || p.format === "Reels / Video");
+  if (!vids.length) return null;
+  const nums = (k: keyof PostMetric) => vids.map((p) => p[k]).filter((v): v is number => typeof v === "number");
+  const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+  const views = nums("views");
+  const watch = nums("avgWatchTime");
+  return {
+    count: vids.length,
+    totalViews: views.length ? views.reduce((a, b) => a + b, 0) : null,
+    avgWatchTimeSec: watch.length ? avg(watch)! / 1000 : null,
+    avgCompletion: avg(nums("completionRate")),
+  };
+}
+
+/** Instagram Stories: list + per-story insights → aggregate + list. */
+async function fetchStories(base: string, apiKey: string, accountId: string) {
+  const AH = { Authorization: `Bearer ${apiKey}`, Accept: "application/json" };
+  try {
+    const list = (await fetch(`${base}/v1/accounts/${accountId}/instagram/stories`, { headers: AH, cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null)) as Record<string, unknown> | null;
+    const stories = (list?.data ?? []) as Record<string, unknown>[];
+    if (!Array.isArray(stories) || !stories.length) return null;
+    const items = await Promise.all(
+      stories.slice(0, 20).map(async (s) => {
+        const ins = (await fetch(`${base}/v1/accounts/${accountId}/instagram/stories/${s.id}/insights`, { headers: AH, cache: "no-store" })
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null)) as Record<string, unknown> | null;
+        const m = ((ins?.data as Record<string, unknown>)?.metrics ?? {}) as Record<string, unknown>;
+        return {
+          date: String(s.timestamp ?? "").slice(0, 10),
+          mediaType: String(s.mediaType ?? ""),
+          views: num(m.views), reach: num(m.reach), replies: num(m.replies), exits: num(m.exits),
+          tapsForward: num(m.tapsForward), tapsBack: num(m.tapsBack),
+          profileVisits: num(m.profileVisits), follows: num(m.follows),
+        };
+      }),
+    );
+    const sum = (k: keyof (typeof items)[number]) => {
+      const v = items.map((i) => i[k]).filter((x): x is number => typeof x === "number");
+      return v.length ? v.reduce((a, b) => a + b, 0) : null;
+    };
+    return {
+      count: items.length,
+      views: sum("views"), reach: sum("reach"), replies: sum("replies"), exits: sum("exits"),
+      tapsForward: sum("tapsForward"), tapsBack: sum("tapsBack"),
+      profileVisits: sum("profileVisits"), follows: sum("follows"),
+      items,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** TikTok pipeline — account counters + per-post analytics (no account-level reach on TikTok). */
+async function fetchTikTok(
+  base: string,
+  apiKey: string,
+  accountId: string,
+  since: string | undefined,
+  until: string | undefined,
+  period: string,
+  acct: ZernioAccount | undefined,
+): Promise<ReportMetrics> {
+  const AH = { Authorization: `Bearer ${apiKey}`, Accept: "application/json" };
+  const range = `${since ? `&since=${since}` : ""}${until ? `&until=${until}` : ""}`;
+  const get = (url: string) => fetch(url, { headers: AH, cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const [insJson, postsJson] = await Promise.all([
+    get(`${base}/v1/analytics/tiktok/account-insights?accountId=${accountId}&metrics=follower_count,likes_count,video_count,followers_gained,followers_lost&metricType=total_value${range}`),
+    get(`${base}/v1/analytics?platform=tiktok&accountId=${accountId}&limit=50`),
+  ]);
+  const mx = ((insJson as Record<string, unknown>)?.metrics ?? {}) as Record<string, Record<string, unknown>>;
+  const posts = mapPosts(postsJson as Record<string, unknown> | null);
+  const sum = (k: keyof PostMetric) => {
+    const v = posts.map((p) => p[k]).filter((x): x is number => typeof x === "number");
+    return v.length ? v.reduce((a, b) => a + b, 0) : null;
+  };
+  const reach = sum("reach"), ti = sum("totalInteractions");
+  const totals: MetricTotals = {
+    posts: posts.length,
+    reach, impressions: sum("impressions"),
+    likes: num(mx.likes_count?.total) ?? sum("likes"),
+    comments: sum("comments"), shares: sum("shares"), saved: sum("saved"),
+    profileVisits: sum("profileVisits"), follows: sum("follows"),
+    webClicks: null, accountsEngaged: null, replies: null, reposts: null,
+    totalInteractions: ti, erReach: reach && ti ? ti / reach : null,
+  };
+  return {
+    connected: true, provider: "zernio", platform: "tiktok", period,
+    account: { id: accountId, username: acct?.username ?? null, followers: num(mx.follower_count?.total), platform: "tiktok" },
+    posts, totals, reels: computeReels(posts),
+    followersGained: num(mx.followers_gained?.total), followersLost: num(mx.followers_lost?.total),
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
 export async function fetchZernioMetrics(opts: {
   apiKey: string | null;
   accountId: string | null;
@@ -166,6 +300,14 @@ export async function fetchZernioMetrics(opts: {
     return (await r.json()) as Record<string, unknown>;
   };
 
+  // Detect platform from the account; TikTok has its own pipeline.
+  const accts = await listZernioAccounts(apiKey!).catch(() => ({ ok: false, accounts: [] as ZernioAccount[] }));
+  const acct = accts.accounts.find((a) => a.id === accountId) ?? accts.accounts[0];
+  const platform = (acct?.platform ?? "instagram").toLowerCase();
+  if (platform === "tiktok") {
+    return fetchTikTok(base, apiKey!, accountId, since, until, period, acct);
+  }
+
   try {
     // Core totals first (fail → not-connected with the real reason).
     const core = await getJson(insightsUrl({}));
@@ -177,16 +319,18 @@ export async function fetchZernioMetrics(opts: {
     const bd = (metrics: string, breakdown: string) =>
       `${base}/v1/analytics/instagram/account-insights?accountId=${accountId}&metrics=${metrics}&metricType=total_value&breakdown=${breakdown}${range}`;
     const fhUrl = `${base}/v1/analytics/instagram/follower-history?accountId=${accountId}&metrics=follower_count,followers_gained,followers_lost&metricType=time_series${range}`;
-    const demoUrl = `${base}/v1/analytics/instagram/demographics?accountId=${accountId}&metric=follower_demographics&breakdown=age,city,country,gender`;
-    const [ctJson, ftJson, cbJson, tsJson, fhJson, demoJson, postsJson, accts] = await Promise.all([
+    const demo = (metric: string) =>
+      `${base}/v1/analytics/instagram/demographics?accountId=${accountId}&metric=${metric}&breakdown=age,city,country,gender`;
+    const [ctJson, ftJson, cbJson, tsJson, fhJson, demoJson, engDemoJson, storiesData, postsJson] = await Promise.all([
       settle(getJson(bd("reach,total_interactions", "media_product_type"))),
       settle(getJson(bd("reach", "follow_type"))),
       settle(getJson(bd("profile_links_taps", "contact_button_type"))),
       settle(getJson(insightsUrl({ metrics: "reach", metricType: "time_series" }))), // only reach supports time_series
       settle(getJson(fhUrl)),
-      settle(getJson(demoUrl)),
+      settle(getJson(demo("follower_demographics"))),
+      settle(getJson(demo("engaged_audience_demographics"))),
+      settle(fetchStories(base, apiKey!, accountId)),
       settle(getJson(`${base}/v1/analytics?platform=instagram&accountId=${accountId}&limit=50`)),
-      settle(listZernioAccounts(apiKey!)),
     ]);
 
     // content-type breakdown (reach + interactions per POST/STORY/REEL/CAROUSEL)
@@ -238,71 +382,39 @@ export async function fetchZernioMetrics(opts: {
     const followersLost = sumVals("followers_lost");
     const latestFollowers = followerSeries?.length ? followerSeries[followerSeries.length - 1].value : null;
 
-    // audience demographics (age / gender / city / country)
-    let demographics = null as null | {
-      ages?: { name: string; value: number }[];
-      genders?: { name: string; value: number }[];
-      cities?: { name: string; value: number }[];
-      countries?: { name: string; value: number }[];
-    };
-    if (demoJson?.demographics) {
-      const d = demoJson.demographics as Record<string, Record<string, unknown>[]>;
+    // audience demographics (age / gender / city / country) — follower + engaged
+    const parseDemo = (j: Record<string, unknown> | null) => {
+      const d = (j?.demographics ?? null) as Record<string, Record<string, unknown>[]> | null;
+      if (!d) return null;
       const conv = (arr?: Record<string, unknown>[]) =>
         (arr ?? []).map((x) => ({ name: String(x.dimension ?? x.name), value: num(x.value) ?? 0 })).filter((x) => x.value > 0);
-      demographics = {
-        ages: conv(d.age),
-        genders: conv(d.gender),
-        cities: conv(d.city).slice(0, 6),
-        countries: conv(d.country).slice(0, 6),
-      };
-    }
+      const out = { ages: conv(d.age), genders: conv(d.gender), cities: conv(d.city).slice(0, 6), countries: conv(d.country).slice(0, 6) };
+      return out.ages.length || out.genders.length || out.cities.length || out.countries.length ? out : null;
+    };
+    const demographics = parseDemo(demoJson);
+    const engagedDemographics = parseDemo(engDemoJson);
 
     // impressions come from the unified overview (not account-insights)
     const overview = (postsJson?.overview ?? {}) as Record<string, unknown>;
     const ovImpr = num(overview.totalImpressions);
     if (ovImpr != null) totals.impressions = ovImpr;
 
-    // per-post analytics
-    const posts: PostMetric[] = [];
-    if (postsJson && Array.isArray(postsJson.posts)) {
-      for (const p of postsJson.posts as Record<string, unknown>[]) {
-        const a = (p.analytics ?? {}) as Record<string, unknown>;
-        const likes = num(a.likes), comments = num(a.comments), shares = num(a.shares), saves = num(a.saves);
-        const ti = [likes, comments, shares, saves].some((x) => x !== null)
-          ? (likes ?? 0) + (comments ?? 0) + (shares ?? 0) + (saves ?? 0)
-          : null;
-        const dur = num(a.videoDurationSeconds) ?? num(a.igReelsVideoViewTotalTime);
-        posts.push({
-          date: String(p.publishedAt ?? p.scheduledFor ?? "").slice(0, 10),
-          caption: String(p.content ?? "").replace(/\s+/g, " ").trim(),
-          format: dur ? "Reels / Video" : "Post",
-          reach: num(a.reach),
-          impressions: num(a.impressions),
-          likes, comments, shares, saved: saves,
-          views: num(a.views),
-          follows: num(a.follows),
-          profileVisits: num(a.profileViews),
-          webClicks: num(a.clicks),
-          totalInteractions: ti,
-          engagementRate: num(a.engagementRate),
-          url: null,
-        });
-      }
-      posts.sort((x, y) => (y.date || "").localeCompare(x.date || ""));
-      totals.posts = posts.length;
-    }
+    // per-post analytics (shared mapper) + reels summary
+    const posts = mapPosts(postsJson);
+    totals.posts = posts.length;
+    const reels = computeReels(posts);
 
-    const acct = accts?.accounts.find((a) => a.id === accountId) ?? accts?.accounts[0];
     const dr = (core.dateRange ?? {}) as Record<string, unknown>;
     return {
       connected: true,
       provider: "zernio",
+      platform: "instagram",
       period: dr.since && dr.until ? `${dr.since} → ${dr.until}` : period,
       account: {
         id: accountId,
         username: acct?.username ?? acct?.displayName ?? null,
         followers: latestFollowers ?? acct?.followers ?? null,
-        platform: acct?.platform ?? null,
+        platform: acct?.platform ?? "instagram",
       },
       posts,
       totals,
@@ -314,6 +426,9 @@ export async function fetchZernioMetrics(opts: {
       followersLost,
       contactButtons,
       demographics,
+      engagedDemographics,
+      reels,
+      stories: (storiesData as ReportMetrics["stories"]) ?? null,
       fetchedAt: new Date().toISOString(),
     };
   } catch (e) {
