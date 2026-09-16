@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Check, Layers } from "lucide-react";
+import { ChevronDown, Check, Layers, Share2, Globe, Users } from "lucide-react";
 
-type Brand = { id: string; name: string };
+type Brand = { id: string; name: string; web?: boolean; social?: boolean };
 
-/** Multi-select account/brand picker — tick several to see a combined report. */
+/** Client picker (accordion) — sits left of Tambah. Tick clients to combine;
+ *  each row shows the connected channels (social media + web). */
 export function BrandMultiSelect({ brands, selectedIds }: { brands: Brand[]; selectedIds: string[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -24,7 +25,7 @@ export function BrandMultiSelect({ brands, selectedIds }: { brands: Brand[]; sel
 
   const label =
     selectedIds.length <= 1
-      ? brands.find((b) => b.id === selectedIds[0])?.name ?? "Pilih akun"
+      ? brands.find((b) => b.id === selectedIds[0])?.name ?? "Pilih client"
       : `Gabungan · ${selectedIds.length} akun`;
 
   return (
@@ -32,18 +33,18 @@ export function BrandMultiSelect({ brands, selectedIds }: { brands: Brand[]; sel
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white py-1.5 pl-3 pr-2.5 text-sm font-semibold text-[#1B2A4A] hover:bg-slate-50"
+        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-2.5 text-sm font-semibold text-[#1B2A4A] hover:bg-slate-50"
       >
-        {selectedIds.length > 1 && <Layers className="h-3.5 w-3.5 text-[#2A2870]" />}
+        {selectedIds.length > 1 ? <Layers className="h-4 w-4 text-[#2A2870]" /> : <Users className="h-4 w-4 text-slate-400" />}
         {label}
-        <ChevronDown className="h-4 w-4 text-slate-400" />
+        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-20 mt-1 max-h-72 w-60 overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+          <div className="absolute right-0 z-20 mt-1 max-h-80 w-72 overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
             <p className="px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">
-              Centang akun (gabungan)
+              Centang client (gabungan) · channel terhubung
             </p>
             {brands.map((b) => {
               const on = selectedIds.includes(b.id);
@@ -63,6 +64,18 @@ export function BrandMultiSelect({ brands, selectedIds }: { brands: Brand[]; sel
                       {on && <Check className="h-3 w-3" />}
                     </span>
                     {b.name}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    {b.social && (
+                      <span title="Social media terhubung" className="text-pink-500">
+                        <Share2 className="h-4 w-4" />
+                      </span>
+                    )}
+                    {b.web && (
+                      <span title="Website terhubung" className="text-[#2A2870]">
+                        <Globe className="h-4 w-4" />
+                      </span>
+                    )}
                   </span>
                 </button>
               );

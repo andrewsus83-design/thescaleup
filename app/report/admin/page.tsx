@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus, ExternalLink, Settings2, LayoutGrid, SlidersHorizontal, Layers } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
 import { isSupabaseAdminConfigured } from "@/lib/supabase/admin";
-import { listClients, getLatestSnapshot, getConfiguredProviders, getClientKey } from "@/lib/report/data";
+import { listClients, getLatestSnapshot, getConfiguredProviders, getClientKey, getChannelFlags } from "@/lib/report/data";
 import { CLIENT_STATUSES, type ReportMetrics } from "@/lib/report/types";
 import { aggregateMetrics } from "@/lib/report/aggregate";
 import { BrandMultiSelect } from "@/components/report/brand-multiselect";
@@ -62,7 +62,13 @@ export default async function ReportAdminDashboard({
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const defSince = isoDaysAgo(now, 29);
-  const brandList = allClients.map((c) => ({ id: c.id, name: c.name }));
+  const flags = allClients.length ? await getChannelFlags() : {};
+  const brandList = allClients.map((c) => ({
+    id: c.id,
+    name: c.name,
+    web: flags[c.id]?.web ?? false,
+    social: flags[c.id]?.social ?? false,
+  }));
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
@@ -77,7 +83,7 @@ export default async function ReportAdminDashboard({
             <p className="text-sm text-slate-500">Report analytics per akun · {admin.email}</p>
           </div>
         </div>
-        {/* top right: Setting + Tambah */}
+        {/* top right: Setting · pilih client (accordion) · Tambah */}
         <div className="flex items-center gap-2">
           <Link
             href="/report/admin/report-settings"
@@ -86,6 +92,7 @@ export default async function ReportAdminDashboard({
           >
             <SlidersHorizontal className="h-4 w-4" /> Setting
           </Link>
+          {!addMode && <BrandMultiSelect brands={brandList} selectedIds={ids} />}
           <Link
             href="/report/admin?add=1"
             className="inline-flex items-center gap-2 rounded-xl bg-[#2A2870] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#211f5c]"
@@ -114,11 +121,13 @@ export default async function ReportAdminDashboard({
               >
                 {combined ? <Layers className="h-5 w-5" /> : primary.name.slice(0, 2).toUpperCase()}
               </span>
-              <div className="flex flex-col gap-1">
-                <BrandMultiSelect brands={brandList} selectedIds={ids} />
-                <p className="pl-1 text-xs text-slate-500">
+              <div>
+                <p className="font-bold text-[#1B2A4A]">
+                  {combined ? `Gabungan · ${selectedClients.length} akun` : primary.name}
+                </p>
+                <p className="text-xs text-slate-500">
                   {combined
-                    ? `${selectedClients.map((c) => c.name).join(", ")}`
+                    ? selectedClients.map((c) => c.name).join(", ")
                     : primary.igHandle
                       ? `@${primary.igHandle} · ${(CLIENT_STATUSES[primary.status] ?? CLIENT_STATUSES.pending).label}`
                       : primary.slug}

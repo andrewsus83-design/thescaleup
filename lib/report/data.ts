@@ -95,6 +95,27 @@ export async function getConfiguredProviders(clientId: string): Promise<string[]
   return Object.keys(s).filter((k) => s[k]?.trim());
 }
 
+/** Client ids that have a website + a zernio (social) key configured — for channel badges. */
+export async function getChannelFlags(): Promise<Record<string, { web: boolean; social: boolean }>> {
+  const out: Record<string, { web: boolean; social: boolean }> = {};
+  if (!isSupabaseAdminConfigured()) return out;
+  try {
+    const { data } = await db()
+      .from("report_client_settings")
+      .select("client_id, key")
+      .in("key", ["website", "zernio"]);
+    for (const r of data ?? []) {
+      const id = String(r.client_id);
+      out[id] ??= { web: false, social: false };
+      if (r.key === "website") out[id].web = true;
+      if (r.key === "zernio") out[id].social = true;
+    }
+  } catch {
+    /* table may not exist yet */
+  }
+  return out;
+}
+
 /* --------------------------------- snapshots ------------------------------- */
 
 export async function getLatestSnapshot(clientId: string): Promise<ReportSnapshot | null> {
