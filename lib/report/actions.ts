@@ -78,6 +78,25 @@ export async function saveReportTemplate(formData: FormData): Promise<void> {
   revalidatePath("/report/admin/report-settings");
 }
 
+/** Set (or clear) the website tracked for a brand. Stored in report_client_settings. */
+export async function saveClientWebsite(formData: FormData): Promise<void> {
+  await requireAdmin();
+  if (!isSupabaseAdminConfigured()) return;
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  let url = String(formData.get("website") ?? "").trim();
+  const db = createSupabaseAdminClient();
+  if (url) {
+    if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+    await db
+      .from("report_client_settings")
+      .upsert({ client_id: id, key: "website", value: url, updated_at: new Date().toISOString() }, { onConflict: "client_id,key" });
+  } else {
+    await db.from("report_client_settings").delete().eq("client_id", id).eq("key", "website");
+  }
+  revalidatePath("/report/admin");
+}
+
 /**
  * Add a client. Per the flow, this only needs the client's Zernio API key +
  * Zernio profile id — the account handle/name is read FROM Zernio (best-effort

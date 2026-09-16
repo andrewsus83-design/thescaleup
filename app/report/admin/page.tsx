@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus, ExternalLink, Settings2, LayoutGrid, SlidersHorizontal, Layers } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
 import { isSupabaseAdminConfigured } from "@/lib/supabase/admin";
-import { listClients, getLatestSnapshot, getConfiguredProviders } from "@/lib/report/data";
+import { listClients, getLatestSnapshot, getConfiguredProviders, getClientKey } from "@/lib/report/data";
 import { CLIENT_STATUSES, type ReportMetrics } from "@/lib/report/types";
 import { aggregateMetrics } from "@/lib/report/aggregate";
 import { BrandMultiSelect } from "@/components/report/brand-multiselect";
@@ -10,6 +10,7 @@ import { ReportDashboard } from "@/components/report/report-dashboard";
 import { AddBrandForm } from "@/components/report/add-brand-form";
 import { DeleteBrandButton } from "@/components/report/delete-brand-button";
 import { DateRangeForm } from "@/components/report/date-range-form";
+import { WebsiteCard } from "@/components/report/website-card";
 
 function isoDaysAgo(base: Date, days: number) {
   return new Date(base.getTime() - days * 86400000).toISOString().slice(0, 10);
@@ -38,6 +39,7 @@ export default async function ReportAdminDashboard({
 
   let metrics: ReportMetrics | null = null;
   let configured: string[] = [];
+  let website: string | null = null;
   if (!addMode && selectedClients.length) {
     if (combined) {
       const snaps = await Promise.all(selectedClients.map((c) => getLatestSnapshot(c.id)));
@@ -46,9 +48,14 @@ export default async function ReportAdminDashboard({
         `Gabungan · ${selectedClients.length} akun`,
       );
     } else if (primary) {
-      const [snap, cfg] = await Promise.all([getLatestSnapshot(primary.id), getConfiguredProviders(primary.id)]);
+      const [snap, cfg, web] = await Promise.all([
+        getLatestSnapshot(primary.id),
+        getConfiguredProviders(primary.id),
+        getClientKey(primary.id, "website"),
+      ]);
       metrics = snap?.data ?? null;
       configured = cfg;
+      website = web;
     }
   }
 
@@ -176,6 +183,14 @@ export default async function ReportAdminDashboard({
               <p className="mt-1 text-sm text-slate-500">
                 Pastikan Zernio API key &amp; Profile ID terisi, lalu klik “Tarik data”.
               </p>
+            </div>
+          )}
+
+          {/* Web / website tracking (single-account view) */}
+          {!combined && (
+            <div>
+              <p className="mb-2 mt-2 flex items-center gap-2 text-sm font-semibold text-slate-600">Web</p>
+              <WebsiteCard clientId={primary.id} website={website} />
             </div>
           )}
         </div>
