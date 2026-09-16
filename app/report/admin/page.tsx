@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { Plus, ExternalLink, Settings2, LayoutGrid, SlidersHorizontal } from "lucide-react";
+import { Plus, ExternalLink, Settings2, LayoutGrid, SlidersHorizontal, Layers } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
 import { isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { listClients, getLatestSnapshot, getConfiguredProviders } from "@/lib/report/data";
-import { CLIENT_STATUSES } from "@/lib/report/types";
-import { BrandPicker } from "@/components/report/brand-picker";
+import { CLIENT_STATUSES, type ReportMetrics } from "@/lib/report/types";
+import { aggregateMetrics } from "@/lib/report/aggregate";
+import { BrandMultiSelect } from "@/components/report/brand-multiselect";
 import { ReportDashboard } from "@/components/report/report-dashboard";
 import { AddBrandForm } from "@/components/report/add-brand-form";
 import { DeleteBrandButton } from "@/components/report/delete-brand-button";
@@ -19,23 +20,42 @@ export const dynamic = "force-dynamic";
 export default async function ReportAdminDashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ client?: string; add?: string }>;
+  searchParams: Promise<{ client?: string; clients?: string; add?: string }>;
 }) {
   const admin = await requireAdmin();
-  const { client, add } = await searchParams;
-  const clients = isSupabaseAdminConfigured() ? await listClients() : [];
+  const { client, clients: clientsCsv, add } = await searchParams;
+  const allClients = isSupabaseAdminConfigured() ? await listClients() : [];
 
-  const selected = clients.find((c) => c.id === client) ?? clients[0] ?? null;
-  const addMode = add === "1" || clients.length === 0;
+  // selected account(s): ?clients=csv (multi), else ?client, else the first brand
+  let ids = (clientsCsv ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!ids.length && client) ids = [client];
+  ids = ids.filter((id) => allClients.some((c) => c.id === id));
+  if (!ids.length && allClients[0]) ids = [allClients[0].id];
+  const selectedClients = ids.map((id) => allClients.find((c) => c.id === id)!).filter(Boolean);
+  const combined = selectedClients.length > 1;
+  const primary = selectedClients[0] ?? null;
+  const addMode = add === "1" || allClients.length === 0;
 
-  const [snapshot, configured] =
-    selected && !addMode
-      ? await Promise.all([getLatestSnapshot(selected.id), getConfiguredProviders(selected.id)])
-      : [null, [] as string[]];
+  let metrics: ReportMetrics | null = null;
+  let configured: string[] = [];
+  if (!addMode && selectedClients.length) {
+    if (combined) {
+      const snaps = await Promise.all(selectedClients.map((c) => getLatestSnapshot(c.id)));
+      metrics = aggregateMetrics(
+        snaps.filter(Boolean).map((s) => s!.data),
+        `Gabungan · ${selectedClients.length} akun`,
+      );
+    } else if (primary) {
+      const [snap, cfg] = await Promise.all([getLatestSnapshot(primary.id), getConfiguredProviders(primary.id)]);
+      metrics = snap?.data ?? null;
+      configured = cfg;
+    }
+  }
 
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const defSince = isoDaysAgo(now, 29);
+  const brandList = allClients.map((c) => ({ id: c.id, name: c.name }));
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
@@ -47,10 +67,10 @@ export default async function ReportAdminDashboard({
           </span>
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight text-[#1B2A4A]">ScaleUp Reports</h1>
-            <p className="text-sm text-slate-500">Report analytics per brand · {admin.email}</p>
+            <p className="text-sm text-slate-500">Report analytics per akun · {admin.email}</p>
           </div>
         </div>
-        {/* setting (report template + rules) · pick / add brand — top right */}
+        {/* top right: Setting + Tambah */}
         <div className="flex items-center gap-2">
           <Link
             href="/report/admin/report-settings"
@@ -59,7 +79,12 @@ export default async function ReportAdminDashboard({
           >
             <SlidersHorizontal className="h-4 w-4" /> Setting
           </Link>
-          <BrandPicker brands={clients.map((c) => ({ id: c.id, name: c.name }))} selectedId={selected?.id} />
+          <Link
+            href="/report/admin?add=1"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#2A2870] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#211f5c]"
+          >
+            <Plus className="h-4 w-4" /> Tambah
+          </Link>
         </div>
       </div>
 
@@ -69,82 +94,91 @@ export default async function ReportAdminDashboard({
         </div>
       )}
 
-      {addMode ? (
-        <AddClientCard hasClients={clients.length > 0} />
-      ) : selected ? (
+      {addMode || !primary ? (
+        <AddClientCard hasClients={allClients.length > 0} />
+      ) : (
         <div className="space-y-5">
-          {/* selected brand bar */}
+          {/* account bar — avatar + multi-select on the LEFT */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-3">
               <span
                 className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-sm font-bold text-white"
-                style={{ backgroundColor: selected.brandColor }}
+                style={{ backgroundColor: primary.brandColor }}
               >
-                {selected.name.slice(0, 2).toUpperCase()}
+                {combined ? <Layers className="h-5 w-5" /> : primary.name.slice(0, 2).toUpperCase()}
               </span>
-              <div>
-                <p className="font-bold text-[#1B2A4A]">{selected.name}</p>
-                <p className="text-xs text-slate-500">
-                  {selected.igHandle ? `@${selected.igHandle}` : selected.slug}
-                  {" · "}
-                  <span>{(CLIENT_STATUSES[selected.status] ?? CLIENT_STATUSES.pending).label}</span>
+              <div className="flex flex-col gap-1">
+                <BrandMultiSelect brands={brandList} selectedIds={ids} />
+                <p className="pl-1 text-xs text-slate-500">
+                  {combined
+                    ? `${selectedClients.map((c) => c.name).join(", ")}`
+                    : primary.igHandle
+                      ? `@${primary.igHandle} · ${(CLIENT_STATUSES[primary.status] ?? CLIENT_STATUSES.pending).label}`
+                      : primary.slug}
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <DateRangeForm clientId={selected.id} defaultSince={defSince} defaultUntil={today} today={today} />
-              <Link
-                href={`/report/admin/${selected.id}/settings`}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-slate-600 hover:bg-slate-50"
-                title="Setting API klien"
-              >
-                <Settings2 className="h-4 w-4" />
-              </Link>
-              <Link
-                href={`/report/admin/${selected.id}`}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Kelola
-              </Link>
-              <Link
-                href={`/report/c/${selected.slug}`}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-slate-600 hover:bg-slate-50"
-                title="Buka laporan klien"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </Link>
-              <DeleteBrandButton id={selected.id} name={selected.name} />
-            </div>
+            {!combined && (
+              <div className="flex flex-wrap items-center gap-2">
+                <DateRangeForm clientId={primary.id} defaultSince={defSince} defaultUntil={today} today={today} />
+                <Link
+                  href={`/report/admin/${primary.id}/settings`}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-slate-600 hover:bg-slate-50"
+                  title="Setting API klien"
+                >
+                  <Settings2 className="h-4 w-4" />
+                </Link>
+                <Link
+                  href={`/report/admin/${primary.id}`}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Kelola
+                </Link>
+                <Link
+                  href={`/report/c/${primary.slug}`}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-slate-600 hover:bg-slate-50"
+                  title="Buka laporan klien"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Link>
+                <DeleteBrandButton id={primary.id} name={primary.name} />
+              </div>
+            )}
           </div>
 
-          {/* the report itself */}
-          {!configured.includes("zernio") && (
+          {combined && (
+            <div className="rounded-2xl border border-[#2A2870]/20 bg-[#2A2870]/5 p-3 text-sm text-[#2A2870]">
+              Menampilkan <b>gabungan {selectedClients.length} akun</b> dari laporan terakhir tiap akun. Untuk memperbarui,
+              buka tiap akun dan klik “Tarik data”.
+            </div>
+          )}
+
+          {/* the report */}
+          {!combined && !configured.includes("zernio") && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-              Zernio API key untuk brand ini belum diisi.{" "}
-              <Link href={`/report/admin/${selected.id}/settings`} className="font-semibold underline">
+              Zernio API key untuk akun ini belum diisi.{" "}
+              <Link href={`/report/admin/${primary.id}/settings`} className="font-semibold underline">
                 Isi di Setting
               </Link>{" "}
               lalu klik “Tarik data”.
             </div>
           )}
-          {snapshot ? (
+          {metrics ? (
             <ReportDashboard
-              metrics={snapshot.data}
-              brandColor={selected.brandColor}
-              accentColor={selected.accentColor}
+              metrics={metrics}
+              brandColor={primary.brandColor}
+              accentColor={primary.accentColor}
               showReason
             />
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-10 text-center">
-              <p className="font-semibold text-slate-700">Belum ada laporan untuk {selected.name}</p>
+              <p className="font-semibold text-slate-700">Belum ada laporan untuk {primary.name}</p>
               <p className="mt-1 text-sm text-slate-500">
                 Pastikan Zernio API key &amp; Profile ID terisi, lalu klik “Tarik data”.
               </p>
             </div>
           )}
         </div>
-      ) : (
-        <AddClientCard hasClients={false} />
       )}
     </div>
   );
