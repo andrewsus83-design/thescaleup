@@ -9,6 +9,24 @@ function pct(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
   return (n * 100).toFixed(2) + "%";
 }
+function pct1(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "—";
+  return (n * 100).toFixed(1) + "%";
+}
+/** Ratios ≥1 read better as "×" (e.g. reach 4.8× followers), else as a percent. */
+function times(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "—";
+  return n >= 1 ? n.toFixed(1) + "×" : (n * 100).toFixed(1) + "%";
+}
+/** Cap Gajah "Total Interaction" = the 8 action metrics summed. */
+function tiOf(p: PostMetric): number {
+  return (p.likes ?? 0) + (p.comments ?? 0) + (p.follows ?? 0) + (p.profileVisits ?? 0) + (p.shares ?? 0) + (p.saved ?? 0) + (p.webClicks ?? 0);
+}
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+function monthLabel(ym: string): string {
+  const mo = Number(ym.slice(5, 7));
+  return mo >= 1 && mo <= 12 ? `${MONTHS[mo - 1]} ${ym.slice(0, 4)}` : ym;
+}
 const CT_LABEL: Record<string, string> = {
   POST: "Post / Image",
   CAROUSEL_CONTAINER: "Carousel",
@@ -16,13 +34,14 @@ const CT_LABEL: Record<string, string> = {
   STORY: "Story",
 };
 
-function Tile({ label, value, accent }: { label: string; value: string; accent?: string }) {
+function Tile({ label, value, accent, hint }: { label: string; value: string; accent?: string; hint?: string }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
       <p className="mt-1 text-2xl font-bold" style={{ color: accent ?? "#1B2A4A" }}>
         {value}
       </p>
+      {hint && <p className="mt-0.5 text-[11px] text-slate-400">{hint}</p>}
     </div>
   );
 }
@@ -118,6 +137,51 @@ export function ReportDashboard({
   const series = metrics.reachSeries ?? [];
   const sMax = Math.max(1, ...series.map((s) => s.value));
 
+  // ---- CMO efficiency + funnel metrics (derived from the totals) ----
+  const followersBase = metrics.account?.followers ?? null;
+  const rate = (num: number | null | undefined, den: number | null | undefined) =>
+    num != null && den != null && den > 0 ? num / den : null;
+  const reachRate = rate(t?.reach, followersBase); // account reach vs follower base
+  const savesRate = rate(t?.saved, t?.reach);
+  const sharesRate = rate(t?.shares, t?.reach);
+  const pvRate = rate(t?.profileVisits, t?.reach); // profile-visit rate
+  const followRate = rate(t?.follows, t?.reach); // follow rate off reach
+  const erReach = t?.erReach ?? rate(t?.totalInteractions, t?.reach);
+  const netGrowth =
+    metrics.followersGained != null || metrics.followersLost != null
+      ? (metrics.followersGained ?? 0) - (metrics.followersLost ?? 0)
+      : null;
+  const growthRate = rate(netGrowth, followersBase);
+  const avgReach = posts.length ? rate(t?.reach, posts.length) : null;
+
+  // ---- per-pillar performance rollup (needs AI-suggested pillars) ----
+  const pillarRoll = (() => {
+    const m = new Map<string, { count: number; reach: number; ti: number }>();
+    for (const p of posts) {
+      if (!p.pillar) continue;
+      const e = m.get(p.pillar) ?? { count: 0, reach: 0, ti: 0 };
+      e.count += 1;
+      e.reach += p.reach ?? 0;
+      e.ti += tiOf(p);
+      m.set(p.pillar, e);
+    }
+    return [...m.entries()].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.reach - a.reach);
+  })();
+  const pillarMaxReach = Math.max(1, ...pillarRoll.map((p) => p.reach));
+
+  // ---- per-post rows grouped by month (mirrors the Excel Post Master) ----
+  const sortedPosts = [...posts].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const monthGroups = (() => {
+    const m = new Map<string, PostMetric[]>();
+    for (const p of sortedPosts) {
+      const k = (p.date || "").slice(0, 7) || "—";
+      (m.get(k) ?? m.set(k, []).get(k)!).push(p);
+    }
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  })();
+  const sumBy = (arr: PostMetric[], f: (p: PostMetric) => number | null | undefined) =>
+    arr.reduce((s, p) => s + (f(p) ?? 0), 0);
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -150,6 +214,51 @@ export function ReportDashboard({
         <Tile label="Web Clicks" value={fmt(t?.webClicks)} />
         <Tile label="Jumlah Post" value={fmt(t?.posts)} />
       </div>
+
+      {/* CMO: efficiency + profile-action funnel (derived) */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <p className="mb-3 text-sm font-semibold text-slate-700">Efisiensi & Funnel Aksi</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <Tile label="Reach Rate" value={times(reachRate)} accent={brandColor} hint="reach ÷ followers" />
+          <Tile label="ER (Reach)" value={pct1(erReach)} hint="interaksi ÷ reach" />
+          <Tile label="Saves Rate" value={pct1(savesRate)} hint="saved ÷ reach · sinyal simpan" />
+          <Tile label="Shares Rate" value={pct1(sharesRate)} accent={accentColor} hint="shares ÷ reach · viralitas" />
+          <Tile label="Profile Visit Rate" value={pct1(pvRate)} hint="profil ÷ reach" />
+          <Tile label="Follow Rate" value={pct1(followRate)} hint="follows ÷ reach" />
+          <Tile
+            label="Net Follower Growth"
+            value={netGrowth != null ? (netGrowth >= 0 ? "+" : "") + fmt(netGrowth) : "—"}
+            accent={netGrowth != null && netGrowth < 0 ? "#DC2626" : brandColor}
+            hint={growthRate != null ? `${pct1(growthRate)} dari basis` : "gained − lost"}
+          />
+          <Tile label="Avg Reach / Post" value={fmt(avgReach != null ? Math.round(avgReach) : null)} hint="rata-rata jangkauan" />
+        </div>
+      </div>
+
+      {/* CMO: performance per content pillar (needs AI-suggested pillars) */}
+      {pillarRoll.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="mb-3 text-sm font-semibold text-slate-700">Performa per Pillar Konten</p>
+          <div className="space-y-2.5">
+            {pillarRoll.map((p) => (
+              <div key={p.name}>
+                <div className="mb-1 flex justify-between text-xs">
+                  <span className="font-medium text-slate-600">
+                    {p.name} <span className="text-slate-400">· {p.count} post</span>
+                  </span>
+                  <span className="text-slate-500">
+                    {fmt(p.reach)} reach · {fmt(p.ti)} interaksi
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full" style={{ width: `${(p.reach / pillarMaxReach) * 100}%`, backgroundColor: brandColor }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-slate-400">Pillar disarankan AI (Claude) — regenerate laporan untuk mengisinya.</p>
+        </div>
+      )}
 
       {/* AI analysis (Claude Opus custom parameters) */}
       {metrics.aiAnalysis && metrics.aiAnalysis.length > 0 && (
@@ -341,45 +450,115 @@ export function ReportDashboard({
         </div>
       )}
 
-      {/* per-post table */}
+      {/* Post Master — full per-post detail (same columns as the Excel report) */}
       {posts.length > 0 && (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="w-full min-w-[820px] text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-400">
-                <th className="p-3">Tanggal</th>
-                <th className="p-3">Konten</th>
-                <th className="p-3 text-right">Reach</th>
-                <th className="p-3 text-right">Impr.</th>
-                <th className="p-3 text-right">Likes</th>
-                <th className="p-3 text-right">Komen</th>
-                <th className="p-3 text-right">Saved</th>
-                <th className="p-3 text-right">Shares</th>
-                <th className="p-3 text-right">ER%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {posts.map((p: PostMetric, i) => (
-                <tr key={i} className="border-b border-slate-50 last:border-0">
-                  <td className="whitespace-nowrap p-3 text-slate-500">{p.date}</td>
-                  <td className="max-w-[240px] p-3 text-slate-700">
-                    <span className="line-clamp-2">{p.caption || "—"}</span>
-                  </td>
-                  <td className="p-3 text-right font-medium">{fmt(p.reach)}</td>
-                  <td className="p-3 text-right">{fmt(p.impressions)}</td>
-                  <td className="p-3 text-right">{fmt(p.likes)}</td>
-                  <td className="p-3 text-right">{fmt(p.comments)}</td>
-                  <td className="p-3 text-right">{fmt(p.saved)}</td>
-                  <td className="p-3 text-right">{fmt(p.shares)}</td>
-                  <td className="p-3 text-right text-slate-500">
-                    {p.engagementRate != null ? p.engagementRate.toFixed(1) + "%" : "—"}
-                  </td>
+        <div className="rounded-2xl border border-slate-200 bg-white">
+          <div className="flex items-center justify-between px-4 pt-4">
+            <p className="text-sm font-semibold text-slate-700">Post Master — detail per post</p>
+            <span className="text-[11px] text-slate-400">sama seperti Excel · {posts.length} post</span>
+          </div>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full min-w-[1180px] text-xs">
+              <thead>
+                <tr className="border-y border-slate-100 text-left uppercase tracking-wide text-slate-400">
+                  <th className="p-2.5">Tanggal</th>
+                  <th className="p-2.5">Pillar</th>
+                  <th className="p-2.5">Konten</th>
+                  <th className="p-2.5 text-right">Followers</th>
+                  <th className="p-2.5 text-right">Likes</th>
+                  <th className="p-2.5 text-right">Komen</th>
+                  <th className="p-2.5 text-right">ER</th>
+                  <th className="p-2.5 text-right">Follows</th>
+                  <th className="p-2.5 text-right">Profil</th>
+                  <th className="p-2.5 text-right">Shared</th>
+                  <th className="p-2.5 text-right">Saved</th>
+                  <th className="p-2.5 text-right">Web Clk</th>
+                  <th className="p-2.5 text-right">Impr.</th>
+                  <th className="p-2.5 text-right">Reach</th>
+                  <th className="p-2.5 text-right">Reach ER</th>
+                  <th className="p-2.5 text-right">Total Int.</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {monthGroups.map(([ym, mp]) => (
+                  <MonthRows key={ym} ym={ym} posts={mp} followersBase={followersBase} sumBy={sumBy} multi={monthGroups.length > 1} />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
+  );
+}
+
+/** One month's post rows + a bold month-total row (mirrors the Excel per-month total). */
+function MonthRows({
+  ym,
+  posts,
+  followersBase,
+  sumBy,
+  multi,
+}: {
+  ym: string;
+  posts: PostMetric[];
+  followersBase: number | null;
+  sumBy: (arr: PostMetric[], f: (p: PostMetric) => number | null | undefined) => number;
+  multi: boolean;
+}) {
+  return (
+    <>
+      {multi && (
+        <tr className="bg-slate-50/70">
+          <td colSpan={16} className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            {monthLabel(ym)}
+          </td>
+        </tr>
+      )}
+      {posts.map((p, i) => {
+        const ti = tiOf(p);
+        const followers = p.followersAtPeriod ?? followersBase;
+        return (
+          <tr key={i} className="border-b border-slate-50 last:border-0">
+            <td className="whitespace-nowrap p-2.5 text-slate-500">{p.date}</td>
+            <td className="whitespace-nowrap p-2.5 text-slate-600">{p.pillar ?? "—"}</td>
+            <td className="max-w-[220px] p-2.5 text-slate-700">
+              <span className="line-clamp-2">{p.caption || "—"}</span>
+            </td>
+            <td className="p-2.5 text-right text-slate-500">{fmt(followers)}</td>
+            <td className="p-2.5 text-right">{fmt(p.likes)}</td>
+            <td className="p-2.5 text-right">{fmt(p.comments)}</td>
+            <td className="p-2.5 text-right text-slate-500">{followers ? pct1(ti / followers) : "—"}</td>
+            <td className="p-2.5 text-right">{fmt(p.follows)}</td>
+            <td className="p-2.5 text-right">{fmt(p.profileVisits)}</td>
+            <td className="p-2.5 text-right">{fmt(p.shares)}</td>
+            <td className="p-2.5 text-right">{fmt(p.saved)}</td>
+            <td className="p-2.5 text-right">{fmt(p.webClicks)}</td>
+            <td className="p-2.5 text-right">{fmt(p.impressions)}</td>
+            <td className="p-2.5 text-right font-medium">{fmt(p.reach)}</td>
+            <td className="p-2.5 text-right text-slate-500">{p.reach ? pct1(ti / p.reach) : "—"}</td>
+            <td className="p-2.5 text-right font-semibold">{fmt(ti)}</td>
+          </tr>
+        );
+      })}
+      <tr className="border-b border-slate-100 bg-amber-50/50 font-semibold text-slate-700">
+        <td className="p-2.5" colSpan={3}>
+          {multi ? `${monthLabel(ym)} — Total` : "Total"}
+        </td>
+        <td className="p-2.5"></td>
+        <td className="p-2.5 text-right">{fmt(sumBy(posts, (p) => p.likes))}</td>
+        <td className="p-2.5 text-right">{fmt(sumBy(posts, (p) => p.comments))}</td>
+        <td className="p-2.5"></td>
+        <td className="p-2.5 text-right">{fmt(sumBy(posts, (p) => p.follows))}</td>
+        <td className="p-2.5 text-right">{fmt(sumBy(posts, (p) => p.profileVisits))}</td>
+        <td className="p-2.5 text-right">{fmt(sumBy(posts, (p) => p.shares))}</td>
+        <td className="p-2.5 text-right">{fmt(sumBy(posts, (p) => p.saved))}</td>
+        <td className="p-2.5 text-right">{fmt(sumBy(posts, (p) => p.webClicks))}</td>
+        <td className="p-2.5 text-right">{fmt(sumBy(posts, (p) => p.impressions))}</td>
+        <td className="p-2.5 text-right">{fmt(sumBy(posts, (p) => p.reach))}</td>
+        <td className="p-2.5"></td>
+        <td className="p-2.5 text-right">{fmt(sumBy(posts, tiOf))}</td>
+      </tr>
+    </>
   );
 }
