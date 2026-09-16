@@ -5,12 +5,12 @@ import { ArrowRight, Loader2, Mail, KeyRound, ArrowLeft } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/landing/logo";
 
-export function AdminLoginForm({ codeFallback = false }: { codeFallback?: boolean }) {
+export function AdminLoginForm({ codeFallback = false, initialError }: { codeFallback?: boolean; initialError?: string }) {
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError ?? null);
   const [info, setInfo] = useState<string | null>(null);
 
   const supabase = createSupabaseBrowserClient();
@@ -155,24 +155,35 @@ export function AdminLoginForm({ codeFallback = false }: { codeFallback?: boolea
           {codeFallback && (
             <div className="mt-5 border-t border-white/10 pt-4">
               <p className="mb-2 flex items-center gap-2 text-xs text-slate-400">
-                <span className="h-px flex-1 bg-white/10" /> atau kode akses <span className="h-px flex-1 bg-white/10" />
+                <span className="h-px flex-1 bg-white/10" /> atau email + kode akses <span className="h-px flex-1 bg-white/10" />
               </p>
-              <form method="post" action="/admin/access" className="flex items-center gap-2">
+              <form method="post" action="/admin/access" className="space-y-2">
                 <input
-                  type="password"
-                  name="code"
+                  type="email"
+                  name="email"
                   required
-                  autoComplete="off"
-                  placeholder="Kode akses"
-                  className="flex-1 rounded-xl border border-white/10 bg-obsidian/50 px-3 py-2.5 text-sm text-mist placeholder:text-slate-600 focus:border-coral/50 focus:outline-none"
+                  defaultValue={email}
+                  placeholder="Email terdaftar"
+                  className="w-full rounded-xl border border-white/10 bg-obsidian/50 px-3 py-2.5 text-sm text-mist placeholder:text-slate-600 focus:border-coral/50 focus:outline-none"
                 />
-                <button
-                  type="submit"
-                  className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-mist hover:bg-white/15"
-                >
-                  Masuk
-                </button>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    name="code"
+                    required
+                    autoComplete="off"
+                    placeholder="Kode akses"
+                    className="flex-1 rounded-xl border border-white/10 bg-obsidian/50 px-3 py-2.5 text-sm text-mist placeholder:text-slate-600 focus:border-coral/50 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-mist hover:bg-white/15"
+                  >
+                    Masuk
+                  </button>
+                </div>
               </form>
+              <p className="mt-1.5 text-[11px] text-slate-500">Masukкан email terdaftar Anda + kode akses.</p>
             </div>
           )}
         </div>

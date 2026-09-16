@@ -58,16 +58,48 @@ export function accessTokenForCode(code: string): string {
   return tokenFor(code);
 }
 
-/** The role carried by the current request's access cookie, or null. */
-export async function adminAccessRole(): Promise<AccessRole | null> {
+/* --- both codes require an email; the cookie is signed with (role, email) so
+       the code alone is never enough and the session knows who logged in. --- */
+function sigSecret(): string {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.ADMIN_ACCESS_CODE || "scaleup-secret";
+}
+function emailSig(role: AccessRole, email: string): string {
+  return crypto.createHmac("sha256", sigSecret()).update(`${role}:${email.toLowerCase()}`).digest("hex").slice(0, 32);
+}
+/** Cookie value for an (already-verified) email + role. */
+export function sessionCookieValue(role: AccessRole, email: string): string {
+  return `${role === "owner" ? "o" : "m"}:${email.toLowerCase()}:${emailSig(role, email)}`;
+}
+function readSessionCookie(v: string): { role: AccessRole; email: string } | null {
+  const role: AccessRole | null = v.startsWith("o:") ? "owner" : v.startsWith("m:") ? "member" : null;
+  if (!role) return null;
+  const rest = v.slice(2);
+  const idx = rest.lastIndexOf(":");
+  if (idx < 0) return null;
+  const email = rest.slice(0, idx);
+  const sig = rest.slice(idx + 1);
+  return safeEqual(sig, emailSig(role, email)) ? { role, email } : null;
+}
+
+export type AccessInfo = { role: AccessRole; email?: string } | null;
+
+/** The access carried by the current request's cookie (role + email), or null. */
+export async function adminAccess(): Promise<AccessInfo> {
   const store = await cookies();
   const v = store.get(COOKIE)?.value;
   if (!v) return null;
+  const parsed = readSessionCookie(v);
+  if (parsed) return parsed;
+  // legacy: raw owner-code hash cookie (pre email-binding)
   const o = OWNER_CODE();
-  const m = MEMBER_CODE();
-  if (o && safeEqual(v, tokenFor(o))) return "owner";
-  if (m && safeEqual(v, tokenFor(m))) return "member";
+  if (o && safeEqual(v, tokenFor(o))) return { role: "owner" };
   return null;
+}
+
+/** Legacy role-only accessor (derived from adminAccess). */
+export async function adminAccessRole(): Promise<AccessRole | null> {
+  const a = await adminAccess();
+  return a ? a.role : null;
 }
 
 /* ------- backward-compatible helpers (owner code) ------- */
