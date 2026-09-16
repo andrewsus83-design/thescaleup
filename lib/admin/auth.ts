@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { isAdminEmail, ADMIN_EMAILS } from "@/lib/admin/config";
-import { hasAdminAccessCookie, isOpenMode } from "@/lib/admin/access";
+import { adminAccessRole, isOpenMode } from "@/lib/admin/access";
 
 export type AdminUser = {
   id: string;
@@ -32,12 +32,22 @@ export async function getAdminUser(): Promise<AdminUser | null> {
   }
 
   // Shared access-code session (fallback for when OTP email isn't delivering).
-  if (await hasAdminAccessCookie()) {
+  const accessRole = await adminAccessRole();
+  if (accessRole === "owner") {
     return {
       id: "access-code",
       email: ADMIN_EMAILS[0] ?? "admin@thescaleup.xyz",
       role: "owner",
       perms: OWNER_PERMS,
+    };
+  }
+  if (accessRole === "member") {
+    // TEMP shared member code (111111) — create/read/update, no delete.
+    return {
+      id: "access-member",
+      email: "member@thescaleup.xyz",
+      role: "admin",
+      perms: { create: true, read: true, update: true, delete: false },
     };
   }
 
