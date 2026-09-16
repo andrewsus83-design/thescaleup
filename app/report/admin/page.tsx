@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { Plus, ExternalLink, Settings2, RefreshCw, LayoutGrid, ArrowLeft } from "lucide-react";
+import { Plus, ExternalLink, Settings2, RefreshCw, LayoutGrid } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
 import { isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { listClients, getLatestSnapshot, getConfiguredProviders } from "@/lib/report/data";
-import { createClient, generateReport } from "@/lib/report/actions";
+import { generateReport } from "@/lib/report/actions";
 import { CLIENT_STATUSES } from "@/lib/report/types";
 import { BrandPicker } from "@/components/report/brand-picker";
 import { ReportDashboard } from "@/components/report/report-dashboard";
+import { AddBrandForm } from "@/components/report/add-brand-form";
+import { DeleteBrandButton } from "@/components/report/delete-brand-button";
 
 export const dynamic = "force-dynamic";
 
@@ -115,6 +117,7 @@ export default async function ReportAdminDashboard({
               >
                 <ExternalLink className="h-4 w-4" />
               </Link>
+              <DeleteBrandButton id={selected.id} name={selected.name} />
             </div>
           </div>
 
@@ -154,66 +157,21 @@ export default async function ReportAdminDashboard({
 function AddClientCard({ hasClients }: { hasClients: boolean }) {
   return (
     <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-6">
-      <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-700">
-        <Plus className="h-4 w-4" /> Tambah Brand
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <Plus className="h-4 w-4" /> Tambah Brand
+        </div>
+        {hasClients && (
+          <Link href="/report/admin" className="text-sm text-slate-500 hover:text-slate-800">
+            Kembali
+          </Link>
+        )}
       </div>
       <p className="mb-4 text-xs text-slate-500">
-        Cukup nama brand + API key &amp; Profile ID Zernio. Handle Instagram &amp; data lain terbaca
-        otomatis dari Zernio.
+        Masukkan Zernio API key → klik <strong>Cek Koneksi</strong> → pilih akun Instagram. Profile ID &amp;
+        handle terisi otomatis dari Zernio.
       </p>
-      <form action={createClient} className="grid gap-4">
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-slate-700">Nama Brand *</span>
-          <input
-            name="name"
-            required
-            placeholder="mis. Cap Gajah"
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#2A2870]"
-          />
-        </label>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-slate-700">Zernio API Key *</span>
-            <input
-              name="zernio_api_key"
-              required
-              type="password"
-              autoComplete="off"
-              placeholder="zernio_..."
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs outline-none focus:border-[#2A2870]"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-slate-700">Zernio Profile ID *</span>
-            <input
-              name="zernio_account_id"
-              required
-              placeholder="id profil / akun di Zernio"
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs outline-none focus:border-[#2A2870]"
-            />
-          </label>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-slate-700">Warna Brand</span>
-            <input name="brand_color" type="color" defaultValue="#2A2870" className="h-11 w-full rounded-lg border border-slate-200 px-1" />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-slate-700">Warna Aksen</span>
-            <input name="accent_color" type="color" defaultValue="#38B6F0" className="h-11 w-full rounded-lg border border-slate-200 px-1" />
-          </label>
-        </div>
-        <div className="flex items-center gap-3">
-          <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-[#2A2870] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#211f5c]">
-            <Plus className="h-4 w-4" /> Buat Brand
-          </button>
-          {hasClients && (
-            <Link href="/report/admin" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800">
-              <ArrowLeft className="h-4 w-4" /> Kembali
-            </Link>
-          )}
-        </div>
-      </form>
+      <AddBrandForm hasClients={hasClients} />
     </div>
   );
 }

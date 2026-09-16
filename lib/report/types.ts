@@ -21,7 +21,7 @@ export type ReportClient = {
 export type PostMetric = {
   date: string;
   caption: string;
-  format: string; // Image | Carousel | Reels / Video
+  format: string; // Image | Carousel | Reels / Video | Post | Story
   reach?: number | null;
   impressions?: number | null;
   likes?: number | null;
@@ -33,8 +33,16 @@ export type PostMetric = {
   webClicks?: number | null;
   views?: number | null;
   totalInteractions?: number | null;
+  engagementRate?: number | null; // percent (e.g. 3.4)
   url?: string | null;
 };
+
+/** Reach split by whether it came from followers vs discovery (non-followers). */
+export type DiscoverySplit = { followers: number | null; nonFollowers: number | null };
+/** One content-type's reach + interactions (POST/STORY/REEL/CAROUSEL). */
+export type ContentTypeStat = { type: string; reach: number | null; interactions: number | null };
+/** One day's value in a time series. */
+export type SeriesPoint = { date: string; value: number };
 
 export type MetricTotals = {
   posts: number;
@@ -60,6 +68,10 @@ export type ReportMetrics = {
   account?: { username?: string | null; followers?: number | null };
   posts: PostMetric[];
   totals?: MetricTotals | null;
+  // Professional-dashboard extras (all optional; present when Zernio returns them):
+  discovery?: DiscoverySplit | null; // reach followers vs non-followers
+  byContentType?: ContentTypeStat[] | null; // reach/interactions per POST/STORY/REEL/CAROUSEL
+  reachSeries?: SeriesPoint[] | null; // daily reach
   fetchedAt?: string;
 };
 

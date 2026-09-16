@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
-import { fetchZernioMetrics } from "@/lib/report/zernio";
+import { fetchZernioMetrics, listZernioAccounts, type ZernioAccount } from "@/lib/report/zernio";
 import { CLIENT_PROVIDERS } from "@/lib/report/config";
 
 function slugify(s: string): string {
@@ -29,6 +29,16 @@ async function uniqueSlug(base: string): Promise<string> {
 }
 
 /* --------------------------------- clients -------------------------------- */
+
+/** Validate a Zernio API key and list its connected accounts (for "Cek Koneksi"). */
+export async function checkZernioConnection(
+  apiKey: string,
+): Promise<{ ok: boolean; accounts: ZernioAccount[]; error?: string }> {
+  await requireAdmin();
+  const key = (apiKey ?? "").trim();
+  if (!key) return { ok: false, accounts: [], error: "Isi Zernio API key dulu." };
+  return listZernioAccounts(key);
+}
 
 /**
  * Add a client. Per the flow, this only needs the client's Zernio API key +
