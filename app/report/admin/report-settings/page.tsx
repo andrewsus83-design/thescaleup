@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getReportRules, getTemplateName, getCustomParams, getTemplateFilename } from "@/lib/report/rules";
 import { saveReportRule, deleteReportRule, saveReportTemplate, saveCustomParam, deleteCustomParam, uploadReportTemplate } from "@/lib/report/actions";
 import { RULE_METRICS, CUSTOM_PARAM_TYPES, REPORT_TEMPLATE_TYPES, DEFAULT_TEMPLATE_TYPE, type ReportRule, type ReportCustomParam } from "@/lib/report/types";
+import { SettingsTabs } from "@/components/report/settings-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -104,10 +105,12 @@ export default async function ReportSettingsPage() {
           <SlidersHorizontal className="h-5 w-5" />
         </span>
         <div>
-          <h1 className="text-2xl font-extrabold text-[#1B2A4A]">Setting Report</h1>
-          <p className="text-sm text-slate-500">Template Excel &amp; parameter rumus (dipakai saat “Tarik Report”)</p>
+          <h1 className="text-2xl font-extrabold text-[#1B2A4A]">Setting</h1>
+          <p className="text-sm text-slate-500">Template Excel, rumus &amp; parameter AI (dipakai saat “Tarik Report”)</p>
         </div>
       </div>
+
+      <SettingsTabs active="report" />
 
       {/* template */}
       <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5">

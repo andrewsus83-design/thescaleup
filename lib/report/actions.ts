@@ -43,6 +43,48 @@ export async function checkZernioConnection(
   return listZernioAccounts(key);
 }
 
+/* -------------------------------- admin users ------------------------------ */
+
+/** Add/update an admin user (role + CRUD perms) from the report platform. */
+export async function reportAddUser(formData: FormData): Promise<void> {
+  const me = await requireAdmin();
+  if (!me.perms.create || !isSupabaseAdminConfigured()) return;
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!email) return;
+  const role = String(formData.get("role") ?? "staff");
+  // sensible default perms by role (owner/admin = full, staff = read+create, viewer = read)
+  const preset =
+    role === "owner" || role === "admin"
+      ? { c: true, r: true, u: true, d: true }
+      : role === "staff"
+        ? { c: true, r: true, u: false, d: false }
+        : { c: false, r: true, u: false, d: false };
+  const db = createSupabaseAdminClient();
+  await db.from("admin_users").upsert(
+    {
+      email,
+      name: (formData.get("name") as string) || null,
+      role,
+      can_create: formData.get("can_create") != null ? formData.get("can_create") === "on" : preset.c,
+      can_read: true,
+      can_update: formData.get("can_update") != null ? formData.get("can_update") === "on" : preset.u,
+      can_delete: formData.get("can_delete") != null ? formData.get("can_delete") === "on" : preset.d,
+    },
+    { onConflict: "email" },
+  );
+  revalidatePath("/report/admin/users");
+}
+
+export async function reportDeleteUser(formData: FormData): Promise<void> {
+  const me = await requireAdmin();
+  if (!me.perms.delete || !isSupabaseAdminConfigured()) return;
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  const db = createSupabaseAdminClient();
+  await db.from("admin_users").delete().eq("id", id);
+  revalidatePath("/report/admin/users");
+}
+
 /* ------------------------------ report settings ---------------------------- */
 
 /** Add or update a report rule (formula). */
