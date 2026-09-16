@@ -6,8 +6,9 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { fetchZernioMetrics, listZernioAccounts, type ZernioAccount } from "@/lib/report/zernio";
 import { CLIENT_PROVIDERS } from "@/lib/report/config";
-import { getReportRules, saveReportRules, saveTemplateName } from "@/lib/report/rules";
-import type { ReportRule } from "@/lib/report/types";
+import { getReportRules, saveReportRules, saveTemplateName, getCustomParams, saveCustomParams } from "@/lib/report/rules";
+import { analyzeReportWithClaude } from "@/lib/report/ai";
+import type { ReportRule, ReportCustomParam } from "@/lib/report/types";
 
 function slugify(s: string): string {
   return (
@@ -75,6 +76,31 @@ export async function deleteReportRule(formData: FormData): Promise<void> {
 export async function saveReportTemplate(formData: FormData): Promise<void> {
   await requireAdmin();
   await saveTemplateName(String(formData.get("template_name") ?? "").trim());
+  revalidatePath("/report/admin/report-settings");
+}
+
+/** Add/update a custom AI parameter (analyzed by Claude Opus). */
+export async function saveCustomParam(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const params = await getCustomParams();
+  const id = String(formData.get("id") ?? "").trim() || randomUUID().slice(0, 8);
+  const param: ReportCustomParam = {
+    id,
+    label: String(formData.get("label") ?? "").trim() || "Parameter",
+    type: String(formData.get("type") ?? "analisa").trim(),
+    prompt: String(formData.get("prompt") ?? "").trim(),
+  };
+  const next = params.some((p) => p.id === id) ? params.map((p) => (p.id === id ? param : p)) : [...params, param];
+  await saveCustomParams(next);
+  revalidatePath("/report/admin/report-settings");
+}
+
+export async function deleteCustomParam(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  const params = await getCustomParams();
+  await saveCustomParams(params.filter((p) => p.id !== id));
   revalidatePath("/report/admin/report-settings");
 }
 
@@ -264,6 +290,22 @@ export async function generateReport(formData: FormData): Promise<void> {
     until,
     period,
   });
+
+  // Custom AI parameters → analyzed by Claude Opus, attached to the report.
+  if (metrics.connected) {
+    const params = await getCustomParams();
+    if (params.length) {
+      const { data: ck } = await db
+        .from("report_client_settings")
+        .select("value")
+        .eq("client_id", id)
+        .eq("key", "claude")
+        .maybeSingle();
+      const ai = await analyzeReportWithClaude((ck?.value as string) ?? null, metrics, params);
+      if (ai) metrics.aiAnalysis = ai;
+    }
+  }
+
   await db.from("report_snapshots").insert({ client_id: id, period, data: metrics, source: "zernio" });
   if (metrics.connected) {
     await db.from("report_clients").update({ status: "active", updated_at: new Date().toISOString() }).eq("id", id);

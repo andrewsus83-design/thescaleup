@@ -1,3 +1,4 @@
+import { Sparkles } from "lucide-react";
 import type { ReportMetrics, PostMetric } from "@/lib/report/types";
 
 function fmt(n: number | null | undefined): string {
@@ -149,6 +150,26 @@ export function ReportDashboard({
         <Tile label="Web Clicks" value={fmt(t?.webClicks)} />
         <Tile label="Jumlah Post" value={fmt(t?.posts)} />
       </div>
+
+      {/* AI analysis (Claude Opus custom parameters) */}
+      {metrics.aiAnalysis && metrics.aiAnalysis.length > 0 && (
+        <div className="rounded-2xl border border-[#2A2870]/25 bg-gradient-to-br from-[#2A2870]/[0.06] to-white p-5">
+          <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#2A2870]">
+            <Sparkles className="h-4 w-4" /> Analisa AI (Claude Opus)
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {metrics.aiAnalysis.map((a, i) => (
+              <div key={i} className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-[#1B2A4A]">
+                  {a.label}
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] capitalize text-slate-500">{a.type}</span>
+                </p>
+                <p className="whitespace-pre-line text-sm text-slate-600">{a.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* discovery split */}

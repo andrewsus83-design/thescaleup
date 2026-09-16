@@ -1,11 +1,42 @@
 import Link from "next/link";
-import { ArrowLeft, FileSpreadsheet, SlidersHorizontal, Plus, Trash2, Trophy } from "lucide-react";
+import { ArrowLeft, FileSpreadsheet, SlidersHorizontal, Plus, Trash2, Trophy, Sparkles } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
-import { getReportRules, getTemplateName } from "@/lib/report/rules";
-import { saveReportRule, deleteReportRule, saveReportTemplate } from "@/lib/report/actions";
-import { RULE_METRICS, type ReportRule } from "@/lib/report/types";
+import { getReportRules, getTemplateName, getCustomParams } from "@/lib/report/rules";
+import { saveReportRule, deleteReportRule, saveReportTemplate, saveCustomParam, deleteCustomParam } from "@/lib/report/actions";
+import { RULE_METRICS, CUSTOM_PARAM_TYPES, type ReportRule, type ReportCustomParam } from "@/lib/report/types";
 
 export const dynamic = "force-dynamic";
+
+function CustomParamForm({ param }: { param?: ReportCustomParam }) {
+  return (
+    <form action={saveCustomParam} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-12">
+      {param && <input type="hidden" name="id" value={param.id} />}
+      <label className="sm:col-span-4">
+        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400">Nama</span>
+        <input name="label" required defaultValue={param?.label ?? ""} placeholder="mis. Rekomendasi Konten"
+          className="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-[#2A2870]" />
+      </label>
+      <label className="sm:col-span-3">
+        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400">Tipe</span>
+        <select name="type" defaultValue={param?.type ?? "analisa"}
+          className="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-[#2A2870]">
+          {CUSTOM_PARAM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+      </label>
+      <label className="sm:col-span-12">
+        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400">Instruksi untuk AI</span>
+        <textarea name="prompt" rows={2} defaultValue={param?.prompt ?? ""}
+          placeholder="mis. Analisa apakah konten giveaway efektif dan beri rekomendasi 3 ide konten minggu depan berdasarkan data."
+          className="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-[#2A2870]" />
+      </label>
+      <div className="sm:col-span-3">
+        <button type="submit" className="w-full rounded-lg bg-[#2A2870] px-3 py-2 text-sm font-semibold text-white hover:bg-[#211f5c]">
+          {param ? "Simpan" : "Tambah parameter"}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 function RuleForm({ rule }: { rule?: ReportRule }) {
   return (
@@ -56,7 +87,7 @@ function RuleForm({ rule }: { rule?: ReportRule }) {
 
 export default async function ReportSettingsPage() {
   await requireAdmin();
-  const [rules, templateName] = await Promise.all([getReportRules(), getTemplateName()]);
+  const [rules, templateName, customParams] = await Promise.all([getReportRules(), getTemplateName(), getCustomParams()]);
 
   return (
     <div className="mx-auto max-w-4xl px-5 py-8 sm:px-8">
@@ -137,6 +168,48 @@ export default async function ReportSettingsPage() {
           <Plus className="h-4 w-4" /> Tambah Rumus Baru
         </div>
         <RuleForm />
+      </div>
+
+      {/* custom AI parameters */}
+      <div className="mb-3 mt-10 flex items-center gap-2 text-sm font-semibold text-slate-700">
+        <Sparkles className="h-4 w-4 text-[#2A2870]" /> Custom Parameter (AI · Claude Opus)
+      </div>
+      <p className="mb-4 text-sm text-slate-500">
+        Parameter custom yang <strong>dianalisa AI (Claude Opus)</strong> memakai data laporan, lalu hasilnya
+        ditambahkan ke report. Contoh: <em>“Analisa efektivitas giveaway + beri 3 ide konten minggu depan.”</em>{" "}
+        Butuh API key <strong>Claude</strong> terisi di Setting API klien. AI dijalankan saat “Tarik data”.
+      </p>
+
+      {customParams.length > 0 && (
+        <div className="mb-4 space-y-3">
+          {customParams.map((p) => (
+            <div key={p.id} className="rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2">
+                <span className="flex items-center gap-2 text-sm">
+                  <Sparkles className="h-3.5 w-3.5 text-[#2A2870]" />
+                  <b>{p.label}</b>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] capitalize text-slate-600">{p.type}</span>
+                </span>
+                <form action={deleteCustomParam}>
+                  <input type="hidden" name="id" value={p.id} />
+                  <button type="submit" title="Hapus parameter" className="rounded-lg border border-red-200 px-2 py-1.5 text-red-500 hover:bg-red-50">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </form>
+              </div>
+              <div className="p-3">
+                <CustomParamForm param={p} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <Plus className="h-4 w-4" /> Tambah Parameter AI Baru
+        </div>
+        <CustomParamForm />
       </div>
     </div>
   );
