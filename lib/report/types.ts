@@ -20,6 +20,7 @@ export type ReportClient = {
 /** One post's metrics, normalized across providers (Zernio → this shape). */
 export type PostMetric = {
   date: string;
+  postedAt?: string | null; // full publish timestamp (for best day/time analysis)
   caption: string;
   format: string; // Image | Carousel | Reels / Video | Post | Story
   pillar?: string | null; // editorial content pillar (AI-suggested, override-able)
@@ -76,6 +77,17 @@ export type StoriesSummary = {
   items: StoryItem[];
 };
 
+/** Previous equal-length window, for period-over-period deltas. */
+export type PeriodComparison = {
+  reach: number | null;
+  totalInteractions: number | null;
+  erReach: number | null;
+  likes: number | null;
+  comments: number | null;
+  saved: number | null;
+  shares: number | null;
+};
+
 /** Reach split by whether it came from followers vs discovery (non-followers). */
 export type DiscoverySplit = { followers: number | null; nonFollowers: number | null };
 /** One content-type's reach + interactions (POST/STORY/REEL/CAROUSEL). */
@@ -130,6 +142,7 @@ export type ReportMetrics = {
   engagedDemographics?: Demographics | null; // engaged-audience breakdown
   reels?: ReelsSummary | null; // video/Reels performance
   stories?: StoriesSummary | null; // Instagram Stories insights
+  comparison?: PeriodComparison | null; // previous equal-length window (period-over-period)
   platform?: string; // instagram | tiktok
   aiAnalysis?: { label: string; type: string; text: string }[] | null; // Claude Opus custom analysis
   fetchedAt?: string;

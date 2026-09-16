@@ -1,5 +1,14 @@
-import { Sparkles } from "lucide-react";
+import { Sparkles, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { ReportMetrics, PostMetric } from "@/lib/report/types";
+import {
+  efficiency,
+  computeDeltas,
+  qualityScore,
+  bestDayTime,
+  reelRows,
+  overlapRows,
+  totalInteraction as tiOf,
+} from "@/lib/report/derive";
 
 function fmt(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
@@ -18,11 +27,22 @@ function times(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
   return n >= 1 ? n.toFixed(1) + "×" : (n * 100).toFixed(1) + "%";
 }
-/** Cap Gajah "Total Interaction" = the 8 action metrics summed. */
-function tiOf(p: PostMetric): number {
-  return (p.likes ?? 0) + (p.comments ?? 0) + (p.follows ?? 0) + (p.profileVisits ?? 0) + (p.shares ?? 0) + (p.saved ?? 0) + (p.webClicks ?? 0);
-}
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+
+/** Δ badge for period-over-period change (fraction, e.g. 0.23 → +23%). */
+function DeltaBadge({ d }: { d: number | null }) {
+  if (d == null) return null;
+  const up = d >= 0;
+  const Icon = d === 0 ? Minus : up ? TrendingUp : TrendingDown;
+  const cls = d === 0 ? "text-slate-400 bg-slate-100" : up ? "text-emerald-600 bg-emerald-50" : "text-red-500 bg-red-50";
+  return (
+    <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${cls}`}>
+      <Icon className="h-3 w-3" />
+      {up && d !== 0 ? "+" : ""}
+      {(d * 100).toFixed(0)}%
+    </span>
+  );
+}
 function monthLabel(ym: string): string {
   const mo = Number(ym.slice(5, 7));
   return mo >= 1 && mo <= 12 ? `${MONTHS[mo - 1]} ${ym.slice(0, 4)}` : ym;
@@ -103,6 +123,50 @@ function BarList({
   );
 }
 
+/** Follower-share vs engaged-share table with a signed gap. */
+function OverlapTable({
+  title,
+  rows,
+  brandColor,
+  accentColor,
+}: {
+  title: string;
+  rows: { name: string; follower: number; engaged: number; gap: number }[];
+  brandColor: string;
+  accentColor: string;
+}) {
+  const list = rows.slice(0, 6);
+  if (!list.length) return null;
+  return (
+    <div>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-left text-[11px] uppercase text-slate-400">
+            <th className="py-1">Segmen</th>
+            <th className="py-1 text-right" style={{ color: brandColor }}>Followers</th>
+            <th className="py-1 text-right" style={{ color: accentColor }}>Interaksi</th>
+            <th className="py-1 text-right">Gap</th>
+          </tr>
+        </thead>
+        <tbody>
+          {list.map((r) => (
+            <tr key={r.name} className="border-t border-slate-50">
+              <td className="py-1.5 pr-2 text-slate-600">{r.name}</td>
+              <td className="py-1.5 text-right text-slate-500">{(r.follower * 100).toFixed(0)}%</td>
+              <td className="py-1.5 text-right text-slate-500">{(r.engaged * 100).toFixed(0)}%</td>
+              <td className={`py-1.5 text-right font-semibold ${r.gap >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                {r.gap >= 0 ? "+" : ""}
+                {(r.gap * 100).toFixed(0)}%
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function ReportDashboard({
   metrics,
   brandColor = "#2A2870",
@@ -137,22 +201,20 @@ export function ReportDashboard({
   const series = metrics.reachSeries ?? [];
   const sMax = Math.max(1, ...series.map((s) => s.value));
 
-  // ---- CMO efficiency + funnel metrics (derived from the totals) ----
+  // ---- CMO efficiency + funnel + advanced metrics (shared with the Excel) ----
   const followersBase = metrics.account?.followers ?? null;
-  const rate = (num: number | null | undefined, den: number | null | undefined) =>
-    num != null && den != null && den > 0 ? num / den : null;
-  const reachRate = rate(t?.reach, followersBase); // account reach vs follower base
-  const savesRate = rate(t?.saved, t?.reach);
-  const sharesRate = rate(t?.shares, t?.reach);
-  const pvRate = rate(t?.profileVisits, t?.reach); // profile-visit rate
-  const followRate = rate(t?.follows, t?.reach); // follow rate off reach
-  const erReach = t?.erReach ?? rate(t?.totalInteractions, t?.reach);
+  const eff = efficiency(t, followersBase, posts.length);
+  const deltas = computeDeltas(t, metrics.comparison);
+  const qScore = qualityScore(posts);
+  const bestTime = bestDayTime(posts);
+  const reels = reelRows(posts);
+  const genderOverlap = overlapRows(metrics.demographics?.genders, metrics.engagedDemographics?.genders);
+  const ageOverlap = overlapRows(metrics.demographics?.ages, metrics.engagedDemographics?.ages);
   const netGrowth =
     metrics.followersGained != null || metrics.followersLost != null
       ? (metrics.followersGained ?? 0) - (metrics.followersLost ?? 0)
       : null;
-  const growthRate = rate(netGrowth, followersBase);
-  const avgReach = posts.length ? rate(t?.reach, posts.length) : null;
+  const growthRate = netGrowth != null && followersBase ? netGrowth / followersBase : null;
 
   // ---- per-pillar performance rollup (needs AI-suggested pillars) ----
   const pillarRoll = (() => {
@@ -215,25 +277,64 @@ export function ReportDashboard({
         <Tile label="Jumlah Post" value={fmt(t?.posts)} />
       </div>
 
-      {/* CMO: efficiency + profile-action funnel (derived) */}
+      {/* CMO: efficiency + profile-action funnel + quality (derived, shared with Excel) */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <p className="mb-3 text-sm font-semibold text-slate-700">Efisiensi & Funnel Aksi</p>
+        <p className="mb-3 text-sm font-semibold text-slate-700">Efisiensi, Funnel & Kualitas</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <Tile label="Reach Rate" value={times(reachRate)} accent={brandColor} hint="reach ÷ followers" />
-          <Tile label="ER (Reach)" value={pct1(erReach)} hint="interaksi ÷ reach" />
-          <Tile label="Saves Rate" value={pct1(savesRate)} hint="saved ÷ reach · sinyal simpan" />
-          <Tile label="Shares Rate" value={pct1(sharesRate)} accent={accentColor} hint="shares ÷ reach · viralitas" />
-          <Tile label="Profile Visit Rate" value={pct1(pvRate)} hint="profil ÷ reach" />
-          <Tile label="Follow Rate" value={pct1(followRate)} hint="follows ÷ reach" />
+          <Tile label="Reach Rate" value={times(eff.reachRate)} accent={brandColor} hint="reach ÷ followers" />
+          <Tile label="ER (Reach)" value={pct1(eff.erReach)} hint="interaksi ÷ reach" />
+          <Tile label="Content Quality Score" value={qScore != null ? qScore.toFixed(1) : "—"} accent={accentColor} hint="engagement berbobot / 1k reach" />
+          <Tile label="Saves Rate" value={pct1(eff.savesRate)} hint="saved ÷ reach · sinyal simpan" />
+          <Tile label="Shares Rate" value={pct1(eff.sharesRate)} hint="shares ÷ reach · viralitas" />
+          <Tile label="Profile Visit Rate" value={pct1(eff.pvRate)} hint="profil ÷ reach" />
+          <Tile label="Follow Rate" value={pct1(eff.followRate)} hint="follows ÷ reach" />
           <Tile
             label="Net Follower Growth"
             value={netGrowth != null ? (netGrowth >= 0 ? "+" : "") + fmt(netGrowth) : "—"}
             accent={netGrowth != null && netGrowth < 0 ? "#DC2626" : brandColor}
             hint={growthRate != null ? `${pct1(growthRate)} dari basis` : "gained − lost"}
           />
-          <Tile label="Avg Reach / Post" value={fmt(avgReach != null ? Math.round(avgReach) : null)} hint="rata-rata jangkauan" />
+          <Tile label="Avg Reach / Post" value={fmt(eff.avgReach != null ? Math.round(eff.avgReach) : null)} hint="rata-rata jangkauan" />
         </div>
       </div>
+
+      {/* CMO: period-over-period comparison */}
+      {deltas && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="mb-3 text-sm font-semibold text-slate-700">Perbandingan vs Periode Sebelumnya</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+            {[
+              ["Reach", deltas.reach],
+              ["Total Interaksi", deltas.totalInteractions],
+              ["ER", deltas.erReach],
+              ["Likes", deltas.likes],
+              ["Komentar", deltas.comments],
+              ["Saved", deltas.saved],
+              ["Shares", deltas.shares],
+            ].map(([label, d]) => (
+              <div key={label as string} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-center">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
+                <div className="mt-1.5 flex justify-center">
+                  {d != null ? <DeltaBadge d={d as number} /> : <span className="text-xs text-slate-400">—</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-slate-400">Dibandingkan dengan periode sepanjang yang sama tepat sebelum rentang tanggal ini.</p>
+        </div>
+      )}
+
+      {/* CMO: best day / time to post */}
+      {bestTime && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="mb-3 text-sm font-semibold text-slate-700">Waktu Terbaik Posting (WIB)</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Tile label="Hari Terbaik" value={bestTime.day} accent={brandColor} hint={`avg reach ${fmt(bestTime.dayAvgReach)}`} />
+            <Tile label="Jam Terbaik" value={`${String(bestTime.hour).padStart(2, "0")}:00`} accent={accentColor} hint={`avg reach ${fmt(bestTime.hourAvgReach)}`} />
+          </div>
+          <p className="mt-2 text-[11px] text-slate-400">Berdasarkan rata-rata reach per hari/jam dari post di periode ini.</p>
+        </div>
+      )}
 
       {/* CMO: performance per content pillar (needs AI-suggested pillars) */}
       {pillarRoll.length > 0 && (
@@ -382,6 +483,48 @@ export function ReportDashboard({
         </div>
       )}
 
+      {/* CMO: per-Reel retention detail */}
+      {reels.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white">
+          <p className="px-4 pt-4 text-sm font-semibold text-slate-700">Retensi Reels per Video</p>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full min-w-[720px] text-xs">
+              <thead>
+                <tr className="border-y border-slate-100 text-left uppercase tracking-wide text-slate-400">
+                  <th className="p-2.5">Tanggal</th>
+                  <th className="p-2.5">Konten</th>
+                  <th className="p-2.5 text-right">Views</th>
+                  <th className="p-2.5 text-right">Reach</th>
+                  <th className="p-2.5 text-right">View Rate</th>
+                  <th className="p-2.5 text-right">Avg Watch</th>
+                  <th className="p-2.5 text-right">Completion</th>
+                  <th className="p-2.5 text-right">Skip</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reels.map((v, i) => (
+                  <tr key={i} className="border-b border-slate-50 last:border-0">
+                    <td className="whitespace-nowrap p-2.5 text-slate-500">{v.date}</td>
+                    <td className="max-w-[240px] p-2.5 text-slate-700">
+                      <span className="line-clamp-1">{v.caption || "—"}</span>
+                    </td>
+                    <td className="p-2.5 text-right font-medium">{fmt(v.views)}</td>
+                    <td className="p-2.5 text-right">{fmt(v.reach)}</td>
+                    <td className="p-2.5 text-right text-slate-500">{v.viewRate != null ? times(v.viewRate) : "—"}</td>
+                    <td className="p-2.5 text-right">{v.avgWatchSec != null ? `${v.avgWatchSec.toFixed(1)} dtk` : "—"}</td>
+                    <td className="p-2.5 text-right">{pct1(v.completion)}</td>
+                    <td className="p-2.5 text-right text-slate-500">{pct1(v.skip)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="px-4 pb-3 pt-2 text-[11px] text-slate-400">
+            View Rate = views ÷ reach (daya tarik hook). Completion tinggi + Skip rendah = retensi kuat.
+          </p>
+        </div>
+      )}
+
       {/* instagram stories */}
       {metrics.stories && metrics.stories.count > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -414,6 +557,20 @@ export function ReportDashboard({
             </div>
           </div>
         )}
+
+      {/* CMO: audience overlap — who follows vs who actually engages */}
+      {(genderOverlap.length > 0 || ageOverlap.length > 0) && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="mb-1 text-sm font-semibold text-slate-700">Overlap Audiens: Followers vs yang Berinteraksi</p>
+          <p className="mb-4 text-[11px] text-slate-400">
+            Gap positif = segmen itu <b>lebih aktif</b> berinteraksi dibanding porsinya di followers.
+          </p>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <OverlapTable title="Umur" rows={ageOverlap} brandColor={brandColor} accentColor={accentColor} />
+            <OverlapTable title="Gender" rows={genderOverlap} brandColor={brandColor} accentColor={accentColor} />
+          </div>
+        </div>
+      )}
 
       {/* contact buttons */}
       {metrics.contactButtons && metrics.contactButtons.length > 0 && (

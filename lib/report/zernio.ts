@@ -150,6 +150,7 @@ function mapPosts(postsJson: Record<string, unknown> | null): PostMetric[] {
       const isVideo = watch != null || num(a.videoDurationSeconds) != null || num(a.completionRate) != null;
       posts.push({
         date: String(p.publishedAt ?? p.scheduledFor ?? "").slice(0, 10),
+        postedAt: String(p.publishedAt ?? p.scheduledFor ?? "") || null,
         caption: String(p.content ?? "").replace(/\s+/g, " ").trim(),
         format: isVideo ? "Reels / Video" : "Post",
         reach: num(a.reach),
@@ -246,7 +247,8 @@ async function fetchTikTok(
     get(`${base}/v1/analytics?platform=tiktok&accountId=${accountId}&limit=50`),
   ]);
   const mx = ((insJson as Record<string, unknown>)?.metrics ?? {}) as Record<string, Record<string, unknown>>;
-  const posts = mapPosts(postsJson as Record<string, unknown> | null);
+  let posts = mapPosts(postsJson as Record<string, unknown> | null);
+  if (since && until) posts = posts.filter((p) => p.date && p.date >= since && p.date <= until);
   // TikTok exposes only a current follower_count (no daily history) → use it per post.
   const tkFollowers = num(mx.follower_count?.total);
   for (const p of posts) p.followersAtPeriod = tkFollowers;
@@ -411,8 +413,9 @@ export async function fetchZernioMetrics(opts: {
     const ovImpr = num(overview.totalImpressions);
     if (ovImpr != null) totals.impressions = ovImpr;
 
-    // per-post analytics (shared mapper) + reels summary
-    const posts = mapPosts(postsJson);
+    // per-post analytics (shared mapper) + reels summary — filtered to the range
+    let posts = mapPosts(postsJson);
+    if (since && until) posts = posts.filter((p) => p.date && p.date >= since && p.date <= until);
     totals.posts = posts.length;
     const reels = computeReels(posts);
 
@@ -440,6 +443,31 @@ export async function fetchZernioMetrics(opts: {
     };
     for (const p of posts) p.followersAtPeriod = followerOn(p.date) ?? currentFollowers;
 
+    // period-over-period: previous equal-length window (headline metrics only)
+    let comparison: ReportMetrics["comparison"] = null;
+    if (since && until) {
+      const span = Math.max(1, Math.round((Date.parse(until) - Date.parse(since)) / 864e5) + 1);
+      const prevUntil = new Date(Date.parse(since) - 864e5).toISOString().slice(0, 10);
+      const prevSince = new Date(Date.parse(since) - span * 864e5).toISOString().slice(0, 10);
+      const pj = await settle(
+        getJson(
+          `${base}/v1/analytics/instagram/account-insights?accountId=${accountId}&metrics=${METRICS}&metricType=total_value&since=${prevSince}&until=${prevUntil}`,
+        ),
+      );
+      if (pj) {
+        const pt = metricsToTotals((pj.metrics ?? {}) as Record<string, unknown>);
+        comparison = {
+          reach: pt.reach,
+          totalInteractions: pt.totalInteractions,
+          erReach: pt.erReach,
+          likes: pt.likes,
+          comments: pt.comments,
+          saved: pt.saved,
+          shares: pt.shares,
+        };
+      }
+    }
+
     const dr = (core.dateRange ?? {}) as Record<string, unknown>;
     return {
       connected: true,
@@ -465,6 +493,7 @@ export async function fetchZernioMetrics(opts: {
       engagedDemographics,
       reels,
       stories: (storiesData as ReportMetrics["stories"]) ?? null,
+      comparison,
       fetchedAt: new Date().toISOString(),
     };
   } catch (e) {
