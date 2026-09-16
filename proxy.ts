@@ -17,10 +17,18 @@ export function proxy(request: NextRequest) {
   if (!host.startsWith("report.")) return NextResponse.next();
 
   const { pathname } = request.nextUrl;
+  // Shared auth pages + internals serve from the apex app as-is (so login,
+  // access-code, logout and Supabase callbacks work on the subdomain and set
+  // their session cookies on report.thescaleup.xyz). Everything else maps to
+  // the /report route tree.
   if (
     pathname.startsWith("/report") ||
     pathname.startsWith("/api") ||
-    pathname.startsWith("/_next")
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/auth") ||
+    pathname === "/admin/login" ||
+    pathname === "/admin/access" ||
+    pathname === "/admin/logout"
   ) {
     return NextResponse.next();
   }
