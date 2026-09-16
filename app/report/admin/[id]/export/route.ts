@@ -20,11 +20,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const since = DATE.test(sinceQ) ? sinceQ : undefined;
   const until = DATE.test(untilQ) ? untilQ : undefined;
 
-  const [apiKey, accountId, rules] = await Promise.all([
+  const accountQ = url.searchParams.get("account") ?? "";
+  const [apiKey, storedAccount, rules] = await Promise.all([
     getClientKey(id, "zernio"),
     getClientKey(id, "zernio_account_id"),
     getReportRules(),
   ]);
+  const accountId = accountQ || storedAccount;
 
   const metrics = await fetchZernioMetrics({ apiKey, accountId, since, until, period: since && until ? `${since} → ${until}` : "last_30d" });
   if (!metrics.connected) {

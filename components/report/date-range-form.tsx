@@ -12,11 +12,13 @@ function iso(d: Date) {
 /** Flight-ticket-style date range (Dari → Sampai) + quick presets → generate report. */
 export function DateRangeForm({
   clientId,
+  accountId,
   defaultSince,
   defaultUntil,
   today,
 }: {
   clientId: string;
+  accountId?: string;
   defaultSince: string;
   defaultUntil: string;
   today: string;
@@ -40,6 +42,7 @@ export function DateRangeForm({
   return (
     <form action={generateReport} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="id" value={clientId} />
+      {accountId && <input type="hidden" name="account" value={accountId} />}
       <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-white p-1.5">
         <CalendarDays className="mb-2 ml-1 h-4 w-4 text-slate-400" />
         <label className="block">
@@ -90,7 +93,7 @@ export function DateRangeForm({
         <RefreshCw className="h-4 w-4" /> Tarik data
       </button>
       <a
-        href={`/report/admin/${clientId}/export?since=${since}&until=${until}`}
+        href={`/report/admin/${clientId}/export?since=${since}&until=${until}${accountId ? `&account=${accountId}` : ""}`}
         className="inline-flex items-center gap-1.5 rounded-lg border border-[#2A2870] px-4 py-2 text-sm font-semibold text-[#2A2870] hover:bg-[#2A2870]/5"
         title="Export Excel sesuai template & rumus di Setting"
       >

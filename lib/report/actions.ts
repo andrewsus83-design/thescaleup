@@ -255,9 +255,11 @@ export async function generateReport(formData: FormData): Promise<void> {
     .in("key", ["zernio", "zernio_account_id"]);
   const map: Record<string, string> = {};
   for (const r of keys ?? []) if (r.key && r.value) map[r.key as string] = r.value as string;
+  // the picker passes the active account id; fall back to the stored default
+  const accountId = String(formData.get("account") ?? "").trim() || map.zernio_account_id || null;
   const metrics = await fetchZernioMetrics({
     apiKey: map.zernio ?? null,
-    accountId: map.zernio_account_id ?? null,
+    accountId,
     since,
     until,
     period,

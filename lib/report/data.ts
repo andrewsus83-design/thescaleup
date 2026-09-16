@@ -4,6 +4,7 @@ import {
   isSupabaseAdminConfigured,
 } from "@/lib/supabase/admin";
 import type { ReportClient, ReportSnapshot, ReportMetrics } from "@/lib/report/types";
+import { listZernioAccounts, type ZernioAccount } from "@/lib/report/zernio";
 
 const COLS =
   "id, slug, name, ig_handle, logo_url, brand_color, accent_color, theme, connect_token, status, notes, created_at";
@@ -89,6 +90,14 @@ export async function getClientKey(clientId: string, provider: string): Promise<
   return s[provider]?.trim() || null;
 }
 
+/** All Zernio social accounts (IG, TikTok, …) connected under a client's key. */
+export async function listClientAccounts(clientId: string): Promise<ZernioAccount[]> {
+  const key = await getClientKey(clientId, "zernio");
+  if (!key) return [];
+  const r = await listZernioAccounts(key);
+  return r.ok ? r.accounts : [];
+}
+
 /** Which provider keys are configured (presence only — safe for the UI). */
 export async function getConfiguredProviders(clientId: string): Promise<string[]> {
   const s = await getClientSettings(clientId);
@@ -118,16 +127,16 @@ export async function getChannelFlags(): Promise<Record<string, { web: boolean; 
 
 /* --------------------------------- snapshots ------------------------------- */
 
-export async function getLatestSnapshot(clientId: string): Promise<ReportSnapshot | null> {
+export async function getLatestSnapshot(clientId: string, accountId?: string): Promise<ReportSnapshot | null> {
   if (!isSupabaseAdminConfigured()) return null;
   try {
-    const { data } = await db()
+    let q = db()
       .from("report_snapshots")
       .select("id, client_id, period, data, source, created_at")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .eq("client_id", clientId);
+    // when an account is given, only snapshots pulled for that account
+    if (accountId) q = q.eq("data->account->>id", accountId);
+    const { data } = await q.order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (!data) return null;
     return {
       id: String(data.id),

@@ -76,7 +76,7 @@ export type ReportMetrics = {
   reason?: string; // why not connected (shown to admin, never fabricated data)
   provider: string;
   period?: string;
-  account?: { username?: string | null; followers?: number | null };
+  account?: { id?: string | null; username?: string | null; followers?: number | null; platform?: string | null };
   posts: PostMetric[];
   totals?: MetricTotals | null;
   // Professional-dashboard extras (all optional; present when Zernio returns them):

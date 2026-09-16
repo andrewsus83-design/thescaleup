@@ -299,8 +299,10 @@ export async function fetchZernioMetrics(opts: {
       provider: "zernio",
       period: dr.since && dr.until ? `${dr.since} → ${dr.until}` : period,
       account: {
+        id: accountId,
         username: acct?.username ?? acct?.displayName ?? null,
         followers: latestFollowers ?? acct?.followers ?? null,
+        platform: acct?.platform ?? null,
       },
       posts,
       totals,
