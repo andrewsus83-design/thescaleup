@@ -127,7 +127,11 @@ export async function getChannelFlags(): Promise<Record<string, { web: boolean; 
 
 /* --------------------------------- snapshots ------------------------------- */
 
-export async function getLatestSnapshot(clientId: string, accountId?: string): Promise<ReportSnapshot | null> {
+export async function getLatestSnapshot(
+  clientId: string,
+  accountId?: string,
+  allowLegacy = true,
+): Promise<ReportSnapshot | null> {
   if (!isSupabaseAdminConfigured()) return null;
   try {
     const run = async (mode: "account" | "legacy" | "any") => {
@@ -140,11 +144,11 @@ export async function getLatestSnapshot(clientId: string, accountId?: string): P
       const { data } = await q.order("created_at", { ascending: false }).limit(1).maybeSingle();
       return data;
     };
-    // prefer the account-tagged snapshot; fall back ONLY to legacy (untagged)
-    // snapshots — never to a DIFFERENT account's data (so an un-pulled TikTok
-    // account shows "no report yet" instead of the Instagram snapshot).
+    // prefer the account-tagged snapshot; fall back to legacy (untagged) ONLY
+    // when allowed — legacy snapshots are all Instagram (pre-account-tagging),
+    // so TikTok must NOT fall back to them (would show IG data).
     let data = accountId ? await run("account") : await run("any");
-    if (!data && accountId) data = await run("legacy");
+    if (!data && accountId && allowLegacy) data = await run("legacy");
     if (!data) return null;
     return {
       id: String(data.id),

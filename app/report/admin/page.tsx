@@ -67,11 +67,13 @@ export default async function ReportAdminDashboard({
   let configured: string[] = [];
   if (!addMode && selectedAccounts.length) {
     if (combined) {
-      const snaps = await Promise.all(selectedAccounts.map((a) => getLatestSnapshot(a.clientId, a.id)));
+      const snaps = await Promise.all(
+        selectedAccounts.map((a) => getLatestSnapshot(a.clientId, a.id, a.platform !== "tiktok")),
+      );
       metrics = aggregateMetrics(snaps.filter(Boolean).map((s) => s!.data), `Gabungan · ${selectedAccounts.length} akun`);
     } else if (primaryAcc) {
       const [snap, cfg] = await Promise.all([
-        getLatestSnapshot(primaryAcc.clientId, primaryAcc.id),
+        getLatestSnapshot(primaryAcc.clientId, primaryAcc.id, primaryAcc.platform !== "tiktok"),
         getConfiguredProviders(primaryAcc.clientId),
       ]);
       metrics = snap?.data ?? null;
