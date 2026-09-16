@@ -6,6 +6,8 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { fetchZernioMetrics, listZernioAccounts, type ZernioAccount } from "@/lib/report/zernio";
 import { CLIENT_PROVIDERS } from "@/lib/report/config";
+import { getReportRules, saveReportRules, saveTemplateName } from "@/lib/report/rules";
+import type { ReportRule } from "@/lib/report/types";
 
 function slugify(s: string): string {
   return (
@@ -38,6 +40,42 @@ export async function checkZernioConnection(
   const key = (apiKey ?? "").trim();
   if (!key) return { ok: false, accounts: [], error: "Isi Zernio API key dulu." };
   return listZernioAccounts(key);
+}
+
+/* ------------------------------ report settings ---------------------------- */
+
+/** Add or update a report rule (formula). */
+export async function saveReportRule(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const rules = await getReportRules();
+  const id = String(formData.get("id") ?? "").trim() || randomUUID().slice(0, 8);
+  const rule: ReportRule = {
+    id,
+    label: String(formData.get("label") ?? "").trim() || "Rule",
+    metric: String(formData.get("metric") ?? "reach").trim(),
+    direction: String(formData.get("direction") ?? "up") === "down" ? "down" : "up",
+    thresholdPct: Number(formData.get("thresholdPct") ?? 0) || 0,
+    color: String(formData.get("color") ?? "").trim() || "#6AA84F",
+    note: String(formData.get("note") ?? "").trim() || undefined,
+  };
+  const next = rules.some((r) => r.id === id) ? rules.map((r) => (r.id === id ? rule : r)) : [...rules, rule];
+  await saveReportRules(next);
+  revalidatePath("/report/admin/report-settings");
+}
+
+export async function deleteReportRule(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  const rules = await getReportRules();
+  await saveReportRules(rules.filter((r) => r.id !== id));
+  revalidatePath("/report/admin/report-settings");
+}
+
+export async function saveReportTemplate(formData: FormData): Promise<void> {
+  await requireAdmin();
+  await saveTemplateName(String(formData.get("template_name") ?? "").trim());
+  revalidatePath("/report/admin/report-settings");
 }
 
 /**
@@ -183,8 +221,13 @@ export async function generateReport(formData: FormData): Promise<void> {
   await requireAdmin();
   if (!isSupabaseAdminConfigured()) return;
   const id = String(formData.get("id") ?? "");
-  const period = String(formData.get("period") ?? "last_30d").trim() || "last_30d";
   if (!id) return;
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+  const rawSince = String(formData.get("since") ?? "").trim();
+  const rawUntil = String(formData.get("until") ?? "").trim();
+  const since = dateRe.test(rawSince) ? rawSince : undefined;
+  const until = dateRe.test(rawUntil) ? rawUntil : undefined;
+  const period = since && until ? `${since} → ${until}` : String(formData.get("period") ?? "last_30d").trim() || "last_30d";
   const db = createSupabaseAdminClient();
   const { data: keys } = await db
     .from("report_client_settings")
@@ -196,6 +239,8 @@ export async function generateReport(formData: FormData): Promise<void> {
   const metrics = await fetchZernioMetrics({
     apiKey: map.zernio ?? null,
     accountId: map.zernio_account_id ?? null,
+    since,
+    until,
     period,
   });
   await db.from("report_snapshots").insert({ client_id: id, period, data: metrics, source: "zernio" });

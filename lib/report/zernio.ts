@@ -68,6 +68,8 @@ const METRICS = [
   "shares",
   "follows_and_unfollows",
   "profile_links_taps",
+  "replies",
+  "reposts",
 ].join(",");
 
 function metricsToTotals(mx: Record<string, unknown>): MetricTotals {
@@ -77,14 +79,17 @@ function metricsToTotals(mx: Record<string, unknown>): MetricTotals {
   return {
     posts: 0,
     reach,
-    impressions: null, // Zernio does not expose impressions/views for IG here
+    impressions: null, // Zernio does not expose impressions/views at account level
     likes: num(mx.likes),
     comments: num(mx.comments),
     shares: num(mx.shares),
     saved: num(mx.saves),
-    profileVisits: null, // not a valid Zernio metric
+    profileVisits: null, // not a valid account-level Zernio metric
     follows: num(mx.follows_and_unfollows),
     webClicks: num(mx.profile_links_taps),
+    accountsEngaged: num(mx.accounts_engaged),
+    replies: num(mx.replies),
+    reposts: num(mx.reposts),
     totalInteractions,
     erReach: reach && totalInteractions ? totalInteractions / reach : null,
   };
@@ -113,8 +118,8 @@ export async function listZernioAccounts(apiKey: string): Promise<{ ok: boolean;
     }
     const j = (await res.json()) as Record<string, unknown>;
     const list = (j.accounts ?? j.data ?? []) as Record<string, unknown>[];
+    // Show ALL platforms (Instagram, TikTok, …) so the user can pick any account.
     const accounts = (Array.isArray(list) ? list : [])
-      .filter((a) => String(a.platform ?? "").toLowerCase() === "instagram" || !a.platform)
       .map((a) => ({
         id: String(a._id ?? a.id ?? ""),
         username: (a.username as string) ?? null,
@@ -133,6 +138,8 @@ export async function fetchZernioMetrics(opts: {
   apiKey: string | null;
   accountId: string | null;
   period?: string;
+  since?: string; // explicit range (YYYY-MM-DD) from the calendar picker
+  until?: string;
 }): Promise<ReportMetrics> {
   const period = opts.period ?? "last_30d";
   const base = baseUrl();
@@ -144,7 +151,9 @@ export async function fetchZernioMetrics(opts: {
   }
   const { apiKey, accountId } = opts;
   const AH = { Authorization: `Bearer ${apiKey}`, Accept: "application/json" };
-  const { since, until } = dateRange(period);
+  // Explicit calendar range wins; otherwise derive from the period label.
+  const { since, until } =
+    opts.since && opts.until ? { since: opts.since, until: opts.until } : dateRange(period);
   const insightsUrl = (extra: Record<string, string>) => {
     const qs = new URLSearchParams({ accountId, metrics: METRICS, metricType: "total_value", ...extra });
     if (since) qs.set("since", since);
@@ -164,10 +173,18 @@ export async function fetchZernioMetrics(opts: {
 
     // Everything else best-effort in parallel (a failure just omits that section).
     const settle = <T>(p: Promise<T>): Promise<T | null> => p.then((x) => x).catch(() => null);
-    const [ctJson, ftJson, tsJson, postsJson, accts] = await Promise.all([
-      settle(getJson(`${base}/v1/analytics/instagram/account-insights?accountId=${accountId}&metrics=reach,total_interactions&metricType=total_value&breakdown=media_product_type${since ? `&since=${since}` : ""}${until ? `&until=${until}` : ""}`)),
-      settle(getJson(`${base}/v1/analytics/instagram/account-insights?accountId=${accountId}&metrics=reach&metricType=total_value&breakdown=follow_type${since ? `&since=${since}` : ""}${until ? `&until=${until}` : ""}`)),
-      settle(getJson(insightsUrl({ metrics: "reach", metricType: "time_series" }))),
+    const range = `${since ? `&since=${since}` : ""}${until ? `&until=${until}` : ""}`;
+    const bd = (metrics: string, breakdown: string) =>
+      `${base}/v1/analytics/instagram/account-insights?accountId=${accountId}&metrics=${metrics}&metricType=total_value&breakdown=${breakdown}${range}`;
+    const fhUrl = `${base}/v1/analytics/instagram/follower-history?accountId=${accountId}&metrics=follower_count,followers_gained,followers_lost&metricType=time_series${range}`;
+    const demoUrl = `${base}/v1/analytics/instagram/demographics?accountId=${accountId}&metric=follower_demographics&breakdown=age,city,country,gender`;
+    const [ctJson, ftJson, cbJson, tsJson, fhJson, demoJson, postsJson, accts] = await Promise.all([
+      settle(getJson(bd("reach,total_interactions", "media_product_type"))),
+      settle(getJson(bd("reach", "follow_type"))),
+      settle(getJson(bd("profile_links_taps", "contact_button_type"))),
+      settle(getJson(insightsUrl({ metrics: "reach", metricType: "time_series" }))), // only reach supports time_series
+      settle(getJson(fhUrl)),
+      settle(getJson(demoUrl)),
       settle(getJson(`${base}/v1/analytics?platform=instagram&accountId=${accountId}&limit=50`)),
       settle(listZernioAccounts(apiKey!)),
     ]);
@@ -194,12 +211,56 @@ export async function fetchZernioMetrics(opts: {
       discovery = { followers: find("FOLLOWER"), nonFollowers: find("NON_FOLLOWER") };
     }
 
-    // daily reach series
-    let reachSeries = null as null | { date: string; value: number }[];
-    if (tsJson) {
-      const vals = (((tsJson.metrics ?? {}) as Record<string, Record<string, unknown>>).reach?.values ?? []) as Record<string, unknown>[];
-      reachSeries = vals.map((v) => ({ date: String(v.date), value: num(v.value) ?? 0 }));
+    // contact-button breakdown (how profile taps split)
+    let contactButtons = null as null | { type: string; value: number }[];
+    if (cbJson) {
+      const rB = (((cbJson.metrics ?? {}) as Record<string, Record<string, unknown>>).profile_links_taps?.breakdowns ?? []) as Record<string, unknown>[];
+      const list = rB.map((b) => ({ type: String(b.dimension), value: num(b.value) ?? 0 })).filter((x) => x.value > 0);
+      if (list.length) contactButtons = list;
     }
+
+    // daily series helper
+    const seriesOf = (j: Record<string, unknown> | null, key: string) => {
+      if (!j) return null;
+      const vals = (((j.metrics ?? {}) as Record<string, Record<string, unknown>>)[key]?.values ?? []) as Record<string, unknown>[];
+      return vals.length ? vals.map((v) => ({ date: String(v.date), value: num(v.value) ?? 0 })) : null;
+    };
+    const reachSeries = seriesOf(tsJson, "reach");
+
+    // follower history: daily count + gained/lost totals; refine the follower number
+    const followerSeries = seriesOf(fhJson, "follower_count");
+    const fhm = (fhJson?.metrics ?? {}) as Record<string, Record<string, unknown>>;
+    const sumVals = (k: string) => {
+      const vals = (fhm[k]?.values ?? []) as Record<string, unknown>[];
+      return vals.length ? vals.reduce((a, v) => a + (num(v.value) ?? 0), 0) : num(fhm[k]?.total);
+    };
+    const followersGained = sumVals("followers_gained");
+    const followersLost = sumVals("followers_lost");
+    const latestFollowers = followerSeries?.length ? followerSeries[followerSeries.length - 1].value : null;
+
+    // audience demographics (age / gender / city / country)
+    let demographics = null as null | {
+      ages?: { name: string; value: number }[];
+      genders?: { name: string; value: number }[];
+      cities?: { name: string; value: number }[];
+      countries?: { name: string; value: number }[];
+    };
+    if (demoJson?.demographics) {
+      const d = demoJson.demographics as Record<string, Record<string, unknown>[]>;
+      const conv = (arr?: Record<string, unknown>[]) =>
+        (arr ?? []).map((x) => ({ name: String(x.dimension ?? x.name), value: num(x.value) ?? 0 })).filter((x) => x.value > 0);
+      demographics = {
+        ages: conv(d.age),
+        genders: conv(d.gender),
+        cities: conv(d.city).slice(0, 6),
+        countries: conv(d.country).slice(0, 6),
+      };
+    }
+
+    // impressions come from the unified overview (not account-insights)
+    const overview = (postsJson?.overview ?? {}) as Record<string, unknown>;
+    const ovImpr = num(overview.totalImpressions);
+    if (ovImpr != null) totals.impressions = ovImpr;
 
     // per-post analytics
     const posts: PostMetric[] = [];
@@ -237,12 +298,20 @@ export async function fetchZernioMetrics(opts: {
       connected: true,
       provider: "zernio",
       period: dr.since && dr.until ? `${dr.since} → ${dr.until}` : period,
-      account: { username: acct?.username ?? acct?.displayName ?? null, followers: acct?.followers ?? null },
+      account: {
+        username: acct?.username ?? acct?.displayName ?? null,
+        followers: latestFollowers ?? acct?.followers ?? null,
+      },
       posts,
       totals,
       discovery,
       byContentType,
       reachSeries,
+      followerSeries,
+      followersGained,
+      followersLost,
+      contactButtons,
+      demographics,
       fetchedAt: new Date().toISOString(),
     };
   } catch (e) {

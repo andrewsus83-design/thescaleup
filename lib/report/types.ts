@@ -55,8 +55,19 @@ export type MetricTotals = {
   profileVisits: number | null;
   follows: number | null;
   webClicks: number | null;
+  accountsEngaged: number | null;
+  replies: number | null;
+  reposts: number | null;
   totalInteractions: number | null;
   erReach: number | null; // total interactions / reach
+};
+
+/** Audience demographic breakdown (top values), when Zernio exposes it. */
+export type Demographics = {
+  cities?: { name: string; value: number }[];
+  countries?: { name: string; value: number }[];
+  ages?: { name: string; value: number }[];
+  genders?: { name: string; value: number }[];
 };
 
 /** Normalized report payload — what a connected provider returns, or a not-connected state. */
@@ -72,6 +83,11 @@ export type ReportMetrics = {
   discovery?: DiscoverySplit | null; // reach followers vs non-followers
   byContentType?: ContentTypeStat[] | null; // reach/interactions per POST/STORY/REEL/CAROUSEL
   reachSeries?: SeriesPoint[] | null; // daily reach
+  followerSeries?: SeriesPoint[] | null; // daily follower count
+  followersGained?: number | null;
+  followersLost?: number | null;
+  contactButtons?: { type: string; value: number }[] | null; // profile-tap breakdown
+  demographics?: Demographics | null; // audience breakdown
   fetchedAt?: string;
 };
 
@@ -83,6 +99,29 @@ export type ReportSnapshot = {
   source: string;
   createdAt: string;
 };
+
+/** A configurable report rule/formula (e.g. "Juara 1 if reach naik ≥ 25%"). */
+export type ReportRule = {
+  id: string;
+  label: string; // e.g. "Juara 1"
+  metric: string; // reach | impressions | total_interactions | engagement_rate | followers | likes | comments | saves | shares
+  direction: "up" | "down"; // naik / turun
+  thresholdPct: number; // e.g. 25 → ≥ 25% change over the selected date range
+  color?: string; // highlight color (hex)
+  note?: string;
+};
+
+export const RULE_METRICS: { value: string; label: string }[] = [
+  { value: "reach", label: "Reach" },
+  { value: "impressions", label: "Impressions" },
+  { value: "total_interactions", label: "Total Interaksi" },
+  { value: "engagement_rate", label: "Engagement Rate" },
+  { value: "followers", label: "Followers" },
+  { value: "likes", label: "Likes" },
+  { value: "comments", label: "Komentar" },
+  { value: "saves", label: "Saved" },
+  { value: "shares", label: "Shares" },
+];
 
 export const CLIENT_STATUSES: Record<string, { label: string; badge: string }> = {
   pending: { label: "Belum konek", badge: "bg-amber-100 text-amber-700 border-amber-200" },

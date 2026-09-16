@@ -1,0 +1,46 @@
+import { requireAdmin } from "@/lib/admin/auth";
+import { getClient, getClientKey } from "@/lib/report/data";
+import { getReportRules } from "@/lib/report/rules";
+import { fetchZernioMetrics } from "@/lib/report/zernio";
+import { buildReportWorkbook } from "@/lib/report/excel";
+
+export const dynamic = "force-dynamic";
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin();
+  const { id } = await params;
+  const client = await getClient(id);
+  if (!client) return new Response("Not found", { status: 404 });
+
+  const url = new URL(req.url);
+  const sinceQ = url.searchParams.get("since") ?? "";
+  const untilQ = url.searchParams.get("until") ?? "";
+  const since = DATE.test(sinceQ) ? sinceQ : undefined;
+  const until = DATE.test(untilQ) ? untilQ : undefined;
+
+  const [apiKey, accountId, rules] = await Promise.all([
+    getClientKey(id, "zernio"),
+    getClientKey(id, "zernio_account_id"),
+    getReportRules(),
+  ]);
+
+  const metrics = await fetchZernioMetrics({ apiKey, accountId, since, until, period: since && until ? `${since} → ${until}` : "last_30d" });
+  if (!metrics.connected) {
+    return new Response(`Tidak bisa menarik report: ${metrics.reason ?? "belum terkoneksi Zernio"}`, {
+      status: 422,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+
+  const buf = await buildReportWorkbook(client, metrics, rules);
+  const fname = `${client.slug}-report-${until ?? "latest"}.xlsx`;
+  return new Response(new Uint8Array(buf), {
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${fname}"`,
+      "Cache-Control": "no-store",
+    },
+  });
+}

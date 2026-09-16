@@ -1,14 +1,18 @@
 import Link from "next/link";
-import { Plus, ExternalLink, Settings2, RefreshCw, LayoutGrid } from "lucide-react";
+import { Plus, ExternalLink, Settings2, LayoutGrid, SlidersHorizontal } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
 import { isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { listClients, getLatestSnapshot, getConfiguredProviders } from "@/lib/report/data";
-import { generateReport } from "@/lib/report/actions";
 import { CLIENT_STATUSES } from "@/lib/report/types";
 import { BrandPicker } from "@/components/report/brand-picker";
 import { ReportDashboard } from "@/components/report/report-dashboard";
 import { AddBrandForm } from "@/components/report/add-brand-form";
 import { DeleteBrandButton } from "@/components/report/delete-brand-button";
+import { DateRangeForm } from "@/components/report/date-range-form";
+
+function isoDaysAgo(base: Date, days: number) {
+  return new Date(base.getTime() - days * 86400000).toISOString().slice(0, 10);
+}
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +33,10 @@ export default async function ReportAdminDashboard({
       ? await Promise.all([getLatestSnapshot(selected.id), getConfiguredProviders(selected.id)])
       : [null, [] as string[]];
 
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const defSince = isoDaysAgo(now, 29);
+
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
       {/* header */}
@@ -42,11 +50,17 @@ export default async function ReportAdminDashboard({
             <p className="text-sm text-slate-500">Report analytics per brand · {admin.email}</p>
           </div>
         </div>
-        {/* pick / add brand — top right */}
-        <BrandPicker
-          brands={clients.map((c) => ({ id: c.id, name: c.name }))}
-          selectedId={selected?.id}
-        />
+        {/* setting (report template + rules) · pick / add brand — top right */}
+        <div className="flex items-center gap-2">
+          <Link
+            href="/report/admin/report-settings"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            title="Setting template & rumus report"
+          >
+            <SlidersHorizontal className="h-4 w-4" /> Setting
+          </Link>
+          <BrandPicker brands={clients.map((c) => ({ id: c.id, name: c.name }))} selectedId={selected?.id} />
+        </div>
       </div>
 
       {!isSupabaseAdminConfigured() && (
@@ -78,29 +92,11 @@ export default async function ReportAdminDashboard({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <form action={generateReport} className="flex items-center gap-2">
-                <input type="hidden" name="id" value={selected.id} />
-                <select
-                  name="period"
-                  defaultValue="last_30d"
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#2A2870]"
-                >
-                  <option value="last_30d">30 hari</option>
-                  <option value="2026-08">Agustus 2026</option>
-                  <option value="2026-07">Juli 2026</option>
-                  <option value="last_90d">90 hari</option>
-                </select>
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#2A2870] px-3 py-2 text-sm font-semibold text-white hover:bg-[#211f5c]"
-                >
-                  <RefreshCw className="h-4 w-4" /> Tarik data
-                </button>
-              </form>
+              <DateRangeForm clientId={selected.id} defaultSince={defSince} defaultUntil={today} today={today} />
               <Link
                 href={`/report/admin/${selected.id}/settings`}
                 className="rounded-lg border border-slate-200 px-3 py-2 text-slate-600 hover:bg-slate-50"
-                title="Setting API"
+                title="Setting API klien"
               >
                 <Settings2 className="h-4 w-4" />
               </Link>

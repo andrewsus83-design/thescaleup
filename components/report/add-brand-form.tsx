@@ -97,12 +97,19 @@ export function AddBrandForm({ hasClients }: { hasClients?: boolean }) {
                   profileId === a.id ? "border-[#2A2870] bg-white" : "border-transparent bg-white/60 hover:bg-white"
                 }`}
               >
-                <span>
-                  <span className="font-semibold text-slate-800">{a.displayName ?? a.username ?? "Akun"}</span>{" "}
-                  {a.username && <span className="text-slate-500">@{a.username}</span>}
-                  {a.followers != null && (
-                    <span className="text-slate-400"> · {a.followers.toLocaleString("id-ID")} followers</span>
+                <span className="flex items-center gap-2">
+                  {a.platform && (
+                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+                      {a.platform}
+                    </span>
                   )}
+                  <span>
+                    <span className="font-semibold text-slate-800">{a.displayName ?? a.username ?? "Akun"}</span>{" "}
+                    {a.username && <span className="text-slate-500">@{a.username}</span>}
+                    {a.followers != null && (
+                      <span className="text-slate-400"> · {a.followers.toLocaleString("id-ID")} followers</span>
+                    )}
+                  </span>
                 </span>
                 {profileId === a.id && <Check className="h-4 w-4 text-[#2A2870]" />}
               </button>

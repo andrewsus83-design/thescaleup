@@ -26,6 +26,63 @@ function Tile({ label, value, accent }: { label: string; value: string; accent?:
   );
 }
 
+/** Simple SVG line chart of a daily series. */
+function FollowerLine({ series, color }: { series: { date: string; value: number }[]; color: string }) {
+  const vals = series.map((s) => s.value);
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const span = max - min || 1;
+  const w = 600;
+  const h = 60;
+  const pts = series
+    .map((s, i) => `${(i / (series.length - 1)) * w},${h - ((s.value - min) / span) * (h - 8) - 4}`)
+    .join(" ");
+  return (
+    <div>
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-16 w-full">
+        <polyline points={pts} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <div className="mt-1 flex justify-between text-[11px] text-slate-400">
+        <span>{series[0]?.date}</span>
+        <span>{series[series.length - 1]?.date}</span>
+      </div>
+    </div>
+  );
+}
+
+/** Horizontal bar list of top demographic values. */
+function BarList({
+  title,
+  items,
+  color,
+}: {
+  title: string;
+  items?: { name: string; value: number }[];
+  color: string;
+}) {
+  const list = (items ?? []).slice(0, 5);
+  const total = list.reduce((a, x) => a + x.value, 0) || 1;
+  if (!list.length) return null;
+  return (
+    <div>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>
+      <div className="space-y-1.5">
+        {list.map((x) => (
+          <div key={x.name}>
+            <div className="mb-0.5 flex justify-between text-xs">
+              <span className="truncate text-slate-600">{x.name}</span>
+              <span className="text-slate-400">{Math.round((x.value / total) * 100)}%</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full" style={{ width: `${(x.value / total) * 100}%`, backgroundColor: color }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ReportDashboard({
   metrics,
   brandColor = "#2A2870",
@@ -79,15 +136,16 @@ export function ReportDashboard({
       {/* top-line tiles */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <Tile label="Reach" value={fmt(t?.reach)} accent={brandColor} />
+        <Tile label="Impressions" value={fmt(t?.impressions)} />
         <Tile label="Total Interaksi" value={fmt(t?.totalInteractions)} accent={accentColor} />
         <Tile label="ER (Reach)" value={pct(t?.erReach)} />
+        <Tile label="Accounts Engaged" value={fmt(t?.accountsEngaged)} />
         <Tile label="Likes" value={fmt(t?.likes)} />
         <Tile label="Komentar" value={fmt(t?.comments)} />
         <Tile label="Shares" value={fmt(t?.shares)} />
         <Tile label="Saved" value={fmt(t?.saved)} />
         <Tile label="Follows" value={fmt(t?.follows)} />
         <Tile label="Web Clicks" value={fmt(t?.webClicks)} />
-        <Tile label="Impressions" value={fmt(t?.impressions)} />
         <Tile label="Jumlah Post" value={fmt(t?.posts)} />
       </div>
 
@@ -140,6 +198,59 @@ export function ReportDashboard({
           </div>
         )}
       </div>
+
+      {/* follower growth */}
+      {(metrics.followerSeries?.length || metrics.followersGained != null) && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-slate-700">Pertumbuhan Follower</p>
+            <div className="flex gap-4 text-sm">
+              {metrics.followersGained != null && (
+                <span className="text-emerald-600">+{fmt(metrics.followersGained)} gained</span>
+              )}
+              {metrics.followersLost != null && <span className="text-red-500">−{fmt(metrics.followersLost)} lost</span>}
+              {metrics.account?.followers != null && (
+                <span className="font-semibold" style={{ color: brandColor }}>
+                  {fmt(metrics.account.followers)} total
+                </span>
+              )}
+            </div>
+          </div>
+          {metrics.followerSeries && metrics.followerSeries.length > 1 && (
+            <FollowerLine series={metrics.followerSeries} color={brandColor} />
+          )}
+        </div>
+      )}
+
+      {/* audience demographics */}
+      {metrics.demographics &&
+        ((metrics.demographics.ages?.length ?? 0) > 0 ||
+          (metrics.demographics.cities?.length ?? 0) > 0 ||
+          (metrics.demographics.genders?.length ?? 0) > 0) && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <p className="mb-4 text-sm font-semibold text-slate-700">Audiens (Followers)</p>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <BarList title="Umur" items={metrics.demographics.ages} color={brandColor} />
+              <BarList title="Gender" items={metrics.demographics.genders} color={accentColor} />
+              <BarList title="Kota" items={metrics.demographics.cities} color={brandColor} />
+              <BarList title="Negara" items={metrics.demographics.countries} color={accentColor} />
+            </div>
+          </div>
+        )}
+
+      {/* contact buttons */}
+      {metrics.contactButtons && metrics.contactButtons.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="mb-3 text-sm font-semibold text-slate-700">Tap Tombol Kontak (Profil)</p>
+          <div className="flex flex-wrap gap-2">
+            {metrics.contactButtons.map((c) => (
+              <span key={c.type} className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">
+                {c.type}: <b>{fmt(c.value)}</b>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* reach trend */}
       {series.length > 1 && (
