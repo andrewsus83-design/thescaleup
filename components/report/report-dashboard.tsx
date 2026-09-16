@@ -9,6 +9,8 @@ import {
   bestDayTime,
   reelRows,
   overlapRows,
+  topMovers,
+  type Mover,
   totalInteraction as tiOf,
 } from "@/lib/report/derive";
 
@@ -225,6 +227,41 @@ function OverlapTable({
   );
 }
 
+/** List of post movers (drivers up / drags down) with an auto-reason. */
+function MoverList({ title, tone, rows, accent }: { title: string; tone: "up" | "down"; rows: Mover[]; accent: string }) {
+  const Icon = tone === "up" ? TrendingUp : TrendingDown;
+  if (!rows.length) return null;
+  return (
+    <div>
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: accent }}>
+        <Icon className="h-3.5 w-3.5" /> {title}
+      </p>
+      <div className="space-y-2">
+        {rows.map((m, i) => (
+          <div key={i} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[11px] text-slate-500">
+                {m.post.date}
+                {m.post.pillar ? ` · ${m.post.pillar}` : ""}
+              </p>
+              <span className="shrink-0 text-[11px] font-semibold" style={{ color: accent }}>
+                {fmt(m.reach)} reach · {Math.round(m.shareOfReach * 100)}%
+              </span>
+            </div>
+            <p className="mt-0.5 line-clamp-2 text-sm text-slate-700">{m.post.caption || "—"}</p>
+            <p className="mt-1 text-[11px] text-slate-500">
+              ER {m.er != null ? (m.er * 100).toFixed(1) + "%" : "—"} · Total Interaksi {fmt(m.ti)}
+            </p>
+            <p className="mt-1 text-[11px]" style={{ color: accent }}>
+              {m.reason}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ReportDashboard({
   metrics,
   brandColor = "#2A2870",
@@ -271,6 +308,7 @@ export function ReportDashboard({
   const qScore = qualityScore(posts);
   const bestTime = bestDayTime(posts);
   const reels = reelRows(posts);
+  const movers = topMovers(posts);
   const genderOverlap = overlapRows(metrics.demographics?.genders, metrics.engagedDemographics?.genders);
   const ageOverlap = overlapRows(metrics.demographics?.ages, metrics.engagedDemographics?.ages);
   const netGrowth =
@@ -385,6 +423,20 @@ export function ReportDashboard({
             ))}
           </div>
           <p className="mt-2 text-[11px] text-slate-400">Dibandingkan dengan periode sepanjang yang sama tepat sebelum rentang tanggal ini.</p>
+        </div>
+      )}
+
+      {/* CMO: post movers — what drove results up / down */}
+      {movers && (movers.up.length > 0 || movers.down.length > 0) && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <SectionTitle info="movers">Post Pendorong &amp; Penyeret</SectionTitle>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <MoverList title="Pendorong (Naik)" tone="up" rows={movers.up} accent="#16A34A" />
+            <MoverList title="Penyeret (Turun)" tone="down" rows={movers.down} accent="#DC2626" />
+          </div>
+          <p className="mt-3 text-[11px] text-slate-400">
+            Rata-rata reach periode: <b>{fmt(Math.round(movers.avgReach))}</b>. Pendorong = jauh di atas rata-rata; penyeret = di bawahnya.
+          </p>
         </div>
       )}
 

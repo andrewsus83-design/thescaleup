@@ -119,6 +119,60 @@ export function reelRows(posts: PostMetric[]): ReelRow[] {
     .sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
 }
 
+// Post movers — which posts pulled the period's numbers up vs dragged them down.
+export type Mover = {
+  post: PostMetric;
+  reach: number;
+  ti: number;
+  er: number | null; // ti / reach
+  shareOfReach: number; // reach / total reach in period
+  reason: string;
+};
+export type Movers = { up: Mover[]; down: Mover[]; avgReach: number } | null;
+
+function moverReasonUp(m: Mover, avg: number): string {
+  const p = m.post, reach = m.reach;
+  const sr = reach ? (p.saved ?? 0) / reach : 0;
+  const shr = reach ? (p.shares ?? 0) / reach : 0;
+  const bits: string[] = [];
+  if (avg > 0 && reach >= avg * 1.4) bits.push(`reach ${(reach / avg).toFixed(1)}× rata-rata`);
+  if (shr >= 0.005) bits.push("banyak dibagikan (viral)");
+  if (sr >= 0.005) bits.push("banyak disimpan (bernilai)");
+  if (m.er != null && m.er >= 0.05) bits.push(`ER ${(m.er * 100).toFixed(1)}% kuat`);
+  if (!bits.length) bits.push("kontributor reach terbesar");
+  return bits.join(" · ");
+}
+function moverReasonDown(m: Mover, avg: number): string {
+  const reach = m.reach;
+  const bits: string[] = [avg > 0 ? `reach ${Math.round((reach / avg) * 100)}% dari rata-rata` : "reach rendah"];
+  if (m.er != null && m.er < 0.02) bits.push("engagement rendah");
+  else if (m.er != null && m.er >= 0.05) bits.push("ER bagus tapi jangkauan kecil");
+  return bits.join(" · ");
+}
+
+/** Top posts driving results up vs underperformers dragging them down. */
+export function topMovers(posts: PostMetric[], n = 3): Movers {
+  const valid = posts.filter((p) => (p.reach ?? 0) > 0);
+  if (valid.length < 2) return null;
+  const totalReach = valid.reduce((s, p) => s + (p.reach ?? 0), 0);
+  const avgReach = totalReach / valid.length;
+  const enrich = (p: PostMetric): Mover => {
+    const reach = p.reach ?? 0;
+    const ti = totalInteraction(p);
+    return { post: p, reach, ti, er: reach ? ti / reach : null, shareOfReach: totalReach ? reach / totalReach : 0, reason: "" };
+  };
+  const byReach = valid.map(enrich).sort((a, b) => b.reach - a.reach);
+  const up = byReach.slice(0, n).map((m) => ({ ...m, reason: moverReasonUp(m, avgReach) }));
+  const upSet = new Set(up.map((m) => m.post));
+  // drags = below-average posts NOT already counted as drivers, worst first
+  const down = byReach
+    .filter((m) => !upSet.has(m.post) && m.reach < avgReach)
+    .slice(-n)
+    .reverse()
+    .map((m) => ({ ...m, reason: moverReasonDown(m, avgReach) }));
+  return { up, down, avgReach };
+}
+
 export type OverlapRow = { name: string; follower: number; engaged: number; gap: number };
 export function overlapRows(
   follower?: { name: string; value: number }[],

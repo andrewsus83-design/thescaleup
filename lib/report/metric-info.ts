@@ -140,6 +140,13 @@ export const METRIC_INFO: Record<string, MetricInfo> = {
     benchmark: "Perbanyak pillar dengan reach/interaksi tertinggi.",
     relation: "Hubungkan tema konten dengan hasil.",
   },
+  movers: {
+    label: "Post Pendorong & Penyeret",
+    desc: "Post yang paling menaikkan hasil periode ini (reach terbesar) vs yang menyeret turun (reach di bawah rata-rata) — biar ketahuan kalau ada yang bagus atau buruk.",
+    rumus: "peringkat berdasarkan reach, dibandingkan rata-rata reach periode",
+    benchmark: "Tiru pola post pendorong; evaluasi topik/hook post penyeret.",
+    relation: "Menjelaskan PENYEBAB perubahan angka (something good/bad happened).",
+  },
 };
 
 /** Plain-text version of a metric's info for an Excel cell note. */

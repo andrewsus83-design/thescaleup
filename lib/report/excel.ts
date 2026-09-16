@@ -1,7 +1,7 @@
 import "server-only";
 import ExcelJS from "exceljs";
 import type { ReportClient, ReportMetrics, ReportRule, PostMetric } from "@/lib/report/types";
-import { efficiency, computeDeltas, qualityScore, bestDayTime, reelRows, overlapRows, totalInteraction } from "@/lib/report/derive";
+import { efficiency, computeDeltas, qualityScore, bestDayTime, reelRows, overlapRows, topMovers, totalInteraction } from "@/lib/report/derive";
 import { infoNote } from "@/lib/report/metric-info";
 
 function argb(hex: string) {
@@ -386,6 +386,27 @@ function buildInsights(wb: ExcelJS.Workbook, metrics: ReportMetrics) {
       ["Saved", deltas.saved],
       ["Shares", deltas.shares],
     ] as [string, number | null][]).forEach(([k, d]) => kv(k, deltaS(d)));
+    row++;
+  }
+
+  // 2b) Post movers — what drove results up / down
+  const movers = topMovers(posts);
+  if (movers && (movers.up.length || movers.down.length)) {
+    section("POST PENDORONG & PENYERET", "#E6E0FF", "movers");
+    headerRow(["Arah", "Tanggal", "Reach", "% Reach", "ER", "Alasan"]);
+    const writeMover = (arah: string, m: (typeof movers.up)[number]) => {
+      ws.getCell(row, 1).value = arah;
+      ws.getCell(row, 2).value = m.post.date;
+      ws.getCell(row, 3).value = m.reach;
+      ws.getCell(row, 3).numFmt = "#,##0";
+      ws.getCell(row, 4).value = Math.round(m.shareOfReach * 100) + "%";
+      ws.getCell(row, 5).value = m.er != null ? (m.er * 100).toFixed(1) + "%" : "—";
+      ws.getCell(row, 6).value = m.reason;
+      row++;
+    };
+    movers.up.forEach((m) => writeMover("↑ Naik", m));
+    movers.down.forEach((m) => writeMover("↓ Turun", m));
+    kv("Rata-rata reach periode", Math.round(movers.avgReach), undefined, false);
     row++;
   }
 
