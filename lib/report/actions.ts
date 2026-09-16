@@ -30,25 +30,58 @@ async function uniqueSlug(base: string): Promise<string> {
 
 /* --------------------------------- clients -------------------------------- */
 
+/**
+ * Add a client. Per the flow, this only needs the client's Zernio API key +
+ * Zernio profile id — the account handle/name is read FROM Zernio (best-effort
+ * on create; refreshed on each report generation). An optional label can be
+ * given for the list before Zernio resolves the real handle.
+ */
 export async function createClient(formData: FormData): Promise<void> {
   await requireAdmin();
   if (!isSupabaseAdminConfigured()) return;
-  const name = String(formData.get("name") ?? "").trim();
-  if (!name) return;
-  const igHandle = String(formData.get("ig_handle") ?? "").trim().replace(/^@/, "");
+  const zernioKey = String(formData.get("zernio_api_key") ?? "").trim();
+  const profileId = String(formData.get("zernio_account_id") ?? "").trim();
+  if (!zernioKey || !profileId) return;
+  const label = String(formData.get("name") ?? "").trim();
   const brand = String(formData.get("brand_color") ?? "").trim() || "#2A2870";
   const accent = String(formData.get("accent_color") ?? "").trim() || "#38B6F0";
   const db = createSupabaseAdminClient();
+  const now = new Date().toISOString();
+
+  // Best-effort: read the handle/name from Zernio so the client appears named.
+  let name = label || profileId;
+  let igHandle: string | null = null;
+  const metrics = await fetchZernioMetrics({ apiKey: zernioKey, accountId: profileId, period: "last_30d" });
+  if (metrics.connected && metrics.account?.username) {
+    igHandle = metrics.account.username;
+    if (!label) name = metrics.account.username;
+  }
+
   const slug = await uniqueSlug(slugify(name));
-  await db.from("report_clients").insert({
-    slug,
-    name,
-    ig_handle: igHandle || null,
-    brand_color: brand,
-    accent_color: accent,
-    connect_token: randomUUID().replace(/-/g, ""),
-    status: "pending",
-  });
+  const { data: inserted } = await db
+    .from("report_clients")
+    .insert({
+      slug,
+      name,
+      ig_handle: igHandle,
+      brand_color: brand,
+      accent_color: accent,
+      connect_token: randomUUID().replace(/-/g, ""),
+      status: "connected",
+    })
+    .select("id")
+    .maybeSingle();
+
+  const clientId = inserted?.id as string | undefined;
+  if (clientId) {
+    await db.from("report_client_settings").upsert(
+      [
+        { client_id: clientId, key: "zernio", value: zernioKey, updated_at: now },
+        { client_id: clientId, key: "zernio_account_id", value: profileId, updated_at: now },
+      ],
+      { onConflict: "client_id,key" },
+    );
+  }
   revalidatePath("/report/admin");
 }
 
