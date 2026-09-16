@@ -153,11 +153,11 @@ export function AdminLoginForm({ codeFallback = false }: { codeFallback?: boolea
           {error && <p className="mt-4 text-sm text-bad">{error}</p>}
 
           {codeFallback && (
-            <details className="mt-5 border-t border-white/10 pt-4">
-              <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-300">
-                Atau masuk dengan kode akses
-              </summary>
-              <form method="post" action="/admin/access" className="mt-3 flex items-center gap-2">
+            <div className="mt-5 border-t border-white/10 pt-4">
+              <p className="mb-2 flex items-center gap-2 text-xs text-slate-400">
+                <span className="h-px flex-1 bg-white/10" /> atau kode akses <span className="h-px flex-1 bg-white/10" />
+              </p>
+              <form method="post" action="/admin/access" className="flex items-center gap-2">
                 <input
                   type="password"
                   name="code"
@@ -173,7 +173,7 @@ export function AdminLoginForm({ codeFallback = false }: { codeFallback?: boolea
                   Masuk
                 </button>
               </form>
-            </details>
+            </div>
           )}
         </div>
 
