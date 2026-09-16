@@ -22,6 +22,8 @@ export type PostMetric = {
   date: string;
   caption: string;
   format: string; // Image | Carousel | Reels / Video | Post | Story
+  pillar?: string | null; // editorial content pillar (AI-suggested, override-able)
+  followersAtPeriod?: number | null; // running follower count at the post's date
   reach?: number | null;
   impressions?: number | null;
   likes?: number | null;

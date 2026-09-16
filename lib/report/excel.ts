@@ -1,6 +1,6 @@
 import "server-only";
 import ExcelJS from "exceljs";
-import type { ReportClient, ReportMetrics, ReportRule } from "@/lib/report/types";
+import type { ReportClient, ReportMetrics, ReportRule, PostMetric } from "@/lib/report/types";
 
 function argb(hex: string) {
   return "FF" + hex.replace("#", "").toUpperCase().padStart(6, "0").slice(0, 6);
@@ -38,7 +38,10 @@ export async function buildReportWorkbook(
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
-/** Fill the user's uploaded .xlsx: detect the header row, map columns, write per-post data. */
+/** Fill the user's uploaded .xlsx into the raw data columns. Handles multi-row
+ *  merged headers (e.g. Cap Gajah's 3-row header) by combining the header band
+ *  per column and detecting the data start from the date column. Formula columns
+ *  (ER, Total Interaction) are left untouched so Excel recomputes them. */
 async function fillUploadedTemplate(base64: string, metrics: ReportMetrics): Promise<ExcelJS.Workbook | null> {
   try {
     const wb = new ExcelJS.Workbook();
@@ -47,65 +50,101 @@ async function fillUploadedTemplate(base64: string, metrics: ReportMetrics): Pro
     await wb.xlsx.load(ab);
     const ws = wb.worksheets[0];
     if (!ws) return null;
-    // field → header keywords (lowercase, matched by exact/contains)
+
+    // field → header keywords (raw data only; formula cols like ER are left alone)
     const KW: Record<string, string[]> = {
       date: ["date", "tanggal"],
       caption: ["content", "konten", "caption", "judul"],
+      pillar: ["pillar", "pilar"],
+      followersAtPeriod: ["followers on", "followers this period", "follower period", "followers pada"],
       likes: ["likes", "suka"],
       comments: ["comment", "komentar"],
-      shares: ["shared", "share"],
-      saved: ["saved", "save", "simpan"],
-      reach: ["reach", "jangkauan"],
-      impressions: ["impression", "impresi"],
       follows: ["follows", "follow"],
       profileVisits: ["profile visit", "kunjungan profil"],
-      webClicks: ["web click", "link click"],
-      totalInteractions: ["total interaction", "total interaksi"],
+      shares: ["shared", "share"],
+      saved: ["saved", "save", "simpan"],
+      webClicks: ["web click", "website click", "link click", "klik web"],
+      others: ["others", "lainnya"],
+      impressions: ["impression", "impresi"],
+      reach: ["reach", "jangkauan"],
       views: ["views", "tayangan"],
-      engagementRate: ["engagement rate"],
     };
-    let headerRow = 0;
-    let best = 0;
-    let colMap: Record<number, string> = {};
-    for (let r = 1; r <= 25; r++) {
-      const row = ws.getRow(r);
-      const map: Record<number, string> = {};
-      const used = new Set<string>();
-      let matches = 0;
-      row.eachCell((cell, col) => {
-        const txt = String(cell.value ?? "").toLowerCase().trim();
-        if (!txt || map[col]) return;
-        for (const [field, kws] of Object.entries(KW)) {
-          if (used.has(field)) continue;
-          if (kws.some((k) => txt === k || txt.includes(k))) {
-            // "follows" must not match "followers"
-            if (field === "follows" && txt.includes("follower")) continue;
-            map[col] = field;
-            used.add(field);
-            matches++;
-            break;
-          }
+    const cellText = (v: ExcelJS.CellValue): string => {
+      if (v == null) return "";
+      if (typeof v === "object") {
+        const o = v as { richText?: { text: string }[]; text?: string; result?: unknown };
+        if (o.richText) return o.richText.map((t) => t.text).join("");
+        if (o.text) return o.text;
+        return "";
+      }
+      return String(v);
+    };
+    const matchField = (txt: string, used: Set<string>): string | null => {
+      const t = txt.toLowerCase().trim();
+      if (!t) return null;
+      for (const [field, kws] of Object.entries(KW)) {
+        if (used.has(field)) continue;
+        if (kws.some((k) => t === k || t.includes(k))) {
+          if (field === "follows" && t.includes("follower")) continue; // not "followers"
+          return field;
         }
-      });
-      if (matches > best) { best = matches; headerRow = r; colMap = map; }
+      }
+      return null;
+    };
+
+    // find the first data row (col 1 is a date) → header band is everything above it
+    const isDate = (v: ExcelJS.CellValue) =>
+      v instanceof Date || (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v.trim()));
+    let dataStart = 0;
+    for (let r = 2; r <= 40; r++) {
+      if (isDate(ws.getRow(r).getCell(1).value)) { dataStart = r; break; }
     }
-    if (!headerRow || best < 3) return null; // too weak → let caller fall back
+
+    const colMap: Record<number, string> = {};
+    if (dataStart > 1) {
+      // combine header-band text per column (handles merged/multi-row headers)
+      const used = new Set<string>();
+      const cols = Math.max(ws.columnCount, 20);
+      for (let col = 1; col <= cols; col++) {
+        let txt = "";
+        for (let r = 1; r < dataStart; r++) txt += " " + cellText(ws.getRow(r).getCell(col).value);
+        const field = matchField(txt, used);
+        if (field) { colMap[col] = field; used.add(field); }
+      }
+    } else {
+      // fallback: single header row with the most matches (flat templates)
+      let best = 0, headerRow = 0;
+      for (let r = 1; r <= 25; r++) {
+        const map: Record<number, string> = {};
+        const used = new Set<string>();
+        let matches = 0;
+        ws.getRow(r).eachCell((cell, col) => {
+          if (map[col]) return;
+          const field = matchField(cellText(cell.value), used);
+          if (field) { map[col] = field; used.add(field); matches++; }
+        });
+        if (matches > best) { best = matches; headerRow = r; Object.assign(colMap, {}); Object.keys(colMap).forEach((k) => delete colMap[Number(k)]); Object.assign(colMap, map); }
+      }
+      dataStart = headerRow ? headerRow + 1 : 0;
+    }
+    if (!dataStart || Object.keys(colMap).length < 3) return null; // too weak → caller falls back
 
     const posts = [...(metrics.posts ?? [])].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
     // clear old sample data in mapped columns (bounded)
-    for (let r = headerRow + 1; r <= headerRow + 400; r++) {
+    for (let r = dataStart; r <= dataStart + 400; r++) {
       const row = ws.getRow(r);
       for (const col of Object.keys(colMap)) row.getCell(Number(col)).value = null;
     }
     // write data
     posts.forEach((p, i) => {
-      const row = ws.getRow(headerRow + 1 + i);
+      const row = ws.getRow(dataStart + i);
       for (const [colStr, field] of Object.entries(colMap)) {
         const col = Number(colStr);
         let v: unknown = null;
         if (field === "date") v = p.date;
         else if (field === "caption") v = p.caption;
-        else if (field === "engagementRate") v = p.engagementRate != null ? p.engagementRate / 100 : null;
+        else if (field === "pillar") v = p.pillar ?? null;
+        else if (field === "others") v = 0;
         else v = (p as unknown as Record<string, number | null>)[field] ?? null;
         row.getCell(col).value = v as ExcelJS.CellValue;
       }
@@ -116,14 +155,17 @@ async function fillUploadedTemplate(base64: string, metrics: ReportMetrics): Pro
   }
 }
 
-/** Sheet 1 — "Post Master" grouped-header layout matching the uploaded Cap Gajah file. */
+/** Sheet 1 — "Post Master - IG" (Cap Gajah) full 17-column layout, literal values.
+ *  Columns: Date | Content | Pillar | Followers-on-period | Likes | Comments | ER |
+ *  Follows | Profile Visits | Shared | Saved | Web Click | Others | Impressions |
+ *  Reach | Reach-ER | Total Interaction — grouped by month with a per-month total. */
 function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: ReportMetrics, rules: ReportRule[], brand: string) {
   const ws = wb.addWorksheet(`Post Master - ${client.name}`.slice(0, 31));
-  // A Date B Content | C Likes D Comments E ER | F Follows G ProfileVisits H Shared I Saved | J Impr | K Reach L ReachER | M TotalInteraction
-  const widths = [13, 44, 8, 10, 7, 8, 12, 8, 8, 11, 11, 7, 13];
+  const NCOL = 17;
+  const widths = [13, 40, 15, 11, 8, 10, 7, 8, 12, 8, 8, 9, 7, 11, 11, 7, 13];
   widths.forEach((w, i) => (ws.getColumn(i + 1).width = w));
 
-  ws.mergeCells("A1:M1");
+  ws.mergeCells(1, 1, 1, NCOL);
   const t = ws.getCell("A1");
   t.value = `${client.name} — Report ${metrics.platform ?? "Instagram"} · ${metrics.period ?? ""}`;
   t.font = { bold: true, size: 14, color: { argb: "FFFFFFFF" } };
@@ -132,79 +174,131 @@ function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: Re
   ws.getRow(1).height = 26;
 
   // group headers (row 2)
-  const groups: [string, string, string][] = [
-    ["A2:B2", "Content", C.PINK],
-    ["C2:E2", "Engagement", C.ENG],
-    ["F2:I2", "Actions", C.ACT],
-    ["J2:J2", "Impressions", C.IMP],
-    ["K2:L2", "Reach", C.REACH],
-    ["M2:M2", "Total Interaction", C.PURPLE],
+  const groups: [number, number, string, string][] = [
+    [1, 4, "Content", C.PINK],
+    [5, 7, "Engagement", C.ENG],
+    [8, 13, "Actions", C.ACT],
+    [14, 14, "Impressions", C.IMP],
+    [15, 16, "Reach", C.REACH],
+    [17, 17, "Total Interaction", C.PURPLE],
   ];
-  for (const [range, label, color] of groups) {
-    ws.mergeCells(range);
-    const cell = ws.getCell(range.split(":")[0]);
+  for (const [a, b, label, color] of groups) {
+    ws.mergeCells(2, a, 2, b);
+    const cell = ws.getCell(2, a);
     cell.value = label;
     cell.fill = fill(color);
     cell.font = { bold: true, size: 11, color: { argb: color === C.PURPLE ? "FFFFFFFF" : "FF1A1A1A" } };
     cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
   }
   // sub headers (row 3)
-  const sub = ["Date", "Content", "Likes", "Comments", "ER", "Follows", "Profile Visits", "Shared", "Saved", "Total", "Total", "ER", "Total"];
-  const subFill = ["", "", C.ENG, C.ENG, C.ENG, C.ACT, C.ACT, C.ACT, C.ACT, C.IMP, C.REACH, C.REACH, ""];
+  const sub = ["Date", "Content", "Pillar", "Followers on this period", "Likes", "Comments", "ER", "Follows", "Profile Visits", "Shared", "Saved", "Web Click", "Others", "Total", "Total", "ER", "Total"];
+  const subFill = ["", "", "", "", C.ENG, C.ENG, C.ENG, C.ACT, C.ACT, C.ACT, C.ACT, C.ACT, C.ACT, C.IMP, C.REACH, C.REACH, ""];
   sub.forEach((h, i) => {
     const cell = ws.getCell(3, i + 1);
     cell.value = h;
     cell.font = { bold: true, size: 9 };
     if (subFill[i]) cell.fill = fill(subFill[i]);
-    cell.alignment = { horizontal: "center", wrapText: true };
+    cell.alignment = { horizontal: "center", wrapText: true, vertical: "middle" };
     cell.border = { bottom: thin };
   });
+  ws.getRow(3).height = 30;
 
+  const N = (v: number | null | undefined) => (v == null ? 0 : v);
   const posts = [...(metrics.posts ?? [])].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  const start = 4;
-  posts.forEach((p, i) => {
-    const r = ws.getRow(start + i);
-    r.getCell(1).value = p.date;
-    r.getCell(2).value = p.caption;
-    r.getCell(3).value = num(p.likes);
-    r.getCell(4).value = num(p.comments);
-    r.getCell(5).value = p.engagementRate != null ? p.engagementRate / 100 : null;
-    r.getCell(6).value = num(p.follows);
-    r.getCell(7).value = num(p.profileVisits);
-    r.getCell(8).value = num(p.shares);
-    r.getCell(9).value = num(p.saved);
-    r.getCell(10).value = num(p.impressions);
-    r.getCell(11).value = num(p.reach);
-    r.getCell(12).value = p.reach && p.totalInteractions ? p.totalInteractions / p.reach : null;
-    r.getCell(13).value = num(p.totalInteractions);
-    [3, 4, 6, 7, 8, 9, 10, 11, 13].forEach((c) => { r.getCell(c).numFmt = "#,##0"; r.getCell(c).alignment = { horizontal: "right" }; });
-    [5, 12].forEach((c) => (r.getCell(c).numFmt = "0.0%"));
-    r.getCell(2).alignment = { wrapText: true };
-  });
-  const end = start + posts.length - 1;
+  const accFollowers = metrics.account?.followers ?? null;
+  const tiOf = (p: PostMetric) =>
+    N(p.likes) + N(p.comments) + N(p.follows) + N(p.profileVisits) + N(p.shares) + N(p.saved) + N(p.webClicks);
+  const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const intCols = [4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 17];
+  const sumCols = [5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 17];
+  const colVal = (p: PostMetric, c: number): number => {
+    switch (c) {
+      case 5: return N(p.likes);
+      case 6: return N(p.comments);
+      case 8: return N(p.follows);
+      case 9: return N(p.profileVisits);
+      case 10: return N(p.shares);
+      case 11: return N(p.saved);
+      case 12: return N(p.webClicks);
+      case 13: return 0;
+      case 14: return N(p.impressions);
+      case 15: return N(p.reach);
+      case 17: return tiOf(p);
+      default: return 0;
+    }
+  };
 
-  // JUARA highlight — rank by total interaction, color with rule colors
-  if (posts.length) {
-    const ranked = posts.map((p, i) => ({ i: start + i, ti: p.totalInteractions ?? 0 })).sort((a, b) => b.ti - a.ti);
+  // group by YYYY-MM
+  const byMonth = new Map<string, PostMetric[]>();
+  for (const p of posts) {
+    const k = (p.date || "").slice(0, 7) || "—";
+    (byMonth.get(k) ?? byMonth.set(k, []).get(k)!).push(p);
+  }
+  const months = [...byMonth.keys()].sort();
+
+  const postRows: { row: number; ti: number }[] = [];
+  let r = 4;
+  for (const mk of months) {
+    const mp = byMonth.get(mk)!;
+    for (const p of mp) {
+      const ti = tiOf(p);
+      const followers = p.followersAtPeriod ?? accFollowers;
+      const row = ws.getRow(r);
+      row.getCell(1).value = p.date;
+      row.getCell(2).value = p.caption;
+      row.getCell(3).value = p.pillar ?? null;
+      row.getCell(4).value = followers ?? null;
+      row.getCell(5).value = N(p.likes);
+      row.getCell(6).value = N(p.comments);
+      row.getCell(7).value = followers ? ti / followers : null;
+      row.getCell(8).value = N(p.follows);
+      row.getCell(9).value = N(p.profileVisits);
+      row.getCell(10).value = N(p.shares);
+      row.getCell(11).value = N(p.saved);
+      row.getCell(12).value = N(p.webClicks);
+      row.getCell(13).value = 0;
+      row.getCell(14).value = p.impressions ?? null;
+      row.getCell(15).value = p.reach ?? null;
+      row.getCell(16).value = p.reach ? ti / N(p.reach) : null;
+      row.getCell(17).value = ti;
+      intCols.forEach((c) => { row.getCell(c).numFmt = "#,##0"; row.getCell(c).alignment = { horizontal: "right" }; });
+      [7, 16].forEach((c) => (row.getCell(c).numFmt = "0.0%"));
+      row.getCell(2).alignment = { wrapText: true, vertical: "top" };
+      row.getCell(3).alignment = { horizontal: "center" };
+      postRows.push({ row: r, ti });
+      r++;
+    }
+    // per-month total (literal sums)
+    const mtr = ws.getRow(r);
+    const label = mk === "—" ? "TOTAL" : `${MONTHS[Number(mk.slice(5, 7)) - 1]} ${mk.slice(0, 4)} TOTAL`;
+    mtr.getCell(1).value = label;
+    for (const c of sumCols) {
+      mtr.getCell(c).value = mp.reduce((s, p) => s + colVal(p, c), 0);
+      mtr.getCell(c).numFmt = "#,##0";
+    }
+    for (let c = 1; c <= NCOL; c++) { mtr.getCell(c).fill = fill(C.CREAM); mtr.getCell(c).font = { bold: true }; }
+    r++;
+  }
+
+  // grand TOTAL + RATA-RATA when the range spans more than one month
+  if (posts.length && months.length > 1) {
+    const gt = ws.getRow(r++);
+    gt.getCell(1).value = "GRAND TOTAL";
+    for (const c of sumCols) { gt.getCell(c).value = posts.reduce((s, p) => s + colVal(p, c), 0); gt.getCell(c).numFmt = "#,##0"; }
+    const av = ws.getRow(r++);
+    av.getCell(1).value = "RATA-RATA";
+    for (const c of sumCols) { av.getCell(c).value = Math.round(posts.reduce((s, p) => s + colVal(p, c), 0) / posts.length); av.getCell(c).numFmt = "#,##0"; }
+    [gt, av].forEach((row) => { for (let c = 1; c <= NCOL; c++) { row.getCell(c).fill = fill("#EDE7C8"); row.getCell(c).font = { bold: true }; } });
+  }
+
+  // JUARA highlight — top posts by total interaction, tinted with rule colors
+  if (postRows.length) {
+    const ranked = [...postRows].sort((a, b) => b.ti - a.ti);
     const tiers = rules.slice(0, 3);
     ranked.slice(0, Math.max(tiers.length, 3)).forEach((rk, idx) => {
       const color = tiers[idx]?.color ?? ["#6AA84F", "#A4C2F4", "#FFFF00"][idx] ?? "#FFF2CC";
-      [1, 2, 13].forEach((c) => (ws.getCell(rk.i, c).fill = fill(color.replace("#", ""))));
+      [2, 17].forEach((c) => (ws.getCell(rk.row, c).fill = fill(color.replace("#", ""))));
     });
-  }
-
-  // TOTAL + AVERAGE
-  if (posts.length) {
-    const cols = [3, 4, 6, 7, 8, 9, 10, 11, 13];
-    const L = (c: number) => ws.getColumn(c).letter;
-    const tr = ws.getRow(end + 1);
-    tr.getCell(1).value = "TOTAL";
-    cols.forEach((c) => { tr.getCell(c).value = { formula: `SUM(${L(c)}${start}:${L(c)}${end})` }; tr.getCell(c).numFmt = "#,##0"; });
-    const ar = ws.getRow(end + 2);
-    ar.getCell(1).value = "RATA-RATA";
-    cols.forEach((c) => { ar.getCell(c).value = { formula: `AVERAGE(${L(c)}${start}:${L(c)}${end})` }; ar.getCell(c).numFmt = "#,##0"; });
-    [5, 12].forEach((c) => { ar.getCell(c).value = { formula: `AVERAGE(${L(c)}${start}:${L(c)}${end})` }; ar.getCell(c).numFmt = "0.0%"; });
-    [tr, ar].forEach((row) => { for (let c = 1; c <= 13; c++) { row.getCell(c).fill = fill(C.CREAM); row.getCell(c).font = { bold: true }; } });
   }
   ws.views = [{ state: "frozen", ySplit: 3 }];
 }

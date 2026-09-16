@@ -1,5 +1,42 @@
 import "server-only";
-import type { ReportMetrics, ReportCustomParam } from "@/lib/report/types";
+import type { ReportMetrics, ReportCustomParam, PostMetric } from "@/lib/report/types";
+
+/**
+ * AI-suggest an editorial "Pillar" for each post (Cap Gajah-style). Classification,
+ * not fabrication: the model labels each caption with a short, consistent pillar.
+ * Mutates posts in place (sets `pillar`); best-effort — no key / failure → left null.
+ */
+export async function suggestPillars(apiKey: string | null, posts: PostMetric[]): Promise<void> {
+  if (!apiKey || !posts.length) return;
+  const items = posts.map((p, i) => ({ i, format: p.format, caption: (p.caption ?? "").slice(0, 160) }));
+  const system =
+    "Anda content strategist. Untuk tiap post, beri SATU 'pillar' konten yang ringkas (1-3 kata) " +
+    "berdasarkan caption + format. Gunakan set pillar yang KONSISTEN di seluruh post (mis. " +
+    "Entertainment, Edukasi, Product Highlight, Storytelling, Promo, Lifestyle, Behind The Scenes). " +
+    "Jika format video/reels dan tak ada tema kuat, boleh 'Video'. JANGAN mengarang isi caption. " +
+    'Balas HANYA JSON array valid: [{"i":<index>,"pillar":"<pillar>"}]. Tanpa teks lain.';
+  const user = `POSTS:\n${JSON.stringify(items)}`;
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({ model: "claude-opus-5", max_tokens: 1200, system, messages: [{ role: "user", content: user }] }),
+      cache: "no-store",
+    });
+    if (!res.ok) return;
+    const j = (await res.json()) as { content?: { text?: string }[] };
+    const out = (j.content ?? []).map((b) => b.text ?? "").join("");
+    const match = out.match(/\[[\s\S]*\]/);
+    const parsed = JSON.parse(match ? match[0] : out) as { i: number; pillar: string }[];
+    for (const r of Array.isArray(parsed) ? parsed : []) {
+      if (typeof r.i === "number" && posts[r.i] && typeof r.pillar === "string") {
+        posts[r.i].pillar = r.pillar.trim().slice(0, 40) || null;
+      }
+    }
+  } catch {
+    /* best-effort — leave pillars null */
+  }
+}
 
 /** Compact, data-only view of the report for the model (no fabrication room). */
 function compact(m: ReportMetrics) {

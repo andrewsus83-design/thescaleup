@@ -8,7 +8,7 @@ import { fetchZernioMetrics, listZernioAccounts, type ZernioAccount } from "@/li
 import { resolveClientZernioKey } from "@/lib/report/data";
 import { CLIENT_PROVIDERS } from "@/lib/report/config";
 import { getReportRules, saveReportRules, saveTemplateName, getCustomParams, saveCustomParams, saveTemplateFile } from "@/lib/report/rules";
-import { analyzeReportWithClaude } from "@/lib/report/ai";
+import { analyzeReportWithClaude, suggestPillars } from "@/lib/report/ai";
 import type { ReportRule, ReportCustomParam } from "@/lib/report/types";
 
 function slugify(s: string): string {
@@ -450,17 +450,19 @@ export async function generateReport(formData: FormData): Promise<void> {
     period,
   });
 
-  // Custom AI parameters → analyzed by Claude Opus, attached to the report.
+  // Claude Opus: AI-suggest content pillars per post + run custom AI parameters.
   if (metrics.connected) {
+    const { data: ck } = await db
+      .from("report_client_settings")
+      .select("value")
+      .eq("client_id", id)
+      .eq("key", "claude")
+      .maybeSingle();
+    const claudeKey = (ck?.value as string) ?? null;
+    await suggestPillars(claudeKey, metrics.posts);
     const params = await getCustomParams();
     if (params.length) {
-      const { data: ck } = await db
-        .from("report_client_settings")
-        .select("value")
-        .eq("client_id", id)
-        .eq("key", "claude")
-        .maybeSingle();
-      const ai = await analyzeReportWithClaude((ck?.value as string) ?? null, metrics, params);
+      const ai = await analyzeReportWithClaude(claudeKey, metrics, params);
       if (ai) metrics.aiAnalysis = ai;
     }
   }

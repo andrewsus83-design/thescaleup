@@ -2,6 +2,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getClient, getClientKey, resolveClientZernioKey } from "@/lib/report/data";
 import { getReportRules, getTemplateName, getTemplateFile } from "@/lib/report/rules";
 import { fetchZernioMetrics } from "@/lib/report/zernio";
+import { suggestPillars } from "@/lib/report/ai";
 import { buildReportWorkbook } from "@/lib/report/excel";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   }
+
+  // AI-suggest content pillars (Cap Gajah "Pillar" column) using the client's Claude key.
+  await suggestPillars(await getClientKey(id, "claude"), metrics.posts);
 
   const buf = await buildReportWorkbook(client, metrics, rules, templateType || "post_master", templateFile?.base64 ?? null);
   const fname = `${client.slug}-report-${until ?? "latest"}.xlsx`;

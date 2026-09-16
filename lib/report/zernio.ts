@@ -247,6 +247,9 @@ async function fetchTikTok(
   ]);
   const mx = ((insJson as Record<string, unknown>)?.metrics ?? {}) as Record<string, Record<string, unknown>>;
   const posts = mapPosts(postsJson as Record<string, unknown> | null);
+  // TikTok exposes only a current follower_count (no daily history) → use it per post.
+  const tkFollowers = num(mx.follower_count?.total);
+  for (const p of posts) p.followersAtPeriod = tkFollowers;
   const sum = (k: keyof PostMetric) => {
     const v = posts.map((p) => p[k]).filter((x): x is number => typeof x === "number");
     return v.length ? v.reduce((a, b) => a + b, 0) : null;
@@ -320,7 +323,14 @@ export async function fetchZernioMetrics(opts: {
     const range = `${since ? `&since=${since}` : ""}${until ? `&until=${until}` : ""}`;
     const bd = (metrics: string, breakdown: string) =>
       `${base}/v1/analytics/instagram/account-insights?accountId=${accountId}&metrics=${metrics}&metricType=total_value&breakdown=${breakdown}${range}`;
-    const fhUrl = `${base}/v1/analytics/instagram/follower-history?accountId=${accountId}&metrics=follower_count,followers_gained,followers_lost&metricType=time_series${range}`;
+    // follower-history is limited to an 88-day window by Zernio → clamp `since`.
+    const fhSince = (() => {
+      if (!since || !until) return since;
+      const days = (Date.parse(until) - Date.parse(since)) / 864e5;
+      return days > 88 ? new Date(Date.parse(until) - 88 * 864e5).toISOString().slice(0, 10) : since;
+    })();
+    const fhRange = `${fhSince ? `&since=${fhSince}` : ""}${until ? `&until=${until}` : ""}`;
+    const fhUrl = `${base}/v1/analytics/instagram/follower-history?accountId=${accountId}&metrics=follower_count,followers_gained,followers_lost&metricType=time_series${fhRange}`;
     const demo = (metric: string) =>
       `${base}/v1/analytics/instagram/demographics?accountId=${accountId}&metric=${metric}&breakdown=age,city,country,gender`;
     const [ctJson, ftJson, cbJson, tsJson, fhJson, demoJson, engDemoJson, storiesData, postsJson] = await Promise.all([
@@ -405,6 +415,30 @@ export async function fetchZernioMetrics(opts: {
     const posts = mapPosts(postsJson);
     totals.posts = posts.length;
     const reels = computeReels(posts);
+
+    // Zernio has no account-level impressions/profile-visits → sum per-post.
+    const sumPost = (k: keyof PostMetric) => {
+      const v = posts.map((p) => p[k]).filter((x): x is number => typeof x === "number");
+      return v.length ? v.reduce((a, b) => a + b, 0) : null;
+    };
+    if (totals.impressions == null) totals.impressions = sumPost("impressions");
+    if (totals.profileVisits == null) totals.profileVisits = sumPost("profileVisits");
+
+    // "Followers on this period": day-to-day follower count mapped onto each post's
+    // date (Zernio snapshots followers daily from the connect date forward). For
+    // dates before Zernio began snapshotting, fall back to the current count.
+    const fsSorted = (followerSeries ?? []).slice().sort((a, b) => a.date.localeCompare(b.date));
+    const currentFollowers = latestFollowers ?? acct?.followers ?? null;
+    const followerOn = (date: string): number | null => {
+      if (!date || !fsSorted.length) return null;
+      let best: number | null = null;
+      for (const p of fsSorted) {
+        if (p.date <= date) best = p.value;
+        else break;
+      }
+      return best ?? fsSorted[0].value;
+    };
+    for (const p of posts) p.followersAtPeriod = followerOn(p.date) ?? currentFollowers;
 
     const dr = (core.dateRange ?? {}) as Record<string, unknown>;
     return {
