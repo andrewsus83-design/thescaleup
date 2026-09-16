@@ -14,7 +14,8 @@ import {
 
 /** Emails allowed into the admin backend (comma-separated env override). */
 export const ADMIN_EMAILS: string[] = (
-  process.env.ADMIN_EMAILS ?? "andrewsus83@gmail.com"
+  process.env.ADMIN_EMAILS ??
+  "andrewsus83@gmail.com,angelica.scaleup@gmail.com"
 )
   .split(",")
   .map((e) => e.trim().toLowerCase())

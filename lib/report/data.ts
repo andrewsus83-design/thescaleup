@@ -1,0 +1,122 @@
+import "server-only";
+import {
+  createSupabaseAdminClient,
+  isSupabaseAdminConfigured,
+} from "@/lib/supabase/admin";
+import type { ReportClient, ReportSnapshot, ReportMetrics } from "@/lib/report/types";
+
+const COLS =
+  "id, slug, name, ig_handle, logo_url, brand_color, accent_color, theme, connect_token, status, notes, created_at";
+
+type Row = Record<string, unknown>;
+
+function toClient(r: Row): ReportClient {
+  return {
+    id: String(r.id),
+    slug: String(r.slug),
+    name: String(r.name),
+    igHandle: (r.ig_handle as string) ?? null,
+    logoUrl: (r.logo_url as string) ?? null,
+    brandColor: (r.brand_color as string) ?? "#2A2870",
+    accentColor: (r.accent_color as string) ?? "#38B6F0",
+    theme: (r.theme as string) ?? "light",
+    connectToken: (r.connect_token as string) ?? null,
+    status: (r.status as string) ?? "pending",
+    notes: (r.notes as string) ?? null,
+    createdAt: String(r.created_at ?? ""),
+  };
+}
+
+function db() {
+  return createSupabaseAdminClient();
+}
+
+export async function listClients(): Promise<ReportClient[]> {
+  if (!isSupabaseAdminConfigured()) return [];
+  try {
+    const { data, error } = await db()
+      .from("report_clients")
+      .select(COLS)
+      .order("created_at", { ascending: false });
+    if (error) return [];
+    return (data ?? []).map(toClient);
+  } catch {
+    return [];
+  }
+}
+
+export async function getClient(id: string): Promise<ReportClient | null> {
+  if (!isSupabaseAdminConfigured()) return null;
+  try {
+    const { data } = await db().from("report_clients").select(COLS).eq("id", id).maybeSingle();
+    return data ? toClient(data) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getClientBySlug(slug: string): Promise<ReportClient | null> {
+  if (!isSupabaseAdminConfigured()) return null;
+  try {
+    const { data } = await db().from("report_clients").select(COLS).eq("slug", slug).maybeSingle();
+    return data ? toClient(data) : null;
+  } catch {
+    return null;
+  }
+}
+
+/* ------------------------------ client settings ---------------------------- */
+
+/** Full raw settings map for a client (server-only — contains secrets). */
+export async function getClientSettings(clientId: string): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  if (!isSupabaseAdminConfigured()) return out;
+  try {
+    const { data } = await db()
+      .from("report_client_settings")
+      .select("key, value")
+      .eq("client_id", clientId);
+    for (const r of data ?? []) if (r.key && r.value) out[r.key as string] = r.value as string;
+  } catch {
+    /* table may not exist yet */
+  }
+  return out;
+}
+
+/** One provider key for a client (server-only). */
+export async function getClientKey(clientId: string, provider: string): Promise<string | null> {
+  const s = await getClientSettings(clientId);
+  return s[provider]?.trim() || null;
+}
+
+/** Which provider keys are configured (presence only — safe for the UI). */
+export async function getConfiguredProviders(clientId: string): Promise<string[]> {
+  const s = await getClientSettings(clientId);
+  return Object.keys(s).filter((k) => s[k]?.trim());
+}
+
+/* --------------------------------- snapshots ------------------------------- */
+
+export async function getLatestSnapshot(clientId: string): Promise<ReportSnapshot | null> {
+  if (!isSupabaseAdminConfigured()) return null;
+  try {
+    const { data } = await db()
+      .from("report_snapshots")
+      .select("id, client_id, period, data, source, created_at")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data) return null;
+    return {
+      id: String(data.id),
+      clientId: String(data.client_id),
+      period: String(data.period),
+      data: (data.data as ReportMetrics) ?? { connected: false, provider: "zernio", posts: [] },
+      source: (data.source as string) ?? "zernio",
+      createdAt: String(data.created_at),
+    };
+  } catch {
+    return null;
+  }
+}

@@ -1,38 +1,36 @@
-import { createServerClient } from "@supabase/ssr";
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 /**
- * Refreshes the Supabase auth session cookie on admin routes so admin
- * sessions survive access-token expiry. (Next.js 16 renamed middleware → proxy.)
+ * Next.js 16 Proxy (formerly Middleware).
+ *
+ * Maps the report subdomain onto the /report route tree so that
+ *   report.thescaleup.xyz/admin      -> /report/admin
+ *   report.thescaleup.xyz/c/<slug>   -> /report/c/<slug>
+ * while the main domain keeps serving thescaleup.xyz unchanged.
+ *
+ * (Add report.thescaleup.xyz as a domain on this Vercel project for the
+ * subdomain to reach here; until then the same pages work at /report/*.)
  */
-export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+export function proxy(request: NextRequest) {
+  const host = (request.headers.get("host") ?? "").toLowerCase();
+  if (!host.startsWith("report.")) return NextResponse.next();
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) return response;
+  const { pathname } = request.nextUrl;
+  if (
+    pathname.startsWith("/report") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/_next")
+  ) {
+    return NextResponse.next();
+  }
 
-  const supabase = createServerClient(url, anon, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) =>
-          request.cookies.set(name, value),
-        );
-        response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options),
-        );
-      },
-    },
-  });
-
-  await supabase.auth.getUser();
-  return response;
+  const url = request.nextUrl.clone();
+  url.pathname = pathname === "/" ? "/report" : `/report${pathname}`;
+  return NextResponse.rewrite(url);
 }
 
-export const proxyConfig = {
-  matcher: ["/admin/:path*"],
+export const config = {
+  // Run on everything except static assets; host filtering happens above.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.[\\w]+$).*)"],
 };
