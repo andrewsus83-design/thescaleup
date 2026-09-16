@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { fetchZernioMetrics, listZernioAccounts, type ZernioAccount } from "@/lib/report/zernio";
+import { resolveClientZernioKey } from "@/lib/report/data";
 import { CLIENT_PROVIDERS } from "@/lib/report/config";
 import { getReportRules, saveReportRules, saveTemplateName, getCustomParams, saveCustomParams, saveTemplateFile } from "@/lib/report/rules";
 import { analyzeReportWithClaude } from "@/lib/report/ai";
@@ -304,6 +305,105 @@ export async function saveClientSettings(formData: FormData): Promise<void> {
   revalidatePath("/report/admin");
 }
 
+/* ---------------------------- Zernio connections --------------------------- */
+
+/**
+ * Add ANOTHER Zernio connection (API key) to a client. A client can hold more
+ * than one Zernio key/profile — accounts from every key show up in the picker
+ * and reports auto-resolve the right key for the chosen account. Validated via
+ * Zernio before saving. The first key added becomes the primary (`zernio`);
+ * further keys are appended to the `zernio_keys` JSON setting.
+ */
+export async function addClientZernioKey(
+  formData: FormData,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin();
+  if (!isSupabaseAdminConfigured()) return { ok: false, error: "Server belum terkonfigurasi." };
+  const id = String(formData.get("id") ?? "");
+  const key = String(formData.get("zernio_api_key") ?? "").trim();
+  const label = String(formData.get("label") ?? "").trim();
+  if (!id || !key) return { ok: false, error: "Isi Zernio API key dulu." };
+
+  const check = await listZernioAccounts(key);
+  if (!check.ok) return { ok: false, error: check.error ?? "Koneksi Zernio gagal." };
+
+  const db = createSupabaseAdminClient();
+  const { data } = await db
+    .from("report_client_settings")
+    .select("key, value")
+    .eq("client_id", id)
+    .in("key", ["zernio", "zernio_keys"]);
+  const map: Record<string, string> = {};
+  for (const r of data ?? []) if (r.key && r.value) map[r.key as string] = r.value as string;
+  const now = new Date().toISOString();
+
+  if (!map.zernio?.trim()) {
+    // No primary yet → this key becomes the primary connection.
+    await db
+      .from("report_client_settings")
+      .upsert({ client_id: id, key: "zernio", value: key, updated_at: now }, { onConflict: "client_id,key" });
+  } else {
+    if (map.zernio.trim() === key) return { ok: false, error: "Key ini sudah jadi koneksi utama." };
+    let extras: { id: string; key: string; label: string }[] = [];
+    try {
+      const p = JSON.parse(map.zernio_keys ?? "[]");
+      if (Array.isArray(p)) extras = p;
+    } catch {
+      /* reset malformed */
+    }
+    if (extras.some((e) => e.key === key)) return { ok: false, error: "Key ini sudah ditambahkan." };
+    extras.push({ id: randomUUID().slice(0, 8), key, label: label || `Zernio ${extras.length + 2}` });
+    await db
+      .from("report_client_settings")
+      .upsert(
+        { client_id: id, key: "zernio_keys", value: JSON.stringify(extras), updated_at: now },
+        { onConflict: "client_id,key" },
+      );
+  }
+  await db.from("report_clients").update({ status: "connected", updated_at: now }).eq("id", id);
+  revalidatePath(`/report/admin/${id}/settings`);
+  revalidatePath("/report/admin");
+  return { ok: true };
+}
+
+/** Remove one Zernio connection. `conn` = "primary" (the `zernio` key) or an extra's id. */
+export async function removeClientZernioKey(formData: FormData): Promise<void> {
+  await requireAdmin();
+  if (!isSupabaseAdminConfigured()) return;
+  const id = String(formData.get("id") ?? "");
+  const connId = String(formData.get("conn") ?? "");
+  if (!id || !connId) return;
+  const db = createSupabaseAdminClient();
+  const now = new Date().toISOString();
+
+  if (connId === "primary") {
+    await db.from("report_client_settings").delete().eq("client_id", id).eq("key", "zernio");
+  } else {
+    const { data } = await db
+      .from("report_client_settings")
+      .select("value")
+      .eq("client_id", id)
+      .eq("key", "zernio_keys")
+      .maybeSingle();
+    let extras: { id: string; key: string; label: string }[] = [];
+    try {
+      const p = JSON.parse((data?.value as string) ?? "[]");
+      if (Array.isArray(p)) extras = p;
+    } catch {
+      /* ignore */
+    }
+    extras = extras.filter((e) => e.id !== connId);
+    await db
+      .from("report_client_settings")
+      .upsert(
+        { client_id: id, key: "zernio_keys", value: JSON.stringify(extras), updated_at: now },
+        { onConflict: "client_id,key" },
+      );
+  }
+  revalidatePath(`/report/admin/${id}/settings`);
+  revalidatePath("/report/admin");
+}
+
 /** Remove one provider key for a client. */
 export async function clearClientSetting(formData: FormData): Promise<void> {
   await requireAdmin();
@@ -335,13 +435,15 @@ export async function generateReport(formData: FormData): Promise<void> {
     .from("report_client_settings")
     .select("key, value")
     .eq("client_id", id)
-    .in("key", ["zernio", "zernio_account_id"]);
+    .eq("key", "zernio_account_id");
   const map: Record<string, string> = {};
   for (const r of keys ?? []) if (r.key && r.value) map[r.key as string] = r.value as string;
   // the picker passes the active account id; fall back to the stored default
   const accountId = String(formData.get("account") ?? "").trim() || map.zernio_account_id || null;
+  // resolve which of the client's Zernio keys owns this account (supports >1 key)
+  const apiKey = await resolveClientZernioKey(id, accountId);
   const metrics = await fetchZernioMetrics({
-    apiKey: map.zernio ?? null,
+    apiKey,
     accountId,
     since,
     until,

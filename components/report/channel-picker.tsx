@@ -2,13 +2,33 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Check, Layers, Share2, Globe, RotateCw, Music2 } from "lucide-react";
+import { ChevronDown, Check, Layers, Share2, Globe, RotateCw, Music2, Megaphone } from "lucide-react";
 
 type Account = { id: string; platform: string; username?: string | null };
 type ClientCh = { id: string; name: string; accounts: Account[]; web: boolean };
 
+/** Platform "family": organic + its ads share one family so they can be combined. */
+function platformFamily(p: string) {
+  const pl = (p || "").toLowerCase();
+  if (pl.includes("tiktok")) return "tiktok";
+  if (pl.includes("instagram") || pl.includes("facebook") || pl.includes("meta")) return "meta";
+  return pl || "other";
+}
+function isAds(p: string) {
+  const pl = (p || "").toLowerCase();
+  return pl.includes("ads") || pl.includes("ad_account") || pl.includes("adaccount");
+}
+function platformLabel(p: string) {
+  const pl = (p || "").toLowerCase();
+  if (pl.includes("tiktok")) return isAds(pl) ? "TikTok Ads" : "TikTok";
+  if (pl.includes("instagram")) return isAds(pl) ? "Instagram Ads" : "Instagram";
+  if (pl.includes("facebook") || pl.includes("meta")) return isAds(pl) ? "Meta Ads" : "Meta";
+  const base = p ? p[0].toUpperCase() + p.slice(1) : "Social";
+  return base.replace(/_/g, " ");
+}
 function platformIcon(p: string) {
   const pl = (p || "").toLowerCase();
+  if (isAds(pl)) return <Megaphone className="h-4 w-4 text-amber-500" />;
   if (pl.includes("tiktok")) return <Music2 className="h-4 w-4 text-slate-800" />;
   return <Share2 className="h-4 w-4 text-pink-500" />;
 }
@@ -42,10 +62,11 @@ export function ChannelPicker({
       go(accountIds.filter((x) => x !== id), webIds);
       return;
     }
-    // only one platform per selection — picking a different platform replaces the set
-    const plat = allAcc.find((a) => a.id === id)?.platform;
-    const currentPlat = allAcc.find((a) => a.id === accountIds[0])?.platform;
-    if (currentPlat && plat !== currentPlat) go([id], webIds);
+    // Same family can be combined (Instagram + Meta Ads, TikTok + TikTok Ads);
+    // a different family (IG vs TikTok — different data) replaces the set.
+    const fam = platformFamily(allAcc.find((a) => a.id === id)?.platform ?? "");
+    const currentFam = platformFamily(allAcc.find((a) => a.id === accountIds[0])?.platform ?? "");
+    if (accountIds.length && currentFam && fam !== currentFam) go([id], webIds);
     else go([...accountIds, id], webIds);
   }
   function toggleWeb(id: string) {
@@ -61,7 +82,7 @@ export function ChannelPicker({
       : totalSel === 1
         ? (() => {
             const a = allAcc.find((x) => x.id === accountIds[0]);
-            if (a) return `${a.username ? "@" + a.username : a.platform}`;
+            if (a) return `${a.username ? "@" + a.username : platformLabel(a.platform)}`;
             const wc = clients.find((c) => c.id === webIds[0]);
             return wc ? `${wc.name} · Web` : "1 channel";
           })()
@@ -120,7 +141,7 @@ export function ChannelPicker({
                     on={accountIds.includes(a.id)}
                     onClick={() => toggleAcc(a.id)}
                     icon={platformIcon(a.platform)}
-                    text={a.platform ? a.platform[0].toUpperCase() + a.platform.slice(1) : "Social"}
+                    text={platformLabel(a.platform)}
                     sub={a.username ? `@${a.username}` : undefined}
                   />
                 ))}

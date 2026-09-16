@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, KeyRound, Database, Search } from "lucide-react";
+import { ArrowLeft, KeyRound, Search } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
-import { getClient, getClientSettings } from "@/lib/report/data";
+import { getClient, getClientSettings, getClientZernioConnMeta } from "@/lib/report/data";
 import { saveClientSettings } from "@/lib/report/actions";
 import { CLIENT_PROVIDERS, SECRET_PROVIDER_KEYS } from "@/lib/report/config";
 import { ClientSubnav } from "@/components/report/client-subnav";
+import { ZernioConnections } from "@/components/report/zernio-connections";
+
+// Zernio keys are managed by the dedicated multi-connection card, not the generic grid.
+const ZERNIO_KEYS = new Set(["zernio", "zernio_account_id"]);
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +23,10 @@ export default async function ClientSettings({ params }: { params: Promise<{ id:
   const { id } = await params;
   const client = await getClient(id);
   if (!client) notFound();
-  const settings = await getClientSettings(id);
+  const [settings, zernioConns] = await Promise.all([getClientSettings(id), getClientZernioConnMeta(id)]);
   const configuredCount = Object.keys(settings).filter((k) => settings[k]?.trim()).length;
 
   const groups: { key: "data" | "research"; title: string; icon: React.ReactNode; desc: string }[] = [
-    { key: "data", title: "Sumber Data Laporan", icon: <Database className="h-4 w-4" />, desc: "Zernio menggantikan Apify sebagai sumber data laporan klien ini." },
     { key: "research", title: "Riset & Audit (dipakai nanti)", icon: <Search className="h-4 w-4" />, desc: "API untuk pipeline riset SEO/GEO/sosial per klien." },
   ];
 
@@ -44,6 +47,11 @@ export default async function ClientSettings({ params }: { params: Promise<{ id:
       </div>
 
       <ClientSubnav id={id} active="settings" configuredCount={configuredCount} />
+
+      {/* Zernio — the data source. Supports MORE THAN ONE key/profile per client. */}
+      <div className="mt-6">
+        <ZernioConnections clientId={id} conns={zernioConns} />
+      </div>
 
       <form action={saveClientSettings} className="mt-6 space-y-6">
         <input type="hidden" name="id" value={id} />

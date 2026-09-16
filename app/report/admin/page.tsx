@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, ExternalLink, Settings2, LayoutGrid, SlidersHorizontal, Layers } from "lucide-react";
+import { Plus, ExternalLink, Settings2, LayoutGrid, SlidersHorizontal, Layers, LogOut } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
 import { isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { listClients, getLatestSnapshot, getConfiguredProviders, getClientKey, getChannelFlags, listClientAccounts } from "@/lib/report/data";
@@ -127,6 +127,13 @@ export default async function ReportAdminDashboard({
             <Plus className="h-4 w-4" /> Tambah
           </Link>
           {!addMode && <RefreshButton />}
+          <a
+            href="/admin/logout"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-red-600"
+            title="Keluar dari akun admin"
+          >
+            <LogOut className="h-4 w-4" /> Logout
+          </a>
         </div>
       </div>
 

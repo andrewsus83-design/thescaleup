@@ -90,12 +90,95 @@ export async function getClientKey(clientId: string, provider: string): Promise<
   return s[provider]?.trim() || null;
 }
 
-/** All Zernio social accounts (IG, TikTok, …) connected under a client's key. */
+/* ------------------------------ Zernio connections -------------------------- */
+
+/** One Zernio connection (API key) belonging to a client. `id` "primary" = the
+ *  legacy `zernio` key; extras live in the `zernio_keys` JSON setting. */
+export type ZernioConn = { id: string; key: string; label: string };
+
+/** All Zernio connections for a client — primary (`zernio`) + extras (`zernio_keys`). */
+export async function getClientZernioKeys(clientId: string): Promise<ZernioConn[]> {
+  const s = await getClientSettings(clientId);
+  return zernioKeysFromSettings(s);
+}
+
+/** Parse the merged Zernio connection list from an already-loaded settings map. */
+export function zernioKeysFromSettings(s: Record<string, string>): ZernioConn[] {
+  const conns: ZernioConn[] = [];
+  const primary = s.zernio?.trim();
+  if (primary) conns.push({ id: "primary", key: primary, label: "Zernio 1" });
+  const rawExtra = s.zernio_keys?.trim();
+  if (rawExtra) {
+    try {
+      const arr = JSON.parse(rawExtra) as { id?: string; key?: string; label?: string }[];
+      for (const e of Array.isArray(arr) ? arr : []) {
+        const key = (e.key ?? "").trim();
+        if (!key || conns.some((c) => c.key === key)) continue;
+        conns.push({
+          id: String(e.id ?? key.slice(-6)),
+          key,
+          label: (e.label ?? "").trim() || `Zernio ${conns.length + 1}`,
+        });
+      }
+    } catch {
+      /* malformed → ignore extras */
+    }
+  }
+  return conns;
+}
+
+/** All Zernio social accounts (IG, TikTok, …) across ALL of a client's connections. */
 export async function listClientAccounts(clientId: string): Promise<ZernioAccount[]> {
-  const key = await getClientKey(clientId, "zernio");
-  if (!key) return [];
-  const r = await listZernioAccounts(key);
-  return r.ok ? r.accounts : [];
+  const conns = await getClientZernioKeys(clientId);
+  if (!conns.length) return [];
+  const lists = await Promise.all(conns.map((c) => listZernioAccounts(c.key)));
+  const seen = new Set<string>();
+  const out: ZernioAccount[] = [];
+  lists.forEach((r, i) => {
+    if (!r.ok) return;
+    for (const a of r.accounts) {
+      if (!a.id || seen.has(a.id)) continue;
+      seen.add(a.id);
+      out.push({ ...a, keyId: conns[i].id });
+    }
+  });
+  return out;
+}
+
+/** Which Zernio API key owns a given social account (across every connection). */
+export async function resolveClientZernioKey(clientId: string, accountId: string | null): Promise<string | null> {
+  const conns = await getClientZernioKeys(clientId);
+  if (!conns.length) return null;
+  if (!accountId) return conns[0].key;
+  const lists = await Promise.all(conns.map((c) => listZernioAccounts(c.key)));
+  for (let i = 0; i < conns.length; i++) {
+    if (lists[i].ok && lists[i].accounts.some((a) => a.id === accountId)) return conns[i].key;
+  }
+  return conns[0].key; // fall back to the primary key
+}
+
+/** Safe (masked) metadata for each Zernio connection, with its live accounts — for the settings UI. */
+export type ZernioConnMeta = {
+  id: string;
+  label: string;
+  masked: string;
+  ok: boolean;
+  error?: string;
+  accounts: ZernioAccount[];
+};
+
+export async function getClientZernioConnMeta(clientId: string): Promise<ZernioConnMeta[]> {
+  const conns = await getClientZernioKeys(clientId);
+  if (!conns.length) return [];
+  const lists = await Promise.all(conns.map((c) => listZernioAccounts(c.key)));
+  return conns.map((c, i) => ({
+    id: c.id,
+    label: c.label,
+    masked: c.key.length <= 6 ? "••••" : "••••" + c.key.slice(-4),
+    ok: lists[i].ok,
+    error: lists[i].error,
+    accounts: lists[i].ok ? lists[i].accounts : [],
+  }));
 }
 
 /** Which provider keys are configured (presence only — safe for the UI). */
@@ -112,12 +195,12 @@ export async function getChannelFlags(): Promise<Record<string, { web: boolean; 
     const { data } = await db()
       .from("report_client_settings")
       .select("client_id, key")
-      .in("key", ["website", "zernio"]);
+      .in("key", ["website", "zernio", "zernio_keys"]);
     for (const r of data ?? []) {
       const id = String(r.client_id);
       out[id] ??= { web: false, social: false };
       if (r.key === "website") out[id].web = true;
-      if (r.key === "zernio") out[id].social = true;
+      if (r.key === "zernio" || r.key === "zernio_keys") out[id].social = true;
     }
   } catch {
     /* table may not exist yet */

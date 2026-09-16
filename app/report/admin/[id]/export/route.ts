@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/admin/auth";
-import { getClient, getClientKey } from "@/lib/report/data";
+import { getClient, getClientKey, resolveClientZernioKey } from "@/lib/report/data";
 import { getReportRules, getTemplateName, getTemplateFile } from "@/lib/report/rules";
 import { fetchZernioMetrics } from "@/lib/report/zernio";
 import { buildReportWorkbook } from "@/lib/report/excel";
@@ -21,14 +21,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const until = DATE.test(untilQ) ? untilQ : undefined;
 
   const accountQ = url.searchParams.get("account") ?? "";
-  const [apiKey, storedAccount, rules, templateType, templateFile] = await Promise.all([
-    getClientKey(id, "zernio"),
+  const [storedAccount, rules, templateType, templateFile] = await Promise.all([
     getClientKey(id, "zernio_account_id"),
     getReportRules(),
     getTemplateName(),
     getTemplateFile(),
   ]);
   const accountId = accountQ || storedAccount;
+  // resolve which of the client's Zernio keys owns this account (supports >1 key)
+  const apiKey = await resolveClientZernioKey(id, accountId);
 
   const metrics = await fetchZernioMetrics({ apiKey, accountId, since, until, period: since && until ? `${since} → ${until}` : "last_30d" });
   if (!metrics.connected) {

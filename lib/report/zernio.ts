@@ -101,6 +101,8 @@ export type ZernioAccount = {
   displayName: string | null;
   platform: string | null;
   followers: number | null;
+  /** Which of the client's Zernio connections (API keys) this account belongs to. */
+  keyId?: string;
 };
 
 /** List the Instagram accounts connected to a Zernio key. Never throws. */
