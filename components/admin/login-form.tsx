@@ -5,7 +5,7 @@ import { ArrowRight, Loader2, Mail, KeyRound, ArrowLeft } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/landing/logo";
 
-export function AdminLoginForm() {
+export function AdminLoginForm({ codeFallback = false }: { codeFallback?: boolean }) {
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -151,6 +151,30 @@ export function AdminLoginForm() {
 
           {info && <p className="mt-4 text-sm text-good">{info}</p>}
           {error && <p className="mt-4 text-sm text-bad">{error}</p>}
+
+          {codeFallback && (
+            <details className="mt-5 border-t border-white/10 pt-4">
+              <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-300">
+                Atau masuk dengan kode akses
+              </summary>
+              <form method="post" action="/admin/access" className="mt-3 flex items-center gap-2">
+                <input
+                  type="password"
+                  name="code"
+                  required
+                  autoComplete="off"
+                  placeholder="Kode akses"
+                  className="flex-1 rounded-xl border border-white/10 bg-obsidian/50 px-3 py-2.5 text-sm text-mist placeholder:text-slate-600 focus:border-coral/50 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-mist hover:bg-white/15"
+                >
+                  Masuk
+                </button>
+              </form>
+            </details>
+          )}
         </div>
 
         <p className="mt-6 text-center text-xs text-slate-600">
