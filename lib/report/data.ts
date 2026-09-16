@@ -130,13 +130,19 @@ export async function getChannelFlags(): Promise<Record<string, { web: boolean; 
 export async function getLatestSnapshot(clientId: string, accountId?: string): Promise<ReportSnapshot | null> {
   if (!isSupabaseAdminConfigured()) return null;
   try {
-    let q = db()
-      .from("report_snapshots")
-      .select("id, client_id, period, data, source, created_at")
-      .eq("client_id", clientId);
-    // when an account is given, only snapshots pulled for that account
-    if (accountId) q = q.eq("data->account->>id", accountId);
-    const { data } = await q.order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const run = async (withAccount: boolean) => {
+      let q = db()
+        .from("report_snapshots")
+        .select("id, client_id, period, data, source, created_at")
+        .eq("client_id", clientId);
+      if (withAccount && accountId) q = q.eq("data->account->>id", accountId);
+      const { data } = await q.order("created_at", { ascending: false }).limit(1).maybeSingle();
+      return data;
+    };
+    // prefer the account-tagged snapshot; fall back to the client's latest
+    // (older snapshots have no account id, so the filtered query misses them)
+    let data = accountId ? await run(true) : await run(false);
+    if (!data && accountId) data = await run(false);
     if (!data) return null;
     return {
       id: String(data.id),

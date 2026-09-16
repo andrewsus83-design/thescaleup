@@ -129,6 +129,7 @@ export type ReportMetrics = {
   reels?: ReelsSummary | null; // video/Reels performance
   stories?: StoriesSummary | null; // Instagram Stories insights
   platform?: string; // instagram | tiktok
+  aiAnalysis?: { label: string; type: string; text: string }[] | null; // Claude Opus custom analysis
   fetchedAt?: string;
 };
 
@@ -151,6 +152,22 @@ export type ReportRule = {
   color?: string; // highlight color (hex)
   note?: string;
 };
+
+/** A custom AI parameter — Claude Opus analyzes the report data against this. */
+export type ReportCustomParam = {
+  id: string;
+  label: string; // e.g. "Analisa Kompetitor", "Rekomendasi Konten"
+  type: string; // analisa | rekomendasi | ringkasan | prediksi | custom
+  prompt: string; // the instruction/question for the AI
+};
+
+export const CUSTOM_PARAM_TYPES: { value: string; label: string }[] = [
+  { value: "analisa", label: "Analisa" },
+  { value: "rekomendasi", label: "Rekomendasi" },
+  { value: "ringkasan", label: "Ringkasan" },
+  { value: "prediksi", label: "Prediksi" },
+  { value: "custom", label: "Custom" },
+];
 
 export const RULE_METRICS: { value: string; label: string }[] = [
   { value: "reach", label: "Reach" },

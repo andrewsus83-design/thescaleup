@@ -33,7 +33,17 @@ export default async function ReportAdminDashboard({
   // Live-fetch the Zernio accounts (Instagram, TikTok, …) under each client's key.
   const flags = allClients.length ? await getChannelFlags() : {};
   const acctLists = addMode ? [] : await Promise.all(allClients.map((c) => listClientAccounts(c.id)));
-  const clientAccounts = allClients.map((c, i) => ({ client: c, accounts: acctLists[i] ?? [] }));
+  const clientAccounts = await Promise.all(
+    allClients.map(async (c, i) => {
+      let accounts = acctLists[i] ?? [];
+      // fallback: if Zernio didn't return accounts but a key/account is stored, use it
+      if (!accounts.length && flags[c.id]?.social) {
+        const acc = await getClientKey(c.id, "zernio_account_id");
+        if (acc) accounts = [{ id: acc, username: c.igHandle, displayName: c.name, platform: "instagram", followers: null }];
+      }
+      return { client: c, accounts };
+    }),
+  );
   const allAccounts = clientAccounts.flatMap(({ client: c, accounts }) =>
     accounts.map((a) => ({ ...a, clientId: c.id })),
   );
