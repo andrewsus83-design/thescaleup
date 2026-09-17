@@ -112,7 +112,7 @@ export default async function ReportAdminDashboard({
           </div>
         </div>
         {/* top right: Setting · Tambah */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Link
             href="/report/admin/report-settings"
             className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"

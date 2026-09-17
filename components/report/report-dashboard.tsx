@@ -1,4 +1,7 @@
-import { Sparkles, TrendingUp, TrendingDown, Minus, Info } from "lucide-react";
+"use client";
+
+import { useRef, useState } from "react";
+import { Sparkles, TrendingUp, TrendingDown, Minus, Info, ChevronLeft, ChevronRight } from "lucide-react";
 import type { ReportMetrics, PostMetric } from "@/lib/report/types";
 import { METRIC_INFO, type MetricInfo } from "@/lib/report/metric-info";
 import {
@@ -262,6 +265,80 @@ function MoverList({ title, tone, rows, accent }: { title: string; tone: "up" | 
   );
 }
 
+type Slide = { id: string; title: string; node: React.ReactNode };
+
+/** Mobile Typeform-style swipe deck: one section per full-height card, swipe L/R. */
+function MobileDeck({ slides, brandColor }: { slides: Slide[]; brandColor: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(0);
+  const go = (i: number) => {
+    const el = ref.current;
+    if (!el) return;
+    const idx = Math.max(0, Math.min(slides.length - 1, i));
+    el.scrollTo({ left: idx * el.clientWidth, behavior: "smooth" });
+  };
+  const onScroll = () => {
+    const el = ref.current;
+    if (el) setActive(Math.round(el.scrollLeft / el.clientWidth));
+  };
+  return (
+    <div className="select-none">
+      <style>{`.sc-deck::-webkit-scrollbar{display:none}`}</style>
+      <div className="mb-2 flex items-center justify-between px-1">
+        <p className="text-sm font-bold text-[#1B2A4A]">{slides[active]?.title}</p>
+        <span className="text-xs font-medium text-slate-400">
+          {active + 1} / {slides.length}
+        </span>
+      </div>
+      <div
+        ref={ref}
+        onScroll={onScroll}
+        className="sc-deck flex h-[74vh] snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth"
+        style={{ scrollbarWidth: "none" }}
+      >
+        {slides.map((s) => (
+          <section key={s.id} className="flex h-full w-full shrink-0 snap-center snap-always flex-col">
+            <div className="flex-1 overflow-y-auto px-0.5 pb-2">{s.node}</div>
+          </section>
+        ))}
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => go(active - 1)}
+          disabled={active === 0}
+          aria-label="Sebelumnya"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <div className="flex flex-1 flex-wrap items-center justify-center gap-1.5">
+          {slides.map((s, i) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => go(i)}
+              aria-label={s.title}
+              className="h-1.5 rounded-full transition-all"
+              style={{ width: i === active ? 18 : 6, backgroundColor: i === active ? brandColor : "#CBD5E1" }}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => go(active + 1)}
+          disabled={active === slides.length - 1}
+          aria-label="Berikutnya"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </button>
+      </div>
+      <p className="mt-2 text-center text-[11px] text-slate-400">Geser kiri / kanan untuk pindah section</p>
+    </div>
+  );
+}
+
 export function ReportDashboard({
   metrics,
   brandColor = "#2A2870",
@@ -300,7 +377,6 @@ export function ReportDashboard({
   const followersBase = metrics.account?.followers ?? null;
   const eff = efficiency(t, followersBase, posts.length);
   const deltas = computeDeltas(t, metrics.comparison);
-  // rate deltas (from the previous window's raw values) for the corner indicators
   const cmp = metrics.comparison;
   const prevRate = (n?: number | null, d?: number | null) => (cmp && n != null && d != null && d > 0 ? n / d : null);
   const savesRateDelta = pctChange(eff.savesRate, prevRate(cmp?.saved, cmp?.reach));
@@ -317,7 +393,6 @@ export function ReportDashboard({
       : null;
   const growthRate = netGrowth != null && followersBase ? netGrowth / followersBase : null;
 
-  // ---- per-pillar performance rollup (needs AI-suggested pillars) ----
   const pillarRoll = (() => {
     const m = new Map<string, { count: number; reach: number; ti: number }>();
     for (const p of posts) {
@@ -332,7 +407,6 @@ export function ReportDashboard({
   })();
   const pillarMaxReach = Math.max(1, ...pillarRoll.map((p) => p.reach));
 
-  // ---- per-post rows grouped by month (mirrors the Excel Post Master) ----
   const sortedPosts = [...posts].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const monthGroups = (() => {
     const m = new Map<string, PostMetric[]>();
@@ -345,40 +419,61 @@ export function ReportDashboard({
   const sumBy = (arr: PostMetric[], f: (p: PostMetric) => number | null | undefined) =>
     arr.reduce((s, p) => s + (f(p) ?? 0), 0);
 
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-sm text-slate-500">
-            {metrics.platform ? <span className="font-semibold capitalize">{metrics.platform}</span> : "Akun"} ·{" "}
-            {metrics.account?.username ? `@${metrics.account.username}` : "terhubung"} · {metrics.period ?? "periode"}
-          </p>
-          <p className="text-lg font-bold" style={{ color: brandColor }}>
-            {fmt(metrics.account?.followers)} followers
-          </p>
+  const hasDemo =
+    !!metrics.demographics &&
+    ((metrics.demographics.ages?.length ?? 0) > 0 ||
+      (metrics.demographics.cities?.length ?? 0) > 0 ||
+      (metrics.demographics.genders?.length ?? 0) > 0);
+  const hasEngDemo =
+    !!metrics.engagedDemographics &&
+    ((metrics.engagedDemographics.ages?.length ?? 0) > 0 ||
+      (metrics.engagedDemographics.cities?.length ?? 0) > 0 ||
+      (metrics.engagedDemographics.genders?.length ?? 0) > 0);
+
+  // ------------------------------- build slides -----------------------------
+  const slides: Slide[] = [];
+
+  slides.push({
+    id: "ringkasan",
+    title: "Ringkasan",
+    node: (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-sm text-slate-500">
+              {metrics.platform ? <span className="font-semibold capitalize">{metrics.platform}</span> : "Akun"} ·{" "}
+              {metrics.account?.username ? `@${metrics.account.username}` : "terhubung"} · {metrics.period ?? "periode"}
+            </p>
+            <p className="text-lg font-bold" style={{ color: brandColor }}>
+              {fmt(metrics.account?.followers)} followers
+            </p>
+          </div>
+          {metrics.fetchedAt && (
+            <p className="text-xs text-slate-400">Data ditarik: {new Date(metrics.fetchedAt).toLocaleString("id-ID")}</p>
+          )}
         </div>
-        {metrics.fetchedAt && (
-          <p className="text-xs text-slate-400">Data ditarik: {new Date(metrics.fetchedAt).toLocaleString("id-ID")}</p>
-        )}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <Tile label="Reach" value={fmt(t?.reach)} accent={brandColor} info="reach" delta={deltas?.reach} />
+          <Tile label="Impressions" value={fmt(t?.impressions)} info="impressions" />
+          <Tile label="Total Interaksi" value={fmt(t?.totalInteractions)} accent={accentColor} info="totalInteractions" delta={deltas?.totalInteractions} />
+          <Tile label="ER (Reach)" value={pct(t?.erReach)} info="erReach" delta={deltas?.erReach} />
+          <Tile label="Accounts Engaged" value={fmt(t?.accountsEngaged)} info="accountsEngaged" />
+          <Tile label="Likes" value={fmt(t?.likes)} info="likes" delta={deltas?.likes} />
+          <Tile label="Komentar" value={fmt(t?.comments)} info="comments" delta={deltas?.comments} />
+          <Tile label="Shares" value={fmt(t?.shares)} info="shares" delta={deltas?.shares} />
+          <Tile label="Saved" value={fmt(t?.saved)} info="saved" delta={deltas?.saved} />
+          <Tile label="Follows" value={fmt(t?.follows)} info="follows" />
+          <Tile label="Web Clicks" value={fmt(t?.webClicks)} info="webClicks" />
+          <Tile label="Jumlah Post" value={fmt(t?.posts)} info="posts" />
+        </div>
       </div>
+    ),
+  });
 
-      {/* top-line tiles */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        <Tile label="Reach" value={fmt(t?.reach)} accent={brandColor} info="reach" delta={deltas?.reach} />
-        <Tile label="Impressions" value={fmt(t?.impressions)} info="impressions" />
-        <Tile label="Total Interaksi" value={fmt(t?.totalInteractions)} accent={accentColor} info="totalInteractions" delta={deltas?.totalInteractions} />
-        <Tile label="ER (Reach)" value={pct(t?.erReach)} info="erReach" delta={deltas?.erReach} />
-        <Tile label="Accounts Engaged" value={fmt(t?.accountsEngaged)} info="accountsEngaged" />
-        <Tile label="Likes" value={fmt(t?.likes)} info="likes" delta={deltas?.likes} />
-        <Tile label="Komentar" value={fmt(t?.comments)} info="comments" delta={deltas?.comments} />
-        <Tile label="Shares" value={fmt(t?.shares)} info="shares" delta={deltas?.shares} />
-        <Tile label="Saved" value={fmt(t?.saved)} info="saved" delta={deltas?.saved} />
-        <Tile label="Follows" value={fmt(t?.follows)} info="follows" />
-        <Tile label="Web Clicks" value={fmt(t?.webClicks)} info="webClicks" />
-        <Tile label="Jumlah Post" value={fmt(t?.posts)} info="posts" />
-      </div>
-
-      {/* CMO: efficiency + profile-action funnel + quality (derived, shared with Excel) */}
+  slides.push({
+    id: "efisiensi",
+    title: "Efisiensi & Kualitas",
+    node: (
       <div className="rounded-2xl border border-slate-200 bg-white p-5">
         <p className="mb-3 text-sm font-semibold text-slate-700">Efisiensi, Funnel & Kualitas</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -399,35 +494,47 @@ export function ReportDashboard({
           <Tile label="Avg Reach / Post" value={fmt(eff.avgReach != null ? Math.round(eff.avgReach) : null)} hint="rata-rata jangkauan" info="avgReach" />
         </div>
       </div>
+    ),
+  });
 
-      {/* CMO: period-over-period comparison */}
-      {deltas && (
+  if (deltas) {
+    slides.push({
+      id: "perbandingan",
+      title: "vs Periode Lalu",
+      node: (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <SectionTitle info="comparison">Perbandingan vs Periode Sebelumnya</SectionTitle>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-            {[
-              ["Reach", deltas.reach],
-              ["Total Interaksi", deltas.totalInteractions],
-              ["ER", deltas.erReach],
-              ["Likes", deltas.likes],
-              ["Komentar", deltas.comments],
-              ["Saved", deltas.saved],
-              ["Shares", deltas.shares],
-            ].map(([label, d]) => (
-              <div key={label as string} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-center">
+            {(
+              [
+                ["Reach", deltas.reach],
+                ["Total Interaksi", deltas.totalInteractions],
+                ["ER", deltas.erReach],
+                ["Likes", deltas.likes],
+                ["Komentar", deltas.comments],
+                ["Saved", deltas.saved],
+                ["Shares", deltas.shares],
+              ] as [string, number | null][]
+            ).map(([label, d]) => (
+              <div key={label} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-center">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
                 <div className="mt-1.5 flex justify-center">
-                  {d != null ? <DeltaBadge d={d as number} /> : <span className="text-xs text-slate-400">—</span>}
+                  {d != null ? <DeltaBadge d={d} /> : <span className="text-xs text-slate-400">—</span>}
                 </div>
               </div>
             ))}
           </div>
           <p className="mt-2 text-[11px] text-slate-400">Dibandingkan dengan periode sepanjang yang sama tepat sebelum rentang tanggal ini.</p>
         </div>
-      )}
+      ),
+    });
+  }
 
-      {/* CMO: post movers — what drove results up / down */}
-      {movers && (movers.up.length > 0 || movers.down.length > 0) && (
+  if (movers && (movers.up.length > 0 || movers.down.length > 0)) {
+    slides.push({
+      id: "movers",
+      title: "Pendorong & Penyeret",
+      node: (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <SectionTitle info="movers">Post Pendorong &amp; Penyeret</SectionTitle>
           <div className="grid gap-5 sm:grid-cols-2">
@@ -438,10 +545,15 @@ export function ReportDashboard({
             Rata-rata reach periode: <b>{fmt(Math.round(movers.avgReach))}</b>. Pendorong = jauh di atas rata-rata; penyeret = di bawahnya.
           </p>
         </div>
-      )}
+      ),
+    });
+  }
 
-      {/* CMO: best day / time to post */}
-      {bestTime && (
+  if (bestTime) {
+    slides.push({
+      id: "waktu",
+      title: "Waktu Terbaik",
+      node: (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <SectionTitle info="bestTime">Waktu Terbaik Posting (WIB)</SectionTitle>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -450,10 +562,15 @@ export function ReportDashboard({
           </div>
           <p className="mt-2 text-[11px] text-slate-400">Berdasarkan rata-rata reach per hari/jam dari post di periode ini.</p>
         </div>
-      )}
+      ),
+    });
+  }
 
-      {/* CMO: performance per content pillar (needs AI-suggested pillars) */}
-      {pillarRoll.length > 0 && (
+  if (pillarRoll.length > 0) {
+    slides.push({
+      id: "pillar",
+      title: "Per Pillar",
+      node: (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <SectionTitle info="pillar">Performa per Pillar Konten</SectionTitle>
           <div className="space-y-2.5">
@@ -475,10 +592,15 @@ export function ReportDashboard({
           </div>
           <p className="mt-2 text-[11px] text-slate-400">Pillar disarankan AI (Claude) — regenerate laporan untuk mengisinya.</p>
         </div>
-      )}
+      ),
+    });
+  }
 
-      {/* AI analysis (Claude Opus custom parameters) */}
-      {metrics.aiAnalysis && metrics.aiAnalysis.length > 0 && (
+  if (metrics.aiAnalysis && metrics.aiAnalysis.length > 0) {
+    slides.push({
+      id: "ai",
+      title: "Analisa AI",
+      node: (
         <div className="rounded-2xl border border-[#2A2870]/25 bg-gradient-to-br from-[#2A2870]/[0.06] to-white p-5">
           <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#2A2870]">
             <Sparkles className="h-4 w-4" /> Analisa AI (Claude Opus)
@@ -495,60 +617,71 @@ export function ReportDashboard({
             ))}
           </div>
         </div>
-      )}
+      ),
+    });
+  }
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* discovery split */}
-        {disc && discTotal > 0 && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <SectionTitle info="discovery">Jangkauan: Followers vs Non-followers</SectionTitle>
-            <div className="flex h-4 overflow-hidden rounded-full">
-              <div style={{ width: `${((disc.followers ?? 0) / discTotal) * 100}%`, backgroundColor: brandColor }} />
-              <div style={{ width: `${((disc.nonFollowers ?? 0) / discTotal) * 100}%`, backgroundColor: accentColor }} />
+  if ((disc && discTotal > 0) || ct.length > 0) {
+    slides.push({
+      id: "jangkauan",
+      title: "Jangkauan & Format",
+      node: (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {disc && discTotal > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <SectionTitle info="discovery">Jangkauan: Followers vs Non-followers</SectionTitle>
+              <div className="flex h-4 overflow-hidden rounded-full">
+                <div style={{ width: `${((disc.followers ?? 0) / discTotal) * 100}%`, backgroundColor: brandColor }} />
+                <div style={{ width: `${((disc.nonFollowers ?? 0) / discTotal) * 100}%`, backgroundColor: accentColor }} />
+              </div>
+              <div className="mt-3 flex flex-wrap justify-between gap-2 text-sm">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: brandColor }} /> Followers{" "}
+                  <b>{fmt(disc.followers)}</b> ({Math.round(((disc.followers ?? 0) / discTotal) * 100)}%)
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accentColor }} /> Non-followers{" "}
+                  <b>{fmt(disc.nonFollowers)}</b> ({Math.round(((disc.nonFollowers ?? 0) / discTotal) * 100)}%)
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-slate-400">
+                Porsi non-followers tinggi = konten Anda banyak ditemukan lewat discovery/explore.
+              </p>
             </div>
-            <div className="mt-3 flex justify-between text-sm">
-              <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: brandColor }} /> Followers{" "}
-                <b>{fmt(disc.followers)}</b> ({Math.round(((disc.followers ?? 0) / discTotal) * 100)}%)
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accentColor }} /> Non-followers{" "}
-                <b>{fmt(disc.nonFollowers)}</b> ({Math.round(((disc.nonFollowers ?? 0) / discTotal) * 100)}%)
-              </span>
-            </div>
-            <p className="mt-2 text-xs text-slate-400">
-              Porsi non-followers tinggi = konten Anda banyak ditemukan lewat discovery/explore.
-            </p>
-          </div>
-        )}
-
-        {/* content type breakdown */}
-        {ct.length > 0 && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <SectionTitle info="contentType">Reach per Jenis Konten</SectionTitle>
-            <div className="space-y-2.5">
-              {ct
-                .sort((a, b) => (b.reach ?? 0) - (a.reach ?? 0))
-                .map((c) => (
-                  <div key={c.type}>
-                    <div className="mb-1 flex justify-between text-xs">
-                      <span className="font-medium text-slate-600">{CT_LABEL[c.type] ?? c.type}</span>
-                      <span className="text-slate-500">
-                        {fmt(c.reach)} reach{c.interactions != null ? ` · ${fmt(c.interactions)} interaksi` : ""}
-                      </span>
+          )}
+          {ct.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <SectionTitle info="contentType">Reach per Jenis Konten</SectionTitle>
+              <div className="space-y-2.5">
+                {ct
+                  .slice()
+                  .sort((a, b) => (b.reach ?? 0) - (a.reach ?? 0))
+                  .map((c) => (
+                    <div key={c.type}>
+                      <div className="mb-1 flex justify-between text-xs">
+                        <span className="font-medium text-slate-600">{CT_LABEL[c.type] ?? c.type}</span>
+                        <span className="text-slate-500">
+                          {fmt(c.reach)} reach{c.interactions != null ? ` · ${fmt(c.interactions)} interaksi` : ""}
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full" style={{ width: `${((c.reach ?? 0) / ctMax) * 100}%`, backgroundColor: brandColor }} />
+                      </div>
                     </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                      <div className="h-full rounded-full" style={{ width: `${((c.reach ?? 0) / ctMax) * 100}%`, backgroundColor: brandColor }} />
-                    </div>
-                  </div>
-                ))}
+                  ))}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      ),
+    });
+  }
 
-      {/* follower growth */}
-      {(metrics.followerSeries?.length || metrics.followersGained != null) && (
+  if (metrics.followerSeries?.length || metrics.followersGained != null) {
+    slides.push({
+      id: "follower",
+      title: "Pertumbuhan Follower",
+      node: (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
@@ -556,9 +689,7 @@ export function ReportDashboard({
               <InfoDot id="followerGrowth" />
             </p>
             <div className="flex gap-4 text-sm">
-              {metrics.followersGained != null && (
-                <span className="text-emerald-600">+{fmt(metrics.followersGained)} gained</span>
-              )}
+              {metrics.followersGained != null && <span className="text-emerald-600">+{fmt(metrics.followersGained)} gained</span>}
               {metrics.followersLost != null && <span className="text-red-500">−{fmt(metrics.followersLost)} lost</span>}
               {metrics.account?.followers != null && (
                 <span className="font-semibold" style={{ color: brandColor }}>
@@ -571,84 +702,98 @@ export function ReportDashboard({
             <FollowerLine series={metrics.followerSeries} color={brandColor} />
           )}
         </div>
-      )}
+      ),
+    });
+  }
 
-      {/* audience demographics */}
-      {metrics.demographics &&
-        ((metrics.demographics.ages?.length ?? 0) > 0 ||
-          (metrics.demographics.cities?.length ?? 0) > 0 ||
-          (metrics.demographics.genders?.length ?? 0) > 0) && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <p className="mb-4 text-sm font-semibold text-slate-700">Audiens (Followers)</p>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              <BarList title="Umur" items={metrics.demographics.ages} color={brandColor} />
-              <BarList title="Gender" items={metrics.demographics.genders} color={accentColor} />
-              <BarList title="Kota" items={metrics.demographics.cities} color={brandColor} />
-              <BarList title="Negara" items={metrics.demographics.countries} color={accentColor} />
-            </div>
-          </div>
-        )}
-
-      {/* reels / video performance */}
-      {metrics.reels && metrics.reels.count > 0 && (
+  if (hasDemo) {
+    slides.push({
+      id: "demografi",
+      title: "Audiens (Followers)",
+      node: (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <SectionTitle info="completion">Performa Reels / Video</SectionTitle>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Tile label="Jumlah Video" value={fmt(metrics.reels.count)} />
-            <Tile label="Total Views" value={fmt(metrics.reels.totalViews)} accent={accentColor} />
-            <Tile label="Avg Watch Time" value={metrics.reels.avgWatchTimeSec != null ? `${metrics.reels.avgWatchTimeSec.toFixed(1)} dtk` : "—"} />
-            <Tile label="Completion Rate" value={pct(metrics.reels.avgCompletion)} accent={brandColor} />
+          <p className="mb-4 text-sm font-semibold text-slate-700">Audiens (Followers)</p>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <BarList title="Umur" items={metrics.demographics!.ages} color={brandColor} />
+            <BarList title="Gender" items={metrics.demographics!.genders} color={accentColor} />
+            <BarList title="Kota" items={metrics.demographics!.cities} color={brandColor} />
+            <BarList title="Negara" items={metrics.demographics!.countries} color={accentColor} />
           </div>
         </div>
-      )}
+      ),
+    });
+  }
 
-      {/* CMO: per-Reel retention detail */}
-      {reels.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white">
-          <p className="flex items-center gap-1.5 px-4 pt-4 text-sm font-semibold text-slate-700">
-            Retensi Reels per Video
-            <InfoDot id="viewRate" />
-          </p>
-          <div className="mt-2 overflow-x-auto">
-            <table className="w-full min-w-[720px] text-xs">
-              <thead>
-                <tr className="border-y border-slate-100 text-left uppercase tracking-wide text-slate-400">
-                  <th className="p-2.5">Tanggal</th>
-                  <th className="p-2.5">Konten</th>
-                  <th className="p-2.5 text-right">Views</th>
-                  <th className="p-2.5 text-right">Reach</th>
-                  <th className="p-2.5 text-right">View Rate</th>
-                  <th className="p-2.5 text-right">Avg Watch</th>
-                  <th className="p-2.5 text-right">Completion</th>
-                  <th className="p-2.5 text-right">Skip</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reels.map((v, i) => (
-                  <tr key={i} className="border-b border-slate-50 last:border-0">
-                    <td className="whitespace-nowrap p-2.5 text-slate-500">{v.date}</td>
-                    <td className="max-w-[240px] p-2.5 text-slate-700">
-                      <span className="line-clamp-1">{v.caption || "—"}</span>
-                    </td>
-                    <td className="p-2.5 text-right font-medium">{fmt(v.views)}</td>
-                    <td className="p-2.5 text-right">{fmt(v.reach)}</td>
-                    <td className="p-2.5 text-right text-slate-500">{v.viewRate != null ? times(v.viewRate) : "—"}</td>
-                    <td className="p-2.5 text-right">{v.avgWatchSec != null ? `${v.avgWatchSec.toFixed(1)} dtk` : "—"}</td>
-                    <td className="p-2.5 text-right">{pct1(v.completion)}</td>
-                    <td className="p-2.5 text-right text-slate-500">{pct1(v.skip)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="px-4 pb-3 pt-2 text-[11px] text-slate-400">
-            View Rate = views ÷ reach (daya tarik hook). Completion tinggi + Skip rendah = retensi kuat.
-          </p>
+  if ((metrics.reels && metrics.reels.count > 0) || reels.length > 0) {
+    slides.push({
+      id: "reels",
+      title: "Reels & Retensi",
+      node: (
+        <div className="space-y-4">
+          {metrics.reels && metrics.reels.count > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <SectionTitle info="completion">Performa Reels / Video</SectionTitle>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Tile label="Jumlah Video" value={fmt(metrics.reels.count)} />
+                <Tile label="Total Views" value={fmt(metrics.reels.totalViews)} accent={accentColor} />
+                <Tile label="Avg Watch Time" value={metrics.reels.avgWatchTimeSec != null ? `${metrics.reels.avgWatchTimeSec.toFixed(1)} dtk` : "—"} />
+                <Tile label="Completion Rate" value={pct(metrics.reels.avgCompletion)} accent={brandColor} />
+              </div>
+            </div>
+          )}
+          {reels.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white">
+              <p className="flex items-center gap-1.5 px-4 pt-4 text-sm font-semibold text-slate-700">
+                Retensi Reels per Video
+                <InfoDot id="viewRate" />
+              </p>
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full min-w-[720px] text-xs">
+                  <thead>
+                    <tr className="border-y border-slate-100 text-left uppercase tracking-wide text-slate-400">
+                      <th className="p-2.5">Tanggal</th>
+                      <th className="p-2.5">Konten</th>
+                      <th className="p-2.5 text-right">Views</th>
+                      <th className="p-2.5 text-right">Reach</th>
+                      <th className="p-2.5 text-right">View Rate</th>
+                      <th className="p-2.5 text-right">Avg Watch</th>
+                      <th className="p-2.5 text-right">Completion</th>
+                      <th className="p-2.5 text-right">Skip</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reels.map((v, i) => (
+                      <tr key={i} className="border-b border-slate-50 last:border-0">
+                        <td className="whitespace-nowrap p-2.5 text-slate-500">{v.date}</td>
+                        <td className="max-w-[240px] p-2.5 text-slate-700">
+                          <span className="line-clamp-1">{v.caption || "—"}</span>
+                        </td>
+                        <td className="p-2.5 text-right font-medium">{fmt(v.views)}</td>
+                        <td className="p-2.5 text-right">{fmt(v.reach)}</td>
+                        <td className="p-2.5 text-right text-slate-500">{v.viewRate != null ? times(v.viewRate) : "—"}</td>
+                        <td className="p-2.5 text-right">{v.avgWatchSec != null ? `${v.avgWatchSec.toFixed(1)} dtk` : "—"}</td>
+                        <td className="p-2.5 text-right">{pct1(v.completion)}</td>
+                        <td className="p-2.5 text-right text-slate-500">{pct1(v.skip)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="px-4 pb-3 pt-2 text-[11px] text-slate-400">
+                View Rate = views ÷ reach (daya tarik hook). Completion tinggi + Skip rendah = retensi kuat.
+              </p>
+            </div>
+          )}
         </div>
-      )}
+      ),
+    });
+  }
 
-      {/* instagram stories */}
-      {metrics.stories && metrics.stories.count > 0 && (
+  if (metrics.stories && metrics.stories.count > 0) {
+    slides.push({
+      id: "stories",
+      title: "Stories",
+      node: (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <p className="mb-3 text-sm font-semibold text-slate-700">Instagram Stories ({metrics.stories.count})</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
@@ -662,26 +807,33 @@ export function ReportDashboard({
             <Tile label="Follows" value={fmt(metrics.stories.follows)} />
           </div>
         </div>
-      )}
+      ),
+    });
+  }
 
-      {/* engaged-audience demographics */}
-      {metrics.engagedDemographics &&
-        ((metrics.engagedDemographics.ages?.length ?? 0) > 0 ||
-          (metrics.engagedDemographics.cities?.length ?? 0) > 0 ||
-          (metrics.engagedDemographics.genders?.length ?? 0) > 0) && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <p className="mb-4 text-sm font-semibold text-slate-700">Audiens yang Berinteraksi</p>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              <BarList title="Umur" items={metrics.engagedDemographics.ages} color={brandColor} />
-              <BarList title="Gender" items={metrics.engagedDemographics.genders} color={accentColor} />
-              <BarList title="Kota" items={metrics.engagedDemographics.cities} color={brandColor} />
-              <BarList title="Negara" items={metrics.engagedDemographics.countries} color={accentColor} />
-            </div>
+  if (hasEngDemo) {
+    slides.push({
+      id: "engaged",
+      title: "Audiens Interaksi",
+      node: (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="mb-4 text-sm font-semibold text-slate-700">Audiens yang Berinteraksi</p>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <BarList title="Umur" items={metrics.engagedDemographics!.ages} color={brandColor} />
+            <BarList title="Gender" items={metrics.engagedDemographics!.genders} color={accentColor} />
+            <BarList title="Kota" items={metrics.engagedDemographics!.cities} color={brandColor} />
+            <BarList title="Negara" items={metrics.engagedDemographics!.countries} color={accentColor} />
           </div>
-        )}
+        </div>
+      ),
+    });
+  }
 
-      {/* CMO: audience overlap — who follows vs who actually engages */}
-      {(genderOverlap.length > 0 || ageOverlap.length > 0) && (
+  if (genderOverlap.length > 0 || ageOverlap.length > 0) {
+    slides.push({
+      id: "overlap",
+      title: "Overlap Audiens",
+      node: (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
             Overlap Audiens: Followers vs yang Berinteraksi
@@ -695,10 +847,15 @@ export function ReportDashboard({
             <OverlapTable title="Gender" rows={genderOverlap} brandColor={brandColor} accentColor={accentColor} />
           </div>
         </div>
-      )}
+      ),
+    });
+  }
 
-      {/* contact buttons */}
-      {metrics.contactButtons && metrics.contactButtons.length > 0 && (
+  if (metrics.contactButtons && metrics.contactButtons.length > 0) {
+    slides.push({
+      id: "kontak",
+      title: "Tombol Kontak",
+      node: (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <p className="mb-3 text-sm font-semibold text-slate-700">Tap Tombol Kontak (Profil)</p>
           <div className="flex flex-wrap gap-2">
@@ -709,10 +866,15 @@ export function ReportDashboard({
             ))}
           </div>
         </div>
-      )}
+      ),
+    });
+  }
 
-      {/* reach trend */}
-      {series.length > 1 && (
+  if (series.length > 1) {
+    slides.push({
+      id: "tren",
+      title: "Tren Reach",
+      node: (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <p className="mb-3 text-sm font-semibold text-slate-700">Tren Reach Harian</p>
           <div className="flex h-24 items-end gap-[3px]">
@@ -730,10 +892,15 @@ export function ReportDashboard({
             <span>{series[series.length - 1]?.date}</span>
           </div>
         </div>
-      )}
+      ),
+    });
+  }
 
-      {/* Post Master — full per-post detail (same columns as the Excel report) */}
-      {posts.length > 0 && (
+  if (posts.length > 0) {
+    slides.push({
+      id: "postmaster",
+      title: "Post Master",
+      node: (
         <div className="rounded-2xl border border-slate-200 bg-white">
           <div className="flex items-center justify-between px-4 pt-4">
             <p className="text-sm font-semibold text-slate-700">Post Master — detail per post</p>
@@ -769,8 +936,23 @@ export function ReportDashboard({
             </table>
           </div>
         </div>
-      )}
-    </div>
+      ),
+    });
+  }
+
+  return (
+    <>
+      {/* Desktop: stacked sections */}
+      <div className="hidden space-y-5 sm:block">
+        {slides.map((s) => (
+          <div key={s.id}>{s.node}</div>
+        ))}
+      </div>
+      {/* Mobile: Typeform-style swipe deck */}
+      <div className="sm:hidden">
+        <MobileDeck slides={slides} brandColor={brandColor} />
+      </div>
+    </>
   );
 }
 

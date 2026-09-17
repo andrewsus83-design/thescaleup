@@ -64,9 +64,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="id"
-      className={`${jakarta.variable} ${inter.variable} ${jbmono.variable} ${syne.variable}`}
+      className={`overflow-x-clip ${jakarta.variable} ${inter.variable} ${jbmono.variable} ${syne.variable}`}
     >
-      <body className="min-h-screen bg-obsidian text-mist antialiased">
+      <body className="min-h-screen overflow-x-clip bg-obsidian text-mist antialiased">
         <ParallaxBg />
         {children}
       </body>
