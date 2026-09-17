@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import {
   createSupabaseAdminClient,
   isSupabaseAdminConfigured,
@@ -68,8 +69,10 @@ export async function getClientBySlug(slug: string): Promise<ReportClient | null
 
 /* ------------------------------ client settings ---------------------------- */
 
-/** Full raw settings map for a client (server-only — contains secrets). */
-export async function getClientSettings(clientId: string): Promise<Record<string, string>> {
+/** Full raw settings map for a client (server-only — contains secrets).
+ *  `cache`d so repeated reads within one render (getClientKey/getConfiguredProviders/
+ *  getClientZernioKeys all call this) hit the DB once. */
+export const getClientSettings = cache(async (clientId: string): Promise<Record<string, string>> => {
   const out: Record<string, string> = {};
   if (!isSupabaseAdminConfigured()) return out;
   try {
@@ -82,7 +85,7 @@ export async function getClientSettings(clientId: string): Promise<Record<string
     /* table may not exist yet */
   }
   return out;
-}
+});
 
 /** One provider key for a client (server-only). */
 export async function getClientKey(clientId: string, provider: string): Promise<string | null> {

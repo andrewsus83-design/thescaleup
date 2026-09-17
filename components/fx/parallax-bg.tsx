@@ -12,6 +12,9 @@ export function ParallaxBg() {
   const c = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // The report platform (report.* / /report/*) uses a solid light theme that
+    // covers these orbs — skip the scroll/pointer work there for smoother mobile.
+    if (window.location.hostname.startsWith("report.") || window.location.pathname.startsWith("/report")) return;
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (mq.matches) return;
 

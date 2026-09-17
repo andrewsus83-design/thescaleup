@@ -105,10 +105,21 @@ export type ZernioAccount = {
   keyId?: string;
 };
 
-/** List the Instagram accounts connected to a Zernio key. Never throws. */
-export async function listZernioAccounts(apiKey: string): Promise<{ ok: boolean; accounts: ZernioAccount[]; error?: string }> {
+type AccountsResult = { ok: boolean; accounts: ZernioAccount[]; error?: string };
+
+// The account list per key rarely changes but is hit on every dashboard render
+// (per client × per key). Cache OK results briefly to avoid hammering Zernio.
+// Node/Fluid reuses the module across requests, so this persists between loads.
+const ACCT_CACHE = new Map<string, { at: number; val: AccountsResult }>();
+const ACCT_TTL_MS = 90_000; // 90s
+
+/** List the accounts connected to a Zernio key. Cached ~90s. Never throws. */
+export async function listZernioAccounts(apiKey: string, opts?: { force?: boolean }): Promise<AccountsResult> {
   const base = baseUrl();
   if (!apiKey) return { ok: false, accounts: [], error: "API key kosong." };
+  const now = Date.now();
+  const hit = ACCT_CACHE.get(apiKey);
+  if (!opts?.force && hit && now - hit.at < ACCT_TTL_MS) return hit.val;
   try {
     const res = await fetch(`${base}/v1/accounts`, {
       headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
@@ -130,7 +141,9 @@ export async function listZernioAccounts(apiKey: string): Promise<{ ok: boolean;
         followers: num(a.followersCount ?? a.followers ?? a.fanCount ?? a.followers_count),
       }))
       .filter((a) => a.id);
-    return { ok: true, accounts };
+    const val: AccountsResult = { ok: true, accounts };
+    ACCT_CACHE.set(apiKey, { at: now, val }); // cache OK results only
+    return val;
   } catch (e) {
     return { ok: false, accounts: [], error: `Gagal menghubungi Zernio: ${(e as Error).message}` };
   }
