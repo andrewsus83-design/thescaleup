@@ -12,6 +12,7 @@ import { DeleteBrandButton } from "@/components/report/delete-brand-button";
 import { DateRangeForm } from "@/components/report/date-range-form";
 import { WebsiteCard } from "@/components/report/website-card";
 import { RefreshButton } from "@/components/report/refresh-button";
+import { AdminBottomNav } from "@/components/report/admin-bottom-nav";
 
 function isoDaysAgo(base: Date, days: number) {
   return new Date(base.getTime() - days * 86400000).toISOString().slice(0, 10);
@@ -99,7 +100,7 @@ export default async function ReportAdminDashboard({
   }));
 
   return (
-    <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
+    <div className="mx-auto max-w-6xl px-5 pb-28 pt-8 sm:px-8">
       {/* header */}
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -241,6 +242,8 @@ export default async function ReportAdminDashboard({
           )}
         </div>
       )}
+
+      <AdminBottomNav accountIds={accountIds} webIds={webIds} active="report" />
     </div>
   );
 }
