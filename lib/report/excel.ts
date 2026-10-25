@@ -317,7 +317,8 @@ function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: Re
       [2, 17].forEach((c) => (ws.getCell(rk.row, c).fill = fill(color.replace("#", ""))));
     });
   }
-  ws.views = [{ state: "frozen", ySplit: 3 }];
+  // keep the header rows and the Date + Content columns in view while scrolling a 17-column sheet
+  ws.views = [{ state: "frozen", xSplit: 2, ySplit: 3 }];
 }
 
 /** Sheet 3 — "Metrik & Insight": the SAME analytical sections as the dashboard. */

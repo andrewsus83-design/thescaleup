@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   Sparkles, TrendingUp, TrendingDown, Minus, Info, ChevronLeft, ChevronRight, ChevronDown,
   CircleCheck, CircleX, TriangleAlert, Lightbulb,
@@ -23,6 +23,19 @@ import {
 } from "@/lib/report/derive";
 import { runChecks, summarizeChecks, type DataCheck } from "@/lib/report/checks";
 import { autoNotes, type AutoNote } from "@/lib/report/notes";
+
+const INK = "#1B2A4A";
+/** Brand/accent colors are fills. As text they must clear 4.5:1 on white (WCAG AA), else fall back to ink —
+ *  a light accent like #38B6F0 is ~2.2:1 and unreadable as a number. */
+function readableOnWhite(hex?: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec((hex ?? "").trim());
+  if (!m) return INK;
+  const [r, g, b] = [0, 2, 4]
+    .map((i) => parseInt(m[1].slice(i, i + 2), 16) / 255)
+    .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return 1.05 / (lum + 0.05) >= 4.5 ? `#${m[1]}` : INK;
+}
 
 function fmt(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
@@ -48,7 +61,7 @@ function DeltaBadge({ d }: { d: number | null }) {
   if (d == null) return null;
   const up = d >= 0;
   const Icon = d === 0 ? Minus : up ? TrendingUp : TrendingDown;
-  const cls = d === 0 ? "text-slate-400 bg-slate-100" : up ? "text-emerald-600 bg-emerald-50" : "text-red-500 bg-red-50";
+  const cls = d === 0 ? "text-slate-500 bg-slate-100" : up ? "text-emerald-700 bg-emerald-50" : "text-red-700 bg-red-50";
   return (
     <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${cls}`}>
       <Icon className="h-3 w-3" />
@@ -72,16 +85,77 @@ const CT_LABEL: Record<string, string> = {
 const PlatformCtx = createContext<string | undefined>(undefined);
 const ScopeCtx = createContext<Scope | undefined>(undefined);
 
-/** Pure-CSS hover tooltip: description + rumus + industry benchmark + relation. */
+const POP_W = 256; // popover width (px)
+
+/** Info popover: description + rumus + benchmark + relation. Opens on hover (mouse), focus (keyboard)
+ *  or tap (touch). Positioned `fixed` and clamped to the viewport so the deck's scroll containers
+ *  can't clip it. It follows its icon while the page scrolls (focusing an off-screen icon scrolls it
+ *  into view) and closes on Esc, blur, an outside tap, or once the icon has left the screen. */
 function InfoDot({ id, info }: { id?: string; info?: MetricInfo }) {
   const platform = useContext(PlatformCtx);
+  const btn = useRef<HTMLButtonElement>(null);
+  const openedAt = useRef(0);
+  const seenVisible = useRef(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const open = pos != null;
+  // Re-anchor under the icon. Close only if the icon WAS on screen during this open and has now left —
+  // a focus on an off-screen icon opens first, and the browser scrolls it into view afterwards.
+  const place = useCallback((closeIfGone: boolean) => {
+    const r = btn.current?.getBoundingClientRect();
+    if (!r) return;
+    const visible = r.bottom >= 0 && r.top <= window.innerHeight;
+    if (visible) seenVisible.current = true;
+    else if (closeIfGone && seenVisible.current) return setPos(null);
+    const left = Math.min(Math.max(8, r.left + r.width / 2 - POP_W / 2), window.innerWidth - POP_W - 8);
+    setPos({ top: r.bottom + 6, left });
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    const follow = () => place(true);
+    const outside = (e: PointerEvent) => {
+      if (!btn.current?.contains(e.target as Node)) setPos(null);
+    };
+    window.addEventListener("scroll", follow, true);
+    window.addEventListener("resize", follow);
+    document.addEventListener("pointerdown", outside);
+    return () => {
+      window.removeEventListener("scroll", follow, true);
+      window.removeEventListener("resize", follow);
+      document.removeEventListener("pointerdown", outside);
+    };
+  }, [open, place]);
   const m = info ?? (id ? METRIC_INFO[id] : undefined);
   if (!m) return null;
   const sc = id ? scopeFor(id, platform) : undefined;
+  const show = () => {
+    openedAt.current = Date.now();
+    seenVisible.current = false;
+    place(false);
+  };
   return (
-    <span className="group/info relative inline-flex align-middle">
-      <Info className="h-3 w-3 cursor-help text-slate-300 transition-colors hover:text-slate-500" />
-      <span className="pointer-events-none absolute left-1/2 top-5 z-40 hidden w-64 -translate-x-1/2 whitespace-normal rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-normal normal-case leading-relaxed tracking-normal text-slate-600 shadow-xl group-hover/info:block">
+    <span className="relative inline-flex align-middle">
+      <button
+        ref={btn}
+        type="button"
+        aria-label={`Info: ${m.label}`}
+        aria-expanded={pos != null}
+        // a tap fires focus then click on the same gesture: only a later click closes it
+        onClick={() => (pos && Date.now() - openedAt.current > 250 ? setPos(null) : show())}
+        onPointerEnter={(e) => e.pointerType === "mouse" && show()}
+        onPointerLeave={(e) => e.pointerType === "mouse" && setPos(null)}
+        onFocus={show}
+        onBlur={() => setPos(null)}
+        onKeyDown={(e) => e.key === "Escape" && setPos(null)}
+        className="-m-1 rounded-full p-1 text-slate-500 transition-colors hover:text-slate-600 focus-visible:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+      >
+        <Info className="h-3 w-3" aria-hidden />
+      </button>
+      {pos && (
+      <span
+        role="tooltip"
+        style={{ position: "fixed", top: pos.top, left: pos.left, width: POP_W }}
+        className="pointer-events-none z-50 whitespace-normal rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-normal normal-case leading-relaxed tracking-normal text-slate-600 shadow-xl"
+      >
         <b className="text-slate-800">{m.label}</b>
         <span className="mt-1 block text-slate-600">{m.desc}</span>
         {sc && (
@@ -96,11 +170,12 @@ function InfoDot({ id, info }: { id?: string; info?: MetricInfo }) {
         )}
         {m.benchmark && (
           <span className="mt-1 block">
-            <b className="text-emerald-600">Patokan bagus:</b> {m.benchmark}
+            <b className="text-emerald-700">Patokan bagus:</b> {m.benchmark}
           </span>
         )}
-        {m.relation && <span className="mt-1 block text-slate-400">↔ {m.relation}</span>}
+        {m.relation && <span className="mt-1 block text-slate-500">↔ {m.relation}</span>}
       </span>
+      )}
     </span>
   );
 }
@@ -135,6 +210,11 @@ function ScopeChip({ scope }: { scope: Scope }) {
   );
 }
 
+/** Small caps label that names a group of tiles. */
+function GroupLabel({ children }: { children: React.ReactNode }) {
+  return <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-slate-600">{children}</p>;
+}
+
 /** Grid whose tiles default to one scope (e.g. a Stories-only block). */
 function ScopeBox({ scope, className, children }: { scope: Scope; className?: string; children: React.ReactNode }) {
   return (
@@ -152,6 +232,8 @@ function Tile({
   info,
   delta,
   scope,
+  hero,
+  className,
 }: {
   label: string;
   value: string;
@@ -160,29 +242,33 @@ function Tile({
   info?: string;
   delta?: number | null;
   scope?: Scope;
+  /** The one lead number of a view: bigger type, same sans. */
+  hero?: boolean;
+  className?: string;
 }) {
   const platform = useContext(PlatformCtx);
   const sectionScope = useContext(ScopeCtx);
   const sc = scope ?? (info ? scopeFor(info, platform) : undefined) ?? sectionScope;
   const na = value === "—"; // every formatter returns "—" for "no data"
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-1">
-        <p className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
-          {label}
-          {info && <InfoDot id={info} />}
+    <div className={`rounded-2xl border border-slate-200 bg-white p-4 ${className ?? ""}`}>
+      <p className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+        {label}
+        {info && <InfoDot id={info} />}
+      </p>
+      {/* the delta sits beside the number (wrapping under it when narrow) so a long label can never push it out of the tile */}
+      <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+        <p
+          className={`${hero ? "text-4xl sm:text-5xl" : "text-2xl"} font-bold ${na ? "text-slate-500" : ""}`}
+          style={na ? undefined : { color: readableOnWhite(accent) }}
+          title={na ? "Data tidak tersedia dari Zernio (bukan 0)" : undefined}
+        >
+          {na ? "n/a" : value}
         </p>
         {delta != null && <DeltaBadge d={delta} />}
       </div>
-      <p
-        className={`mt-1 text-2xl font-bold ${na ? "text-slate-300" : ""}`}
-        style={na ? undefined : { color: accent ?? "#1B2A4A" }}
-        title={na ? "Data tidak tersedia dari Zernio (bukan 0)" : undefined}
-      >
-        {na ? "n/a" : value}
-      </p>
       {(sc || hint) && (
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-400">
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
           {sc && <ScopeChip scope={sc} />}
           {hint && <span>{hint}</span>}
         </p>
@@ -207,7 +293,7 @@ function FollowerLine({ series, color }: { series: { date: string; value: number
       <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-16 w-full">
         <polyline points={pts} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
       </svg>
-      <div className="mt-1 flex justify-between text-[11px] text-slate-400">
+      <div className="mt-1 flex justify-between text-[11px] text-slate-500">
         <span>{series[0]?.date}</span>
         <span>{series[series.length - 1]?.date}</span>
       </div>
@@ -230,13 +316,13 @@ function BarList({
   if (!list.length) return null;
   return (
     <div>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</p>
       <div className="space-y-1.5">
         {list.map((x) => (
           <div key={x.name}>
             <div className="mb-0.5 flex justify-between text-xs">
               <span className="truncate text-slate-600">{x.name}</span>
-              <span className="text-slate-400">{Math.round((x.value / total) * 100)}%</span>
+              <span className="text-slate-500">{Math.round((x.value / total) * 100)}%</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
               <div className="h-full rounded-full" style={{ width: `${(x.value / total) * 100}%`, backgroundColor: color }} />
@@ -264,13 +350,19 @@ function OverlapTable({
   if (!list.length) return null;
   return (
     <div>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</p>
       <table className="w-full text-xs">
         <thead>
-          <tr className="text-left text-[11px] uppercase text-slate-400">
+          <tr className="text-left text-[11px] uppercase text-slate-500">
             <th className="py-1">Segmen</th>
-            <th className="py-1 text-right" style={{ color: brandColor }}>Followers</th>
-            <th className="py-1 text-right" style={{ color: accentColor }}>Interaksi</th>
+            <th className="py-1 text-right">
+              <span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: brandColor }} />
+              Followers
+            </th>
+            <th className="py-1 text-right">
+              <span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: accentColor }} />
+              Interaksi
+            </th>
             <th className="py-1 text-right">Gap</th>
           </tr>
         </thead>
@@ -280,7 +372,7 @@ function OverlapTable({
               <td className="py-1.5 pr-2 text-slate-600">{r.name}</td>
               <td className="py-1.5 text-right text-slate-500">{(r.follower * 100).toFixed(0)}%</td>
               <td className="py-1.5 text-right text-slate-500">{(r.engaged * 100).toFixed(0)}%</td>
-              <td className={`py-1.5 text-right font-semibold ${r.gap >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+              <td className={`py-1.5 text-right font-semibold ${r.gap >= 0 ? "text-emerald-700" : "text-red-600"}`}>
                 {r.gap >= 0 ? "+" : ""}
                 {(r.gap * 100).toFixed(0)}%
               </td>
@@ -328,7 +420,7 @@ function MoverList({ title, tone, rows, accent }: { title: string; tone: "up" | 
 }
 
 const CHECK_ICON = { pass: CircleCheck, warn: TriangleAlert, fail: CircleX, skip: Minus } as const;
-const CHECK_TONE = { pass: "text-emerald-700", warn: "text-amber-700", fail: "text-red-700", skip: "text-slate-400" } as const;
+const CHECK_TONE = { pass: "text-emerald-700", warn: "text-amber-700", fail: "text-red-700", skip: "text-slate-500" } as const;
 const CHECK_WORD = { pass: "Lolos", warn: "Cek", fail: "Gagal", skip: "Dilewati" } as const;
 
 /** Admin-only QA banner: one line, expands (native <details>, keyboard-friendly) to every check. */
@@ -384,7 +476,7 @@ function DataQualityBanner({ checks }: { checks: DataCheck[] }) {
 }
 
 const NOTE_STYLE = {
-  good: { Icon: CircleCheck, tone: "text-emerald-600" },
+  good: { Icon: CircleCheck, tone: "text-emerald-700" },
   info: { Icon: Lightbulb, tone: "text-sky-600" },
   warn: { Icon: TriangleAlert, tone: "text-amber-600" },
 } as const;
@@ -406,7 +498,7 @@ function AutoNotes({ notes }: { notes: AutoNote[] }) {
           );
         })}
       </ul>
-      <p className="mt-3 text-[11px] text-slate-400">
+      <p className="mt-3 text-[11px] text-slate-500">
         Dibuat otomatis dari aturan tetap (bukan AI): angka yang sama selalu menghasilkan kalimat yang sama.
       </p>
     </div>
@@ -433,8 +525,23 @@ function MobileDeck({ slides, brandColor }: { slides: Slide[]; brandColor: strin
     <div className="select-none">
       <style>{`.sc-deck::-webkit-scrollbar{display:none}`}</style>
       <div className="mb-2 flex items-center justify-between px-1">
-        <p className="text-sm font-bold text-[#1B2A4A]">{slides[active]?.title}</p>
-        <span className="text-xs font-medium text-slate-400">
+        {/* native picker: a real jump-to-section control with a full-size tap target (the 6px dots were not one) */}
+        <label className="relative flex items-center text-sm font-bold text-[#1B2A4A]">
+          <span className="sr-only">Pindah ke section</span>
+          <select
+            value={active}
+            onChange={(e) => go(Number(e.target.value))}
+            className="max-w-[60vw] cursor-pointer appearance-none truncate rounded bg-transparent py-1 pr-6 font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          >
+            {slides.map((s, i) => (
+              <option key={s.id} value={i}>
+                {s.title}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-0 h-4 w-4 text-slate-500" aria-hidden />
+        </label>
+        <span className="text-xs font-medium text-slate-600">
           {active + 1} / {slides.length}
         </span>
       </div>
@@ -456,17 +563,15 @@ function MobileDeck({ slides, brandColor }: { slides: Slide[]; brandColor: strin
           onClick={() => go(active - 1)}
           disabled={active === 0}
           aria-label="Sebelumnya"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-40"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <div className="flex flex-1 flex-wrap items-center justify-center gap-1.5">
+        {/* progress only — jumping between sections is the picker above */}
+        <div aria-hidden className="pointer-events-none flex flex-1 flex-wrap items-center justify-center gap-1.5">
           {slides.map((s, i) => (
-            <button
+            <span
               key={s.id}
-              type="button"
-              onClick={() => go(i)}
-              aria-label={s.title}
               className="h-1.5 rounded-full transition-all"
               style={{ width: i === active ? 18 : 6, backgroundColor: i === active ? brandColor : "#CBD5E1" }}
             />
@@ -477,12 +582,12 @@ function MobileDeck({ slides, brandColor }: { slides: Slide[]; brandColor: strin
           onClick={() => go(active + 1)}
           disabled={active === slides.length - 1}
           aria-label="Berikutnya"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:opacity-40"
         >
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
-      <p className="mt-2 text-center text-[11px] text-slate-400">Geser kiri / kanan untuk pindah section</p>
+      <p className="mt-2 text-center text-[11px] text-slate-600">Geser kiri / kanan untuk pindah section</p>
     </div>
   );
 }
@@ -599,22 +704,27 @@ export function ReportDashboard({
       <div className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-600">
               {metrics.platform ? <span className="font-semibold capitalize">{metrics.platform}</span> : "Akun"} ·{" "}
               {metrics.account?.username ? `@${metrics.account.username}` : "terhubung"} · {metrics.period ?? "periode"}
             </p>
-            <p className="text-lg font-bold" style={{ color: brandColor }}>
+            <p className="text-lg font-bold" style={{ color: readableOnWhite(brandColor) }}>
               {fmt(metrics.account?.followers)} followers
             </p>
           </div>
           {metrics.fetchedAt && (
-            <p className="text-xs text-slate-400">Data ditarik: {new Date(metrics.fetchedAt).toLocaleString("id-ID")}</p>
+            <p className="text-xs text-slate-600">Data ditarik: {new Date(metrics.fetchedAt).toLocaleString("id-ID")}</p>
           )}
         </div>
         <DataQualityBanner checks={checks} />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <Tile label="Reach" value={fmt(t?.reach)} accent={brandColor} info="reach" delta={deltas?.reach} />
+        <GroupLabel>Jangkauan &amp; volume</GroupLabel>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Tile hero className="col-span-2" label="Reach" value={fmt(t?.reach)} accent={brandColor} info="reach" delta={deltas?.reach} />
           <Tile label="Impressions (post)" value={fmt(postImpressions.total)} hint={postImpressions.n ? `dari ${postImpressions.n} post` : undefined} info="impressions" />
+          <Tile label="Jumlah Post" value={fmt(t?.posts)} info="posts" />
+        </div>
+        <GroupLabel>Interaksi</GroupLabel>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
           <Tile label="Total Interaksi" value={fmt(t?.totalInteractions)} accent={accentColor} info="totalInteractions" delta={deltas?.totalInteractions} />
           <Tile label="ER (Reach)" value={pct(t?.erReach)} info="erReach" delta={deltas?.erReach} />
           <Tile label="Accounts Engaged" value={fmt(t?.accountsEngaged)} info="accountsEngaged" />
@@ -622,16 +732,18 @@ export function ReportDashboard({
           <Tile label="Komentar" value={fmt(t?.comments)} info="comments" delta={deltas?.comments} />
           <Tile label="Shares" value={fmt(t?.shares)} info="shares" delta={deltas?.shares} />
           <Tile label="Saved" value={fmt(t?.saved)} info="saved" delta={deltas?.saved} />
+        </div>
+        <GroupLabel>Konversi</GroupLabel>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Tile label="Follows" value={fmt(t?.follows)} info="follows" />
           <Tile label="Web Clicks" value={fmt(t?.webClicks)} info="webClicks" />
-          <Tile label="Jumlah Post" value={fmt(t?.posts)} info="posts" />
         </div>
-        <p className="text-[11px] leading-relaxed text-slate-500">
-          <b className="font-semibold text-slate-600">Cakupan angka:</b>{" "}
+        <p className="text-[11px] leading-relaxed text-slate-600">
+          <b className="font-semibold text-slate-700">Cakupan angka:</b>{" "}
           {legendScopes.map((s, i) => (
             <span key={s}>
               {i > 0 && " · "}
-              <b className="font-semibold text-slate-600">{SCOPE_INFO[s].label}</b> = {SCOPE_LEGEND[s]}
+              <b className="font-semibold text-slate-700">{SCOPE_INFO[s].label}</b> = {SCOPE_LEGEND[s]}
             </span>
           ))}
           . Angka beda cakupan tidak untuk dibandingkan langsung.
@@ -687,14 +799,14 @@ export function ReportDashboard({
               ] as [string, number | null][]
             ).map(([label, d]) => (
               <div key={label} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-center">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
                 <div className="mt-1.5 flex justify-center">
-                  {d != null ? <DeltaBadge d={d} /> : <span className="text-xs text-slate-400">—</span>}
+                  {d != null ? <DeltaBadge d={d} /> : <span className="text-xs text-slate-500">—</span>}
                 </div>
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-slate-400">Dibandingkan dengan periode sepanjang yang sama tepat sebelum rentang tanggal ini.</p>
+          <p className="mt-2 text-[11px] text-slate-500">Dibandingkan dengan periode sepanjang yang sama tepat sebelum rentang tanggal ini.</p>
         </div>
       ),
     });
@@ -712,10 +824,10 @@ export function ReportDashboard({
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <SectionTitle info="movers">Post Pendorong &amp; Penyeret</SectionTitle>
           <div className="grid gap-5 sm:grid-cols-2">
-            <MoverList title="Pendorong (Naik)" tone="up" rows={movers.up} accent="#16A34A" />
+            <MoverList title="Pendorong (Naik)" tone="up" rows={movers.up} accent="#15803D" />
             <MoverList title="Penyeret (Turun)" tone="down" rows={movers.down} accent="#DC2626" />
           </div>
-          <p className="mt-3 text-[11px] text-slate-400">
+          <p className="mt-3 text-[11px] text-slate-500">
             Rata-rata reach periode: <b>{fmt(Math.round(movers.avgReach))}</b>. Pendorong = jauh di atas rata-rata; penyeret = di bawahnya.
           </p>
         </div>
@@ -734,7 +846,7 @@ export function ReportDashboard({
             <Tile label="Hari Terbaik" value={bestTime.day} accent={brandColor} hint={`avg reach ${fmt(bestTime.dayAvgReach)}`} />
             <Tile label="Jam Terbaik" value={`${String(bestTime.hour).padStart(2, "0")}:00`} accent={accentColor} hint={`avg reach ${fmt(bestTime.hourAvgReach)}`} />
           </ScopeBox>
-          <p className="mt-2 text-[11px] text-slate-400">Berdasarkan rata-rata reach per hari/jam dari post di periode ini.</p>
+          <p className="mt-2 text-[11px] text-slate-500">Berdasarkan rata-rata reach per hari/jam dari post di periode ini.</p>
         </div>
       ),
     });
@@ -752,7 +864,7 @@ export function ReportDashboard({
               <div key={p.name}>
                 <div className="mb-1 flex justify-between text-xs">
                   <span className="font-medium text-slate-600">
-                    {p.name} <span className="text-slate-400">· {p.count} post</span>
+                    {p.name} <span className="text-slate-500">· {p.count} post</span>
                   </span>
                   <span className="text-slate-500">
                     {fmt(p.reach)} reach · {fmt(p.ti)} actions
@@ -764,7 +876,7 @@ export function ReportDashboard({
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-slate-400">Pillar disarankan AI (Claude) — regenerate laporan untuk mengisinya.</p>
+          <p className="mt-2 text-[11px] text-slate-500">Pillar disarankan AI (Claude) — regenerate laporan untuk mengisinya.</p>
         </div>
       ),
     });
@@ -804,7 +916,7 @@ export function ReportDashboard({
           {disc && discTotal > 0 && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5">
               <SectionTitle info="discovery">Jangkauan: Followers vs Non-followers</SectionTitle>
-              <div className="flex h-4 overflow-hidden rounded-full">
+              <div className="flex h-4 gap-0.5 overflow-hidden rounded-full">
                 <div style={{ width: `${((disc.followers ?? 0) / discTotal) * 100}%`, backgroundColor: brandColor }} />
                 <div style={{ width: `${((disc.nonFollowers ?? 0) / discTotal) * 100}%`, backgroundColor: accentColor }} />
               </div>
@@ -818,7 +930,7 @@ export function ReportDashboard({
                   <b>{fmt(disc.nonFollowers)}</b> ({Math.round(((disc.nonFollowers ?? 0) / discTotal) * 100)}%)
                 </span>
               </div>
-              <p className="mt-2 text-xs text-slate-400">
+              <p className="mt-2 text-xs text-slate-500">
                 Porsi non-followers tinggi = konten Anda banyak ditemukan lewat discovery/explore.
               </p>
             </div>
@@ -863,10 +975,10 @@ export function ReportDashboard({
               <InfoDot id="followerGrowth" />
             </p>
             <div className="flex gap-4 text-sm">
-              {metrics.followersGained != null && <span className="text-emerald-600">+{fmt(metrics.followersGained)} gained</span>}
-              {metrics.followersLost != null && <span className="text-red-500">−{fmt(metrics.followersLost)} lost</span>}
+              {metrics.followersGained != null && <span className="text-emerald-700">+{fmt(metrics.followersGained)} gained</span>}
+              {metrics.followersLost != null && <span className="text-red-600">−{fmt(metrics.followersLost)} lost</span>}
               {metrics.account?.followers != null && (
-                <span className="font-semibold" style={{ color: brandColor }}>
+                <span className="font-semibold" style={{ color: readableOnWhite(brandColor) }}>
                   {fmt(metrics.account.followers)} total
                 </span>
               )}
@@ -924,7 +1036,7 @@ export function ReportDashboard({
               <div className="mt-2 overflow-x-auto">
                 <table className="w-full min-w-[720px] text-xs">
                   <thead>
-                    <tr className="border-y border-slate-100 text-left uppercase tracking-wide text-slate-400">
+                    <tr className="border-y border-slate-100 text-left uppercase tracking-wide text-slate-500">
                       <th className="p-2.5">Tanggal</th>
                       <th className="p-2.5">Konten</th>
                       <th className="p-2.5 text-right">Views</th>
@@ -953,7 +1065,7 @@ export function ReportDashboard({
                   </tbody>
                 </table>
               </div>
-              <p className="px-4 pb-3 pt-2 text-[11px] text-slate-400">
+              <p className="px-4 pb-3 pt-2 text-[11px] text-slate-500">
                 View Rate = views ÷ reach (daya tarik hook). Completion tinggi + Skip rendah = retensi kuat.
               </p>
             </div>
@@ -1013,7 +1125,7 @@ export function ReportDashboard({
             Overlap Audiens: Followers vs yang Berinteraksi
             <InfoDot id="overlap" />
           </p>
-          <p className="mb-4 text-[11px] text-slate-400">
+          <p className="mb-4 text-[11px] text-slate-500">
             Gap positif = segmen itu <b>lebih aktif</b> berinteraksi dibanding porsinya di followers.
           </p>
           <div className="grid gap-6 sm:grid-cols-2">
@@ -1061,7 +1173,7 @@ export function ReportDashboard({
               />
             ))}
           </div>
-          <div className="mt-1.5 flex justify-between text-[11px] text-slate-400">
+          <div className="mt-1.5 flex justify-between text-[11px] text-slate-500">
             <span>{series[0]?.date}</span>
             <span>{series[series.length - 1]?.date}</span>
           </div>
@@ -1078,13 +1190,13 @@ export function ReportDashboard({
         <div className="rounded-2xl border border-slate-200 bg-white">
           <div className="flex items-center justify-between px-4 pt-4">
             <p className="text-sm font-semibold text-slate-700">Post Master — detail per post</p>
-            <span className="text-[11px] text-slate-400">sama seperti Excel · {posts.length} post</span>
+            <span className="text-[11px] text-slate-500">sama seperti Excel · {posts.length} post</span>
           </div>
           <div className="mt-2 overflow-x-auto">
             <table className="w-full min-w-[1180px] text-xs">
               <thead>
-                <tr className="border-y border-slate-100 text-left uppercase tracking-wide text-slate-400">
-                  <th className="p-2.5">Tanggal</th>
+                <tr className="border-y border-slate-100 text-left uppercase tracking-wide text-slate-500">
+                  <th className="sticky left-0 z-10 border-r border-slate-100 bg-white p-2.5">Tanggal</th>
                   <th className="p-2.5">Pillar</th>
                   <th className="p-2.5">Konten</th>
                   <th className="p-2.5 text-right">Followers</th>
@@ -1109,7 +1221,7 @@ export function ReportDashboard({
               </tbody>
             </table>
           </div>
-          <p className="px-4 pb-3 pt-2 text-[11px] text-slate-400">
+          <p className="px-4 pb-3 pt-2 text-[11px] text-slate-500">
             “—” = data tidak tersedia dari Zernio (bukan 0). Total Actions = like + komentar + follows + profil + shared + saved + web click.
           </p>
         </div>
@@ -1162,7 +1274,7 @@ function MonthRows({
         const followers = p.followersAtPeriod ?? followersBase;
         return (
           <tr key={i} className="border-b border-slate-50 last:border-0">
-            <td className="whitespace-nowrap p-2.5 text-slate-500">{p.date}</td>
+            <td className="sticky left-0 z-10 whitespace-nowrap border-r border-slate-100 bg-white p-2.5 text-slate-500">{p.date}</td>
             <td className="whitespace-nowrap p-2.5 text-slate-600">{p.pillar ?? "—"}</td>
             <td className="max-w-[220px] p-2.5 text-slate-700">
               <span className="line-clamp-2">{p.caption || "—"}</span>
