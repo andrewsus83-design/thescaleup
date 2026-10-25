@@ -1,9 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Sparkles, TrendingUp, TrendingDown, Minus, Info, ChevronLeft, ChevronRight } from "lucide-react";
+import { createContext, useContext, useRef, useState } from "react";
+import {
+  Sparkles, TrendingUp, TrendingDown, Minus, Info, ChevronLeft, ChevronRight, ChevronDown,
+  CircleCheck, CircleX, TriangleAlert, Lightbulb,
+} from "lucide-react";
 import type { ReportMetrics, PostMetric } from "@/lib/report/types";
-import { METRIC_INFO, type MetricInfo } from "@/lib/report/metric-info";
+import { METRIC_INFO, SCOPE_INFO, scopeFor, type MetricInfo, type Scope } from "@/lib/report/metric-info";
 import {
   efficiency,
   computeDeltas,
@@ -16,7 +19,10 @@ import {
   type Mover,
   totalActions,
   postTotal,
+  postHasData,
 } from "@/lib/report/derive";
+import { runChecks, summarizeChecks, type DataCheck } from "@/lib/report/checks";
+import { autoNotes, type AutoNote } from "@/lib/report/notes";
 
 function fmt(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
@@ -62,16 +68,27 @@ const CT_LABEL: Record<string, string> = {
   STORY: "Story",
 };
 
+/** Platform + section-scope context, so tiles and tooltips can name their scope without threading props. */
+const PlatformCtx = createContext<string | undefined>(undefined);
+const ScopeCtx = createContext<Scope | undefined>(undefined);
+
 /** Pure-CSS hover tooltip: description + rumus + industry benchmark + relation. */
 function InfoDot({ id, info }: { id?: string; info?: MetricInfo }) {
+  const platform = useContext(PlatformCtx);
   const m = info ?? (id ? METRIC_INFO[id] : undefined);
   if (!m) return null;
+  const sc = id ? scopeFor(id, platform) : undefined;
   return (
     <span className="group/info relative inline-flex align-middle">
       <Info className="h-3 w-3 cursor-help text-slate-300 transition-colors hover:text-slate-500" />
       <span className="pointer-events-none absolute left-1/2 top-5 z-40 hidden w-64 -translate-x-1/2 whitespace-normal rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-normal normal-case leading-relaxed tracking-normal text-slate-600 shadow-xl group-hover/info:block">
         <b className="text-slate-800">{m.label}</b>
         <span className="mt-1 block text-slate-600">{m.desc}</span>
+        {sc && (
+          <span className="mt-1 block">
+            <b className="text-slate-500">Cakupan:</b> {SCOPE_INFO[sc].label} — {SCOPE_INFO[sc].desc}
+          </span>
+        )}
         {m.rumus && (
           <span className="mt-1.5 block">
             <b className="text-slate-500">Rumus:</b> <code className="rounded bg-slate-100 px-1 text-slate-700">{m.rumus}</code>
@@ -98,6 +115,35 @@ function SectionTitle({ children, info }: { children: React.ReactNode; info?: st
   );
 }
 
+const SCOPE_LEGEND: Record<Scope, string> = {
+  A: "semua konten di periode ini",
+  P: "hanya post yang terbit di periode ini",
+  S: "story saja",
+  D: "snapshot audiens saat ditarik",
+};
+
+/** Small pill naming which slice of the data a number covers (account vs posts vs …). */
+function ScopeChip({ scope }: { scope: Scope }) {
+  const s = SCOPE_INFO[scope];
+  return (
+    <span
+      title={`${s.label}: ${s.desc}`}
+      className="inline-flex items-center rounded bg-slate-100 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-slate-600"
+    >
+      {s.label}
+    </span>
+  );
+}
+
+/** Grid whose tiles default to one scope (e.g. a Stories-only block). */
+function ScopeBox({ scope, className, children }: { scope: Scope; className?: string; children: React.ReactNode }) {
+  return (
+    <ScopeCtx.Provider value={scope}>
+      <div className={className}>{children}</div>
+    </ScopeCtx.Provider>
+  );
+}
+
 function Tile({
   label,
   value,
@@ -105,6 +151,7 @@ function Tile({
   hint,
   info,
   delta,
+  scope,
 }: {
   label: string;
   value: string;
@@ -112,7 +159,12 @@ function Tile({
   hint?: string;
   info?: string;
   delta?: number | null;
+  scope?: Scope;
 }) {
+  const platform = useContext(PlatformCtx);
+  const sectionScope = useContext(ScopeCtx);
+  const sc = scope ?? (info ? scopeFor(info, platform) : undefined) ?? sectionScope;
+  const na = value === "—"; // every formatter returns "—" for "no data"
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex items-start justify-between gap-1">
@@ -122,10 +174,19 @@ function Tile({
         </p>
         {delta != null && <DeltaBadge d={delta} />}
       </div>
-      <p className="mt-1 text-2xl font-bold" style={{ color: accent ?? "#1B2A4A" }}>
-        {value}
+      <p
+        className={`mt-1 text-2xl font-bold ${na ? "text-slate-300" : ""}`}
+        style={na ? undefined : { color: accent ?? "#1B2A4A" }}
+        title={na ? "Data tidak tersedia dari Zernio (bukan 0)" : undefined}
+      >
+        {na ? "n/a" : value}
       </p>
-      {hint && <p className="mt-0.5 text-[11px] text-slate-400">{hint}</p>}
+      {(sc || hint) && (
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-400">
+          {sc && <ScopeChip scope={sc} />}
+          {hint && <span>{hint}</span>}
+        </p>
+      )}
     </div>
   );
 }
@@ -266,6 +327,92 @@ function MoverList({ title, tone, rows, accent }: { title: string; tone: "up" | 
   );
 }
 
+const CHECK_ICON = { pass: CircleCheck, warn: TriangleAlert, fail: CircleX, skip: Minus } as const;
+const CHECK_TONE = { pass: "text-emerald-700", warn: "text-amber-700", fail: "text-red-700", skip: "text-slate-400" } as const;
+const CHECK_WORD = { pass: "Lolos", warn: "Cek", fail: "Gagal", skip: "Dilewati" } as const;
+
+/** Admin-only QA banner: one line, expands (native <details>, keyboard-friendly) to every check. */
+function DataQualityBanner({ checks }: { checks: DataCheck[] }) {
+  const s = summarizeChecks(checks);
+  if (s.level === "none") return null;
+  const tone = {
+    fail: "border-red-200 bg-red-50 text-red-800",
+    warn: "border-amber-200 bg-amber-50 text-amber-800",
+    pass: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  }[s.level];
+  const Icon = CHECK_ICON[s.level];
+  const title =
+    s.level === "fail"
+      ? `Cek data: ${s.fail} gagal${s.warn ? `, ${s.warn} peringatan` : ""}`
+      : s.level === "warn"
+        ? `Cek data: ${s.warn} peringatan`
+        : `Cek data: ${s.pass} lolos`;
+  const sub =
+    s.level === "fail"
+      ? "Periksa sebelum laporan dibagikan ke klien."
+      : s.level === "warn"
+        ? "Angka tetap tampil — baca dengan catatan."
+        : s.skip
+          ? `${s.skip} cek dilewati (data tidak tersedia).`
+          : "Semua cek lolos.";
+  return (
+    <details className={`group rounded-xl border ${tone}`}>
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+        <Icon className="h-4 w-4 shrink-0" aria-hidden />
+        <span>{title}</span>
+        <span className="hidden text-xs font-normal opacity-80 sm:inline">· {sub}</span>
+        <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
+      </summary>
+      <ul className="space-y-2 border-t border-slate-200 bg-white/80 px-3 py-2.5 text-xs text-slate-700">
+        {checks.map((c) => {
+          const CIcon = CHECK_ICON[c.status];
+          return (
+            <li key={c.id} className="flex items-start gap-2">
+              <CIcon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${CHECK_TONE[c.status]}`} aria-hidden />
+              <span>
+                <b className="font-semibold text-slate-800">{c.label}</b> <ScopeChip scope={c.scope} />{" "}
+                <span className={`font-semibold ${CHECK_TONE[c.status]}`}>{CHECK_WORD[c.status]}</span>
+                <br />
+                <span className="text-slate-500">{c.detail}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </details>
+  );
+}
+
+const NOTE_STYLE = {
+  good: { Icon: CircleCheck, tone: "text-emerald-600" },
+  info: { Icon: Lightbulb, tone: "text-sky-600" },
+  warn: { Icon: TriangleAlert, tone: "text-amber-600" },
+} as const;
+
+/** Plain-language reasons behind the numbers — fixed rules, not AI. */
+function AutoNotes({ notes }: { notes: AutoNote[] }) {
+  if (!notes.length) return null;
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <SectionTitle>Catatan Otomatis</SectionTitle>
+      <ul className="space-y-3">
+        {notes.map((n) => {
+          const { Icon, tone } = NOTE_STYLE[n.tone];
+          return (
+            <li key={n.id} className="flex items-start gap-2.5 text-sm text-slate-700">
+              <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${tone}`} aria-hidden />
+              <span>{n.text}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-3 text-[11px] text-slate-400">
+        Dibuat otomatis dari aturan tetap (bukan AI): angka yang sama selalu menghasilkan kalimat yang sama.
+      </p>
+    </div>
+  );
+}
+
 type Slide = { id: string; title: string; node: React.ReactNode };
 
 /** Mobile Typeform-style swipe deck: one section per full-height card, swipe L/R. */
@@ -345,11 +492,14 @@ export function ReportDashboard({
   brandColor = "#2A2870",
   accentColor = "#38B6F0",
   showReason = false,
+  showChecks = false,
 }: {
   metrics: ReportMetrics;
   brandColor?: string;
   accentColor?: string;
   showReason?: boolean;
+  /** Admin-only data-quality banner — never pass on the client-facing page. */
+  showChecks?: boolean;
 }) {
   if (!metrics.connected) {
     return (
@@ -386,6 +536,13 @@ export function ReportDashboard({
   const qScore = qualityScore(posts);
   const bestTime = bestDayTime(posts);
   const reels = reelRows(posts);
+  const avgWatch = (() => {
+    const v = reels.map((r) => r.avgWatchSec).filter((x): x is number => x != null);
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  })();
+  const checks = showChecks ? runChecks(metrics) : [];
+  const notes = autoNotes(metrics);
+  const legendScopes: Scope[] = metrics.platform === "tiktok" ? ["P"] : ["A", "P"];
   const movers = topMovers(posts);
   const genderOverlap = overlapRows(metrics.demographics?.genders, metrics.engagedDemographics?.genders);
   const ageOverlap = overlapRows(metrics.demographics?.ages, metrics.engagedDemographics?.ages);
@@ -418,8 +575,8 @@ export function ReportDashboard({
     }
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   })();
-  const sumBy = (arr: PostMetric[], f: (p: PostMetric) => number | null | undefined) =>
-    arr.reduce((s, p) => s + (f(p) ?? 0), 0);
+  // null (→ "—") when no post has the field, never a fake 0
+  const sumBy = (arr: PostMetric[], f: (p: PostMetric) => number | null | undefined) => postTotal(arr, f).total;
 
   const hasDemo =
     !!metrics.demographics &&
@@ -454,9 +611,10 @@ export function ReportDashboard({
             <p className="text-xs text-slate-400">Data ditarik: {new Date(metrics.fetchedAt).toLocaleString("id-ID")}</p>
           )}
         </div>
+        <DataQualityBanner checks={checks} />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <Tile label="Reach" value={fmt(t?.reach)} accent={brandColor} info="reach" delta={deltas?.reach} />
-          <Tile label="Impressions (post)" value={fmt(postImpressions.total)} hint={postImpressions.n ? `dari ${postImpressions.n} post · bukan total akun` : undefined} info="impressions" />
+          <Tile label="Impressions (post)" value={fmt(postImpressions.total)} hint={postImpressions.n ? `dari ${postImpressions.n} post` : undefined} info="impressions" />
           <Tile label="Total Interaksi" value={fmt(t?.totalInteractions)} accent={accentColor} info="totalInteractions" delta={deltas?.totalInteractions} />
           <Tile label="ER (Reach)" value={pct(t?.erReach)} info="erReach" delta={deltas?.erReach} />
           <Tile label="Accounts Engaged" value={fmt(t?.accountsEngaged)} info="accountsEngaged" />
@@ -468,6 +626,16 @@ export function ReportDashboard({
           <Tile label="Web Clicks" value={fmt(t?.webClicks)} info="webClicks" />
           <Tile label="Jumlah Post" value={fmt(t?.posts)} info="posts" />
         </div>
+        <p className="text-[11px] leading-relaxed text-slate-500">
+          <b className="font-semibold text-slate-600">Cakupan angka:</b>{" "}
+          {legendScopes.map((s, i) => (
+            <span key={s}>
+              {i > 0 && " · "}
+              <b className="font-semibold text-slate-600">{SCOPE_INFO[s].label}</b> = {SCOPE_LEGEND[s]}
+            </span>
+          ))}
+          . Angka beda cakupan tidak untuk dibandingkan langsung.
+        </p>
       </div>
     ),
   });
@@ -532,6 +700,10 @@ export function ReportDashboard({
     });
   }
 
+  if (notes.length > 0) {
+    slides.push({ id: "catatan", title: "Catatan", node: <AutoNotes notes={notes} /> });
+  }
+
   if (movers && (movers.up.length > 0 || movers.down.length > 0)) {
     slides.push({
       id: "movers",
@@ -558,10 +730,10 @@ export function ReportDashboard({
       node: (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <SectionTitle info="bestTime">Waktu Terbaik Posting (WIB)</SectionTitle>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <ScopeBox scope="P" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Tile label="Hari Terbaik" value={bestTime.day} accent={brandColor} hint={`avg reach ${fmt(bestTime.dayAvgReach)}`} />
             <Tile label="Jam Terbaik" value={`${String(bestTime.hour).padStart(2, "0")}:00`} accent={accentColor} hint={`avg reach ${fmt(bestTime.hourAvgReach)}`} />
-          </div>
+          </ScopeBox>
           <p className="mt-2 text-[11px] text-slate-400">Berdasarkan rata-rata reach per hari/jam dari post di periode ini.</p>
         </div>
       ),
@@ -735,12 +907,12 @@ export function ReportDashboard({
           {metrics.reels && metrics.reels.count > 0 && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5">
               <SectionTitle info="completion">Performa Reels / Video</SectionTitle>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <ScopeBox scope="P" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Tile label="Jumlah Video" value={fmt(metrics.reels.count)} />
                 <Tile label="Total Views" value={fmt(metrics.reels.totalViews)} accent={accentColor} />
-                <Tile label="Avg Watch Time" value={metrics.reels.avgWatchTimeSec != null ? `${metrics.reels.avgWatchTimeSec.toFixed(1)} dtk` : "—"} />
+                <Tile label="Avg Watch Time" value={avgWatch != null ? `${avgWatch.toFixed(1)} dtk` : "—"} />
                 <Tile label="Completion Rate" value={pct(metrics.reels.avgCompletion)} accent={brandColor} />
-              </div>
+              </ScopeBox>
             </div>
           )}
           {reels.length > 0 && (
@@ -798,7 +970,7 @@ export function ReportDashboard({
       node: (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <p className="mb-3 text-sm font-semibold text-slate-700">Instagram Stories ({metrics.stories.count})</p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+          <ScopeBox scope="S" className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
             <Tile label="Views" value={fmt(metrics.stories.views)} accent={brandColor} />
             <Tile label="Reach" value={fmt(metrics.stories.reach)} />
             <Tile label="Replies" value={fmt(metrics.stories.replies)} />
@@ -807,7 +979,7 @@ export function ReportDashboard({
             <Tile label="Exits" value={fmt(metrics.stories.exits)} />
             <Tile label="Profile Visits" value={fmt(metrics.stories.profileVisits)} />
             <Tile label="Follows" value={fmt(metrics.stories.follows)} />
-          </div>
+          </ScopeBox>
         </div>
       ),
     });
@@ -937,13 +1109,16 @@ export function ReportDashboard({
               </tbody>
             </table>
           </div>
+          <p className="px-4 pb-3 pt-2 text-[11px] text-slate-400">
+            “—” = data tidak tersedia dari Zernio (bukan 0). Total Actions = like + komentar + follows + profil + shared + saved + web click.
+          </p>
         </div>
       ),
     });
   }
 
   return (
-    <>
+    <PlatformCtx.Provider value={metrics.platform}>
       {/* Desktop: stacked sections */}
       <div className="hidden space-y-5 sm:block">
         {slides.map((s) => (
@@ -954,7 +1129,7 @@ export function ReportDashboard({
       <div className="sm:hidden">
         <MobileDeck slides={slides} brandColor={brandColor} />
       </div>
-    </>
+    </PlatformCtx.Provider>
   );
 }
 
@@ -969,7 +1144,7 @@ function MonthRows({
   ym: string;
   posts: PostMetric[];
   followersBase: number | null;
-  sumBy: (arr: PostMetric[], f: (p: PostMetric) => number | null | undefined) => number;
+  sumBy: (arr: PostMetric[], f: (p: PostMetric) => number | null | undefined) => number | null;
   multi: boolean;
 }) {
   return (
@@ -983,6 +1158,7 @@ function MonthRows({
       )}
       {posts.map((p, i) => {
         const ti = totalActions(p);
+        const has = postHasData(p); // a post with no insights yet shows "—", not 0 actions / 0% ER
         const followers = p.followersAtPeriod ?? followersBase;
         return (
           <tr key={i} className="border-b border-slate-50 last:border-0">
@@ -994,7 +1170,7 @@ function MonthRows({
             <td className="p-2.5 text-right text-slate-500">{fmt(followers)}</td>
             <td className="p-2.5 text-right">{fmt(p.likes)}</td>
             <td className="p-2.5 text-right">{fmt(p.comments)}</td>
-            <td className="p-2.5 text-right text-slate-500">{followers ? pct1(ti / followers) : "—"}</td>
+            <td className="p-2.5 text-right text-slate-500">{followers && has ? pct1(ti / followers) : "—"}</td>
             <td className="p-2.5 text-right">{fmt(p.follows)}</td>
             <td className="p-2.5 text-right">{fmt(p.profileVisits)}</td>
             <td className="p-2.5 text-right">{fmt(p.shares)}</td>
@@ -1003,7 +1179,7 @@ function MonthRows({
             <td className="p-2.5 text-right">{fmt(p.impressions)}</td>
             <td className="p-2.5 text-right font-medium">{fmt(p.reach)}</td>
             <td className="p-2.5 text-right text-slate-500">{p.reach ? pct1(ti / p.reach) : "—"}</td>
-            <td className="p-2.5 text-right font-semibold">{fmt(ti)}</td>
+            <td className="p-2.5 text-right font-semibold">{has ? fmt(ti) : "—"}</td>
           </tr>
         );
       })}
@@ -1023,7 +1199,7 @@ function MonthRows({
         <td className="p-2.5 text-right">{fmt(sumBy(posts, (p) => p.impressions))}</td>
         <td className="p-2.5 text-right">{fmt(sumBy(posts, (p) => p.reach))}</td>
         <td className="p-2.5"></td>
-        <td className="p-2.5 text-right">{fmt(sumBy(posts, totalActions))}</td>
+        <td className="p-2.5 text-right">{fmt(sumBy(posts, (p) => (postHasData(p) ? totalActions(p) : null)))}</td>
       </tr>
     </>
   );

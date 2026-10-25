@@ -61,6 +61,14 @@ export type Efficiency = {
   reachPosts: number;
 };
 
+/** A post that already has insights (any metric above zero). Fresh posts come back from Zernio
+ *  empty or all zeros — that means "not synced yet", not "nobody saw it". */
+export function postHasData(p: PostMetric): boolean {
+  return [p.reach, p.impressions, p.likes, p.comments, p.shares, p.saved, p.follows, p.profileVisits, p.webClicks].some(
+    (v) => (v ?? 0) > 0,
+  );
+}
+
 /** P-scope: sum of one per-post field over the posts that report it, and how many did.
  *  `total` is null (not 0) when no post has the field, so the UI can show "—". */
 export function postTotal(
@@ -157,7 +165,8 @@ export function reelRows(posts: PostMetric[]): ReelRow[] {
       views: p.views ?? null,
       reach: p.reach ?? null,
       viewRate: r(p.views, p.reach),
-      avgWatchSec: p.avgWatchTime != null ? p.avgWatchTime / 1000 : null,
+      // 0 ms means Zernio had no watch data yet (a video with views is never watched for 0 s) → n/a
+      avgWatchSec: p.avgWatchTime != null && p.avgWatchTime > 0 ? p.avgWatchTime / 1000 : null,
       completion: p.completionRate ?? null,
       skip: p.skipRate ?? null,
     }))

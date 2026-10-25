@@ -12,6 +12,36 @@ export type MetricInfo = {
   relation?: string;
 };
 
+/** Which slice of the data a number covers. Never mix scopes in one calculation or one card.
+ *  A = account (all content, each account counted once) · P = posts published in the period ·
+ *  S = stories · D = audience snapshot at pull time. */
+export type Scope = "A" | "P" | "S" | "D";
+
+export const SCOPE_INFO: Record<Scope, { label: string; desc: string }> = {
+  A: { label: "Akun", desc: "Semua konten akun di periode ini (post, story, reels); tiap akun dihitung sekali." },
+  P: { label: "Post", desc: "Hanya post yang terbit di periode ini — dijumlah atau dirata-rata per post." },
+  S: { label: "Story", desc: "Hanya story (tersedia 24 jam, jadi ditarik selagi masih aktif)." },
+  D: { label: "Audiens", desc: "Snapshot audiens saat data ditarik, bukan total periode." },
+};
+
+// Default scope per catalog metric. Per-post Excel columns pass "P" explicitly (see infoNote).
+const SCOPES: Record<string, Scope> = {
+  reach: "A", totalInteractions: "A", erReach: "A", accountsEngaged: "A",
+  likes: "A", comments: "A", shares: "A", saved: "A", follows: "A", webClicks: "A",
+  reachRate: "A", savesRate: "A", sharesRate: "A", followRate: "A", netGrowth: "A",
+  comparison: "A", discovery: "A", contentType: "A", followerGrowth: "A",
+  impressions: "P", posts: "P", totalActions: "P", erActionsFollowers: "P", erActionsReach: "P",
+  qualityScore: "P", pvRate: "P", avgReach: "P", bestTime: "P", pillar: "P", movers: "P",
+  viewRate: "P", completion: "P", skip: "P", avgWatch: "P",
+  overlap: "D",
+};
+
+/** Scope of a catalog metric. TikTok has no account-level totals, so there everything is summed from posts. */
+export function scopeFor(id: string, platform?: string | null): Scope | undefined {
+  const s = SCOPES[id];
+  return s === "A" && platform === "tiktok" ? "P" : s;
+}
+
 export const METRIC_INFO: Record<string, MetricInfo> = {
   reach: {
     label: "Reach",
@@ -171,10 +201,12 @@ export const METRIC_INFO: Record<string, MetricInfo> = {
 };
 
 /** Plain-text version of a metric's info for an Excel cell note. */
-export function infoNote(id: string): string | null {
+export function infoNote(id: string, scope?: Scope): string | null {
   const m = METRIC_INFO[id];
   if (!m) return null;
+  const sc = scope ?? scopeFor(id);
   const lines = [m.label, m.desc];
+  if (sc) lines.push(`Cakupan: ${SCOPE_INFO[sc].label} — ${SCOPE_INFO[sc].desc}`);
   if (m.rumus) lines.push(`Rumus: ${m.rumus}`);
   if (m.benchmark) lines.push(`Patokan bagus: ${m.benchmark}`);
   if (m.relation) lines.push(`Relasi: ${m.relation}`);

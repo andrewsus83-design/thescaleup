@@ -1,8 +1,9 @@
 import "server-only";
 import ExcelJS from "exceljs";
 import type { ReportClient, ReportMetrics, ReportRule, PostMetric } from "@/lib/report/types";
-import { efficiency, computeDeltas, qualityScore, bestDayTime, reelRows, overlapRows, topMovers, totalActions, postTotal } from "@/lib/report/derive";
-import { infoNote } from "@/lib/report/metric-info";
+import { efficiency, computeDeltas, qualityScore, bestDayTime, reelRows, overlapRows, topMovers, totalActions, postTotal, postHasData } from "@/lib/report/derive";
+import { infoNote, type Scope } from "@/lib/report/metric-info";
+import { autoNotes } from "@/lib/report/notes";
 
 function argb(hex: string) {
   return "FF" + hex.replace("#", "").toUpperCase().padStart(6, "0").slice(0, 6);
@@ -205,7 +206,9 @@ function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: Re
     if (subFill[i]) cell.fill = fill(subFill[i]);
     cell.alignment = { horizontal: "center", wrapText: true, vertical: "middle" };
     cell.border = { bottom: thin };
-    const n = subInfo[i] ? infoNote(subInfo[i]) : null;
+    // per-post columns are post-scope; "Followers on this period" is a follower-count snapshot
+    const sc: Scope = i === 3 ? "D" : "P";
+    const n = subInfo[i] ? infoNote(subInfo[i], sc) : null;
     if (n) cell.note = n;
   });
   ws.getRow(3).height = 30;
@@ -253,19 +256,21 @@ function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: Re
       row.getCell(2).value = p.caption;
       row.getCell(3).value = p.pillar ?? null;
       row.getCell(4).value = followers ?? null;
-      row.getCell(5).value = N(p.likes);
-      row.getCell(6).value = N(p.comments);
-      row.getCell(7).value = followers ? ti / followers : null;
-      row.getCell(8).value = N(p.follows);
-      row.getCell(9).value = N(p.profileVisits);
-      row.getCell(10).value = N(p.shares);
-      row.getCell(11).value = N(p.saved);
-      row.getCell(12).value = N(p.webClicks);
+      // blank (not 0) where Zernio has no value, so "unavailable" never reads as "nobody engaged"
+      const has = postHasData(p);
+      row.getCell(5).value = p.likes ?? null;
+      row.getCell(6).value = p.comments ?? null;
+      row.getCell(7).value = has && followers ? ti / followers : null;
+      row.getCell(8).value = p.follows ?? null;
+      row.getCell(9).value = p.profileVisits ?? null;
+      row.getCell(10).value = p.shares ?? null;
+      row.getCell(11).value = p.saved ?? null;
+      row.getCell(12).value = p.webClicks ?? null;
       row.getCell(13).value = 0;
       row.getCell(14).value = p.impressions ?? null;
       row.getCell(15).value = p.reach ?? null;
-      row.getCell(16).value = p.reach ? ti / N(p.reach) : null;
-      row.getCell(17).value = ti;
+      row.getCell(16).value = has && p.reach ? ti / N(p.reach) : null;
+      row.getCell(17).value = has ? ti : null;
       intCols.forEach((c) => { row.getCell(c).numFmt = "#,##0"; row.getCell(c).alignment = { horizontal: "right" }; });
       [7, 16].forEach((c) => (row.getCell(c).numFmt = "0.0%"));
       row.getCell(2).alignment = { wrapText: true, vertical: "top" };
@@ -292,9 +297,16 @@ function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: Re
     for (const c of sumCols) { gt.getCell(c).value = posts.reduce((s, p) => s + colVal(p, c), 0); gt.getCell(c).numFmt = "#,##0"; }
     const av = ws.getRow(r++);
     av.getCell(1).value = "RATA-RATA";
-    for (const c of sumCols) { av.getCell(c).value = Math.round(posts.reduce((s, p) => s + colVal(p, c), 0) / posts.length); av.getCell(c).numFmt = "#,##0"; }
+    // average over posts that already have insights — a fresh post would drag every average down
+    const counted = Math.max(1, posts.filter(postHasData).length);
+    for (const c of sumCols) { av.getCell(c).value = Math.round(posts.reduce((s, p) => s + colVal(p, c), 0) / counted); av.getCell(c).numFmt = "#,##0"; }
     [gt, av].forEach((row) => { for (let c = 1; c <= NCOL; c++) { row.getCell(c).fill = fill("#EDE7C8"); row.getCell(c).font = { bold: true }; } });
   }
+
+  // legend for blank cells and the client-convention total
+  const legend = ws.getCell(r + 1, 1);
+  legend.value = "Sel kosong = data tidak tersedia dari Zernio (bukan 0). Total Actions = like + komentar + follows + profile visits + shared + saved + web click.";
+  legend.font = { italic: true, size: 9, color: { argb: "FF6B7280" } };
 
   // JUARA highlight — top posts by total actions, tinted with rule colors
   if (postRows.length) {
@@ -351,6 +363,22 @@ function buildInsights(wb: ExcelJS.Workbook, metrics: ReportMetrics) {
     });
     row++;
   };
+
+  // 0) Notes — fixed-rule explanations, the same sentences the dashboard shows.
+  //    (The data-quality checks are admin-only and deliberately not written here: this file goes to the client.)
+  const notes = autoNotes(metrics);
+  if (notes.length) {
+    section("CATATAN OTOMATIS", "#FFF2CC");
+    for (const nt of notes) {
+      ws.mergeCells(row, 1, row, 6);
+      const c = ws.getCell(row, 1);
+      c.value = nt.text;
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(row).height = Math.max(16, Math.ceil(nt.text.length / 95) * 15);
+      row++;
+    }
+    row++;
+  }
 
   // 1) Efficiency, funnel & quality
   const eff = efficiency(t, followers, posts);

@@ -193,7 +193,7 @@ function computeReels(posts: PostMetric[]) {
   const nums = (k: keyof PostMetric) => vids.map((p) => p[k]).filter((v): v is number => typeof v === "number");
   const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
   const views = nums("views");
-  const watch = nums("avgWatchTime");
+  const watch = nums("avgWatchTime").filter((v) => v > 0); // 0 ms = no watch data yet, not an instant skip
   return {
     count: vids.length,
     totalViews: views.length ? views.reduce((a, b) => a + b, 0) : null,
