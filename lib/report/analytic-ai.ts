@@ -27,7 +27,7 @@ export function computeHealthScore(metrics: ReportMetrics): HealthScore | null {
   const posts = metrics.posts ?? [];
   const t = metrics.totals;
   const followers = metrics.account?.followers ?? null;
-  const eff = efficiency(t, followers, posts.length);
+  const eff = efficiency(t, followers, posts);
   const cqs = qualityScore(posts) ?? 0;
   const gained = metrics.followersGained ?? 0;
   const lost = metrics.followersLost ?? 0;

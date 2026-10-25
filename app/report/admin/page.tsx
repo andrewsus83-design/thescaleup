@@ -219,7 +219,7 @@ export default async function ReportAdminDashboard({
                 </div>
               )}
               {metrics ? (
-                <ReportDashboard metrics={metrics} brandColor={primary.brandColor} accentColor={primary.accentColor} showReason />
+                <ReportDashboard metrics={metrics} brandColor={primary.brandColor} accentColor={primary.accentColor} showReason showChecks />
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-10 text-center">
                   <p className="font-semibold text-slate-700">Belum ada laporan untuk {primary.name}</p>

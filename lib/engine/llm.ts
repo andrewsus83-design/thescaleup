@@ -5,6 +5,15 @@ import type { ApiKeys } from "./keys";
 export type LlmResult = { text: string; provider: string; model: string };
 
 /**
+ * Claude model for the audit — the biggest per-audit cost lever. Defaults to the model the
+ * engine has always used; set ENGINE_CLAUDE_MODEL (e.g. in Vercel env) to change it with no
+ * code change (must be a Claude 4.6+ model: the request sets output_config.effort). The model
+ * that actually ran comes back in LlmResult.model.
+ */
+const DEFAULT_CLAUDE_MODEL = "claude-opus-5";
+const claudeModel = () => process.env.ENGINE_CLAUDE_MODEL?.trim() || DEFAULT_CLAUDE_MODEL;
+
+/**
  * Call whichever LLM has a configured key, preferring Claude. Returns raw text
  * (the caller extracts JSON). Throws "NO_LLM_KEY" if none is configured.
  */
@@ -15,7 +24,7 @@ export async function callLLM(
 ): Promise<LlmResult> {
   // 1. Claude (preferred)
   if (keys.claude) {
-    const model = "claude-opus-5";
+    const model = claudeModel();
     const client = new Anthropic({ apiKey: keys.claude });
     const resp = await client.messages.create({
       model,

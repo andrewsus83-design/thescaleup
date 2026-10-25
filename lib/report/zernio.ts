@@ -193,7 +193,7 @@ function computeReels(posts: PostMetric[]) {
   const nums = (k: keyof PostMetric) => vids.map((p) => p[k]).filter((v): v is number => typeof v === "number");
   const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
   const views = nums("views");
-  const watch = nums("avgWatchTime");
+  const watch = nums("avgWatchTime").filter((v) => v > 0); // 0 ms = no watch data yet, not an instant skip
   return {
     count: vids.length,
     totalViews: views.length ? views.reduce((a, b) => a + b, 0) : null,
@@ -421,24 +421,17 @@ export async function fetchZernioMetrics(opts: {
     const demographics = parseDemo(demoJson);
     const engagedDemographics = parseDemo(engDemoJson);
 
-    // impressions come from the unified overview (not account-insights)
-    const overview = (postsJson?.overview ?? {}) as Record<string, unknown>;
-    const ovImpr = num(overview.totalImpressions);
-    if (ovImpr != null) totals.impressions = ovImpr;
-
     // per-post analytics (shared mapper) + reels summary — filtered to the range
     let posts = mapPosts(postsJson);
     if (since && until) posts = posts.filter((p) => p.date && p.date >= since && p.date <= until);
     totals.posts = posts.length;
     const reels = computeReels(posts);
 
-    // Zernio has no account-level impressions/profile-visits → sum per-post.
-    const sumPost = (k: keyof PostMetric) => {
-      const v = posts.map((p) => p[k]).filter((x): x is number => typeof x === "number");
-      return v.length ? v.reduce((a, b) => a + b, 0) : null;
-    };
-    if (totals.impressions == null) totals.impressions = sumPost("impressions");
-    if (totals.profileVisits == null) totals.profileVisits = sumPost("profileVisits");
+    // Zernio has no account-level impressions/profile-visits, so totals.impressions and
+    // totals.profileVisits stay null here. Post sums are a different scope (only posts
+    // published in the range) and are derived from `posts` in lib/report/derive.ts —
+    // never write them into the account totals: they would sit beside account reach as if
+    // comparable (impressions < reach) and skew every rate built on them.
 
     // "Followers on this period": day-to-day follower count mapped onto each post's
     // date (Zernio snapshots followers daily from the connect date forward). For

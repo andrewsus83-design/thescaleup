@@ -12,6 +12,36 @@ export type MetricInfo = {
   relation?: string;
 };
 
+/** Which slice of the data a number covers. Never mix scopes in one calculation or one card.
+ *  A = account (all content, each account counted once) · P = posts published in the period ·
+ *  S = stories · D = audience snapshot at pull time. */
+export type Scope = "A" | "P" | "S" | "D";
+
+export const SCOPE_INFO: Record<Scope, { label: string; desc: string }> = {
+  A: { label: "Akun", desc: "Semua konten akun di periode ini (post, story, reels); tiap akun dihitung sekali." },
+  P: { label: "Post", desc: "Hanya post yang terbit di periode ini — dijumlah atau dirata-rata per post." },
+  S: { label: "Story", desc: "Hanya story (tersedia 24 jam, jadi ditarik selagi masih aktif)." },
+  D: { label: "Audiens", desc: "Snapshot audiens saat data ditarik, bukan total periode." },
+};
+
+// Default scope per catalog metric. Per-post Excel columns pass "P" explicitly (see infoNote).
+const SCOPES: Record<string, Scope> = {
+  reach: "A", totalInteractions: "A", erReach: "A", accountsEngaged: "A",
+  likes: "A", comments: "A", shares: "A", saved: "A", follows: "A", webClicks: "A",
+  reachRate: "A", savesRate: "A", sharesRate: "A", followRate: "A", netGrowth: "A",
+  comparison: "A", discovery: "A", contentType: "A", followerGrowth: "A",
+  impressions: "P", posts: "P", totalActions: "P", erActionsFollowers: "P", erActionsReach: "P",
+  qualityScore: "P", pvRate: "P", avgReach: "P", bestTime: "P", pillar: "P", movers: "P",
+  viewRate: "P", completion: "P", skip: "P", avgWatch: "P",
+  overlap: "D",
+};
+
+/** Scope of a catalog metric. TikTok has no account-level totals, so there everything is summed from posts. */
+export function scopeFor(id: string, platform?: string | null): Scope | undefined {
+  const s = SCOPES[id];
+  return s === "A" && platform === "tiktok" ? "P" : s;
+}
+
 export const METRIC_INFO: Record<string, MetricInfo> = {
   reach: {
     label: "Reach",
@@ -21,18 +51,39 @@ export const METRIC_INFO: Record<string, MetricInfo> = {
     relation: "Basis hampir semua rate (ER, saves rate, dll).",
   },
   impressions: {
-    label: "Impressions",
-    desc: "Total tayangan konten — satu orang bisa melihat lebih dari sekali.",
-    rumus: "total tayangan",
-    benchmark: "Impressions > reach = konten dilihat berulang (bagus untuk recall).",
-    relation: "Impressions ÷ reach = frekuensi tayang.",
+    label: "Impressions (post)",
+    desc: "Total tayangan dari post yang terbit di periode ini — dijumlah per post, bukan total akun (Zernio tidak menyediakan tayangan tingkat akun). Satu orang bisa melihat lebih dari sekali.",
+    rumus: "Σ impressions tiap post di periode",
+    benchmark: "Bandingkan dengan Σ reach post, bukan reach akun: impressions > reach post = konten dilihat berulang (bagus untuk recall).",
+    relation: "Σ impressions post ÷ Σ reach post = frekuensi tayang.",
   },
   totalInteractions: {
     label: "Total Interaksi",
-    desc: "Total semua aksi pada konten.",
-    rumus: "likes + komentar + follows + profile visits + shared + saved + web click",
+    desc: "Total interaksi akun di periode ini menurut Instagram Insights (like, komentar, simpan, share, dll.), dari semua konten.",
+    rumus: "angka Instagram Insights tingkat akun — tidak menghitung profile visits, follows, atau web click",
     benchmark: "Bandingkan antar periode; kejar tren naik.",
-    relation: "Pembilang untuk ER (Reach).",
+    relation: "Pembilang untuk ER (Reach). Beda dengan Total Actions per post, yang menambah follows, profile visits & web click.",
+  },
+  totalActions: {
+    label: "Total Actions",
+    desc: "Jumlah semua aksi pada satu post (konvensi klien Cap Gajah, dulu bernama Total Interaction). Lebih besar dari interaksi Instagram karena ikut menghitung follows, profile visits, dan web click.",
+    rumus: "likes + komentar + follows + profile visits + shared + saved + web click",
+    benchmark: "Bandingkan antar post dan antar periode; jangan disandingkan dengan Total Interaksi akun.",
+    relation: "Pembilang untuk ER dan Reach-ER per post.",
+  },
+  erActionsFollowers: {
+    label: "ER (Followers)",
+    desc: "Engagement per post terhadap followers saat post terbit (konvensi klien Cap Gajah) — pembilangnya Total Actions, bukan interaksi Instagram.",
+    rumus: "Total Actions ÷ followers saat post",
+    benchmark: "Bandingkan antar post. Patokan IG 1–3% memakai interaksi saja, jadi angka di sini lebih tinggi.",
+    relation: "Memakai Total Actions yang sama dengan kolom terakhir.",
+  },
+  erActionsReach: {
+    label: "Reach-ER",
+    desc: "Engagement per post terhadap reach post itu (konvensi klien Cap Gajah) — pembilangnya Total Actions, bukan interaksi Instagram.",
+    rumus: "Total Actions ÷ reach post",
+    benchmark: "Bandingkan antar post. Patokan IG 1–3% memakai interaksi saja, jadi angka di sini lebih tinggi.",
+    relation: "Beda dengan ER (Reach) akun di Ringkasan, yang memakai Total Interaksi Instagram.",
   },
   erReach: {
     label: "ER (Reach)",
@@ -84,10 +135,10 @@ export const METRIC_INFO: Record<string, MetricInfo> = {
   },
   savesRate: { label: "Saves Rate", desc: "Porsi yang menyimpan dari yang menjangkau.", rumus: "saved ÷ reach", benchmark: ">0.5% = kuat.", relation: "Sinyal simpan bernilai tinggi bagi algoritma." },
   sharesRate: { label: "Shares Rate", desc: "Porsi yang membagikan dari yang menjangkau.", rumus: "shares ÷ reach", benchmark: ">0.5–1% = kuat.", relation: "Pendorong utama reach non-follower." },
-  pvRate: { label: "Profile Visit Rate", desc: "Porsi yang mengunjungi profil dari reach.", rumus: "profile visits ÷ reach", benchmark: "1–3% = konten mendorong orang cek profil.", relation: "Langkah funnel sebelum follow." },
+  pvRate: { label: "Profile Visit Rate", desc: "Porsi yang mengunjungi profil dari reach post (profile visits hanya tersedia per post).", rumus: "Σ profile visits post ÷ Σ reach post", benchmark: "1–3% = konten mendorong orang cek profil.", relation: "Langkah funnel sebelum follow." },
   followRate: { label: "Follow Rate", desc: "Porsi yang follow dari yang menjangkau.", rumus: "follows ÷ reach", benchmark: "0.5–1% = konversi follower sehat.", relation: "Ujung funnel discovery → aksi." },
   netGrowth: { label: "Net Follower Growth", desc: "Pertumbuhan follower bersih di periode ini.", rumus: "followers gained − followers lost", benchmark: "Organik sehat ≈ 2–5%/bulan dari basis.", relation: "Hasil akumulasi Follow Rate dikurangi unfollow." },
-  avgReach: { label: "Avg Reach / Post", desc: "Rata-rata jangkauan tiap post.", rumus: "reach ÷ jumlah post", benchmark: "Naik = tiap konten menjangkau lebih luas.", relation: "Normalisasi reach terhadap volume post." },
+  avgReach: { label: "Avg Reach / Post", desc: "Rata-rata jangkauan tiap post yang terbit di periode ini.", rumus: "Σ reach tiap post ÷ jumlah post (bukan reach akun ÷ jumlah post)", benchmark: "Naik = tiap konten menjangkau lebih luas.", relation: "Reach akun mencakup semua konten (story, reels) dan menghitung tiap akun sekali, jadi tidak boleh dibagi jumlah post." },
 
   comparison: {
     label: "Perbandingan vs Periode Sebelumnya",
@@ -150,10 +201,12 @@ export const METRIC_INFO: Record<string, MetricInfo> = {
 };
 
 /** Plain-text version of a metric's info for an Excel cell note. */
-export function infoNote(id: string): string | null {
+export function infoNote(id: string, scope?: Scope): string | null {
   const m = METRIC_INFO[id];
   if (!m) return null;
+  const sc = scope ?? scopeFor(id);
   const lines = [m.label, m.desc];
+  if (sc) lines.push(`Cakupan: ${SCOPE_INFO[sc].label} — ${SCOPE_INFO[sc].desc}`);
   if (m.rumus) lines.push(`Rumus: ${m.rumus}`);
   if (m.benchmark) lines.push(`Patokan bagus: ${m.benchmark}`);
   if (m.relation) lines.push(`Relasi: ${m.relation}`);

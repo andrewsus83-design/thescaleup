@@ -107,6 +107,7 @@ export default async function ClientOverview({ params }: { params: Promise<{ id:
             brandColor={client.brandColor}
             accentColor={client.accentColor}
             showReason
+            showChecks
           />
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center text-sm text-slate-500">
