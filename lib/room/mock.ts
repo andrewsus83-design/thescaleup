@@ -128,7 +128,7 @@ export const REPORTS: Record<string, ReportData> = {
     scorecard: [
       { name: "Kopi Senja", self: true, must: 72, nice: 58, try: 40, coverage: 0.86 },
       { name: "Kopi Rimba", must: 81, nice: 66, try: 52, coverage: 0.92 },
-      { name: "Senopati Coffee Lab", must: 64, nice: 49, try: 35, coverage: 0.78 },
+      { name: "Kopi Lab Selatan", must: 64, nice: 49, try: 35, coverage: 0.78 },
     ],
     insights: [
       { id: "i1", priority: 1, title: "No FAQ page — AI answers cannot quote you", evidence: "Crawled 14 URLs: none matched /faq or carried FAQPage schema.", todoId: "t1" },
@@ -144,7 +144,7 @@ export const REPORTS: Record<string, ReportData> = {
     score: 54,
     scorecard: [
       { name: "Batik Laras", self: true, must: 61, nice: 47, try: 30, coverage: 0.74 },
-      { name: "Danar Hadi", must: 78, nice: 63, try: 48, coverage: 0.9 },
+      { name: "Batik Kencana", must: 78, nice: 63, try: 48, coverage: 0.9 },
     ],
     insights: [
       { id: "j1", priority: 1, title: "Product pages have no Product schema", evidence: "0 of 12 product pages include structured data.", todoId: "b1" },
