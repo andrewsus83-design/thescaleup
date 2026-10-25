@@ -1,7 +1,7 @@
 import "server-only";
 import ExcelJS from "exceljs";
 import type { ReportClient, ReportMetrics, ReportRule, PostMetric } from "@/lib/report/types";
-import { efficiency, computeDeltas, qualityScore, bestDayTime, reelRows, overlapRows, topMovers, totalInteraction } from "@/lib/report/derive";
+import { efficiency, computeDeltas, qualityScore, bestDayTime, reelRows, overlapRows, topMovers, totalActions, postTotal } from "@/lib/report/derive";
 import { infoNote } from "@/lib/report/metric-info";
 
 function argb(hex: string) {
@@ -45,7 +45,7 @@ export async function buildReportWorkbook(
 /** Fill the user's uploaded .xlsx into the raw data columns. Handles multi-row
  *  merged headers (e.g. Cap Gajah's 3-row header) by combining the header band
  *  per column and detecting the data start from the date column. Formula columns
- *  (ER, Total Interaction) are left untouched so Excel recomputes them. */
+ *  (ER, Total Interaction/Actions) are left untouched so Excel recomputes them. */
 async function fillUploadedTemplate(base64: string, metrics: ReportMetrics): Promise<ExcelJS.Workbook | null> {
   try {
     const wb = new ExcelJS.Workbook();
@@ -162,7 +162,7 @@ async function fillUploadedTemplate(base64: string, metrics: ReportMetrics): Pro
 /** Sheet 1 — "Post Master - IG" (Cap Gajah) full 17-column layout, literal values.
  *  Columns: Date | Content | Pillar | Followers-on-period | Likes | Comments | ER |
  *  Follows | Profile Visits | Shared | Saved | Web Click | Others | Impressions |
- *  Reach | Reach-ER | Total Interaction — grouped by month with a per-month total. */
+ *  Reach | Reach-ER | Total Actions — grouped by month with a per-month total. */
 function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: ReportMetrics, rules: ReportRule[], brand: string) {
   const ws = wb.addWorksheet(`Post Master - ${client.name}`.slice(0, 31));
   const NCOL = 17;
@@ -184,7 +184,7 @@ function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: Re
     [8, 13, "Actions", C.ACT],
     [14, 14, "Impressions", C.IMP],
     [15, 16, "Reach", C.REACH],
-    [17, 17, "Total Interaction", C.PURPLE],
+    [17, 17, "Total Actions", C.PURPLE],
   ];
   for (const [a, b, label, color] of groups) {
     ws.mergeCells(2, a, 2, b);
@@ -197,7 +197,7 @@ function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: Re
   // sub headers (row 3)
   const sub = ["Date", "Content", "Pillar", "Followers on this period", "Likes", "Comments", "ER", "Follows", "Profile Visits", "Shared", "Saved", "Web Click", "Others", "Total", "Total", "ER", "Total"];
   const subFill = ["", "", "", "", C.ENG, C.ENG, C.ENG, C.ACT, C.ACT, C.ACT, C.ACT, C.ACT, C.ACT, C.IMP, C.REACH, C.REACH, ""];
-  const subInfo = ["", "", "pillar", "followerGrowth", "likes", "comments", "erReach", "follows", "pvRate", "shares", "saved", "webClicks", "", "impressions", "reach", "erReach", "totalInteractions"];
+  const subInfo = ["", "", "pillar", "followerGrowth", "likes", "comments", "erActionsFollowers", "follows", "pvRate", "shares", "saved", "webClicks", "", "impressions", "reach", "erActionsReach", "totalActions"];
   sub.forEach((h, i) => {
     const cell = ws.getCell(3, i + 1);
     cell.value = h;
@@ -213,8 +213,6 @@ function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: Re
   const N = (v: number | null | undefined) => (v == null ? 0 : v);
   const posts = [...(metrics.posts ?? [])].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const accFollowers = metrics.account?.followers ?? null;
-  const tiOf = (p: PostMetric) =>
-    N(p.likes) + N(p.comments) + N(p.follows) + N(p.profileVisits) + N(p.shares) + N(p.saved) + N(p.webClicks);
   const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
   const intCols = [4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 17];
   const sumCols = [5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 17];
@@ -230,7 +228,7 @@ function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: Re
       case 13: return 0;
       case 14: return N(p.impressions);
       case 15: return N(p.reach);
-      case 17: return tiOf(p);
+      case 17: return totalActions(p);
       default: return 0;
     }
   };
@@ -248,7 +246,7 @@ function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: Re
   for (const mk of months) {
     const mp = byMonth.get(mk)!;
     for (const p of mp) {
-      const ti = tiOf(p);
+      const ti = totalActions(p);
       const followers = p.followersAtPeriod ?? accFollowers;
       const row = ws.getRow(r);
       row.getCell(1).value = p.date;
@@ -298,7 +296,7 @@ function buildPostMaster(wb: ExcelJS.Workbook, client: ReportClient, metrics: Re
     [gt, av].forEach((row) => { for (let c = 1; c <= NCOL; c++) { row.getCell(c).fill = fill("#EDE7C8"); row.getCell(c).font = { bold: true }; } });
   }
 
-  // JUARA highlight — top posts by total interaction, tinted with rule colors
+  // JUARA highlight — top posts by total actions, tinted with rule colors
   if (postRows.length) {
     const ranked = [...postRows].sort((a, b) => b.ti - a.ti);
     const tiers = rules.slice(0, 3);
@@ -355,7 +353,7 @@ function buildInsights(wb: ExcelJS.Workbook, metrics: ReportMetrics) {
   };
 
   // 1) Efficiency, funnel & quality
-  const eff = efficiency(t, followers, posts.length);
+  const eff = efficiency(t, followers, posts);
   section("EFISIENSI, FUNNEL & KUALITAS", "#B6D7A8");
   kv("Reach Rate (reach ÷ followers)", timesS(eff.reachRate), "reachRate");
   kv("ER (Reach)", pctS(eff.erReach), "erReach");
@@ -426,12 +424,12 @@ function buildInsights(wb: ExcelJS.Workbook, metrics: ReportMetrics) {
     const e = pillarMap.get(p.pillar) ?? { count: 0, reach: 0, ti: 0 };
     e.count += 1;
     e.reach += p.reach ?? 0;
-    e.ti += totalInteraction(p);
+    e.ti += totalActions(p);
     pillarMap.set(p.pillar, e);
   }
   if (pillarMap.size) {
     section("PERFORMA PER PILLAR KONTEN", "#EAD1DC", "pillar");
-    headerRow(["Pillar", "Post", "Reach", "Interaksi"]);
+    headerRow(["Pillar", "Post", "Reach", "Total Actions"]);
     [...pillarMap.entries()].sort((a, b) => b[1].reach - a[1].reach).forEach(([name, v]) => {
       ws.getCell(row, 1).value = name;
       ws.getCell(row, 2).value = v.count;
@@ -495,7 +493,7 @@ function buildSummary(wb: ExcelJS.Workbook, client: ReportClient, metrics: Repor
     ["Platform", metrics.platform ?? "instagram"],
     ["Followers", metrics.account?.followers ?? null],
     ["Reach", t?.reach ?? null],
-    ["Impressions", t?.impressions ?? null],
+    ["Impressions (post)", postTotal(metrics.posts ?? [], (p) => p.impressions).total],
     ["Total Interaksi", t?.totalInteractions ?? null],
     ["ER (Reach)", t?.erReach != null ? `${(t.erReach * 100).toFixed(2)}%` : null],
     ["Accounts Engaged", t?.accountsEngaged ?? null],

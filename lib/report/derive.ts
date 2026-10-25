@@ -1,11 +1,27 @@
 // Shared, PURE derivations for the report — imported by BOTH the dashboard
 // (components/report/report-dashboard.tsx) and the Excel builder (lib/report/excel.ts)
 // so the two are guaranteed identical. No side effects, no "server-only".
+//
+// SCOPES — every number belongs to exactly one, and a rate keeps its numerator
+// and denominator in the same one:
+//   A (account): MetricTotals from the account-insights endpoint — ALL content
+//                (posts, stories, reels), each account counted once.
+//   P (posts):   figures summed/averaged from `posts` — only posts published in
+//                the selected range.
+// Dividing an A figure by a post count (or P by A) is how "Avg Reach / Post"
+// once showed account reach ÷ posts and "Impressions" sat below Reach.
+// See efficiency() and postTotal().
 
 import type { PostMetric, MetricTotals, PeriodComparison } from "@/lib/report/types";
 
-/** Cap Gajah "Total Interaction" = the 8 action metrics summed. */
-export function totalInteraction(p: PostMetric): number {
+/**
+ * Total Actions (client convention, Cap Gajah) = every action on a post summed:
+ * likes + comments + follows + profile visits + shares + saved + web clicks.
+ * It is NOT Instagram's `total_interactions` — it also counts follows, profile
+ * visits and web clicks — so it is labelled "Total Actions", never "Interactions".
+ * (The Cap Gajah "Others" column is not tracked → 0.)
+ */
+export function totalActions(p: PostMetric): number {
   return (
     (p.likes ?? 0) + (p.comments ?? 0) + (p.follows ?? 0) + (p.profileVisits ?? 0) +
     (p.shares ?? 0) + (p.saved ?? 0) + (p.webClicks ?? 0)
@@ -41,16 +57,45 @@ export type Efficiency = {
   pvRate: number | null;
   followRate: number | null;
   avgReach: number | null;
+  /** How many posts the P-scope figures (avgReach, pvRate) are built on. */
+  reachPosts: number;
 };
-export function efficiency(t: MetricTotals | null | undefined, followers: number | null | undefined, postCount: number): Efficiency {
+
+/** P-scope: sum of one per-post field over the posts that report it, and how many did.
+ *  `total` is null (not 0) when no post has the field, so the UI can show "—". */
+export function postTotal(
+  posts: PostMetric[],
+  pick: (p: PostMetric) => number | null | undefined,
+): { total: number | null; n: number } {
+  let total = 0, n = 0;
+  for (const p of posts) {
+    const v = pick(p);
+    if (typeof v === "number") { total += v; n++; }
+  }
+  return { total: n ? total : null, n };
+}
+
+/** `t` is account-scope (A); the per-post figures are built from `posts` (P). */
+export function efficiency(t: MetricTotals | null | undefined, followers: number | null | undefined, posts: PostMetric[]): Efficiency {
+  // Posts with a usable reach (> 0) — the same sample topMovers() averages over.
+  const reached = posts.filter((p) => (p.reach ?? 0) > 0);
+  const reachSum = reached.reduce((s, p) => s + (p.reach ?? 0), 0);
+  // Profile visits exist per post only (Zernio has no account-level metric), so the
+  // rate is Σ post profile visits ÷ Σ reach of those same posts — never ÷ account reach.
+  const visited = reached.filter((p) => typeof p.profileVisits === "number");
   return {
     reachRate: r(t?.reach, followers),
     erReach: t?.erReach ?? r(t?.totalInteractions, t?.reach),
     savesRate: r(t?.saved, t?.reach),
     sharesRate: r(t?.shares, t?.reach),
-    pvRate: r(t?.profileVisits, t?.reach),
+    pvRate: r(
+      visited.reduce((s, p) => s + (p.profileVisits ?? 0), 0),
+      visited.reduce((s, p) => s + (p.reach ?? 0), 0),
+    ),
     followRate: r(t?.follows, t?.reach),
-    avgReach: postCount ? r(t?.reach, postCount) : null,
+    // Avg reach per post = Σ post reach ÷ posts — NOT account reach ÷ posts.
+    avgReach: r(reachSum, reached.length),
+    reachPosts: reached.length,
   };
 }
 
@@ -123,8 +168,8 @@ export function reelRows(posts: PostMetric[]): ReelRow[] {
 export type Mover = {
   post: PostMetric;
   reach: number;
-  ti: number;
-  er: number | null; // ti / reach
+  actions: number; // totalActions(post)
+  er: number | null; // actions / reach
   shareOfReach: number; // reach / total reach in period
   reason: string;
 };
@@ -161,8 +206,8 @@ export function topMovers(posts: PostMetric[], n?: number): Movers {
   const avgReach = totalReach / valid.length;
   const enrich = (p: PostMetric): Mover => {
     const reach = p.reach ?? 0;
-    const ti = totalInteraction(p);
-    return { post: p, reach, ti, er: reach ? ti / reach : null, shareOfReach: totalReach ? reach / totalReach : 0, reason: "" };
+    const actions = totalActions(p);
+    return { post: p, reach, actions, er: reach ? actions / reach : null, shareOfReach: totalReach ? reach / totalReach : 0, reason: "" };
   };
   const byReach = valid.map(enrich).sort((a, b) => b.reach - a.reach);
   const up = byReach.slice(0, k).map((m) => ({ ...m, reason: moverReasonUp(m, avgReach) }));

@@ -95,6 +95,10 @@ export type ContentTypeStat = { type: string; reach: number | null; interactions
 /** One day's value in a time series. */
 export type SeriesPoint = { date: string; value: number };
 
+/** Period totals. Instagram: ACCOUNT scope (all content, from account-insights) — `impressions`
+ *  and `profileVisits` stay null because Zernio has no account-level metric for them; post sums
+ *  are a different scope, derived from `posts` in lib/report/derive.ts. TikTok has no account-level
+ *  reach, so its totals are summed from posts. */
 export type MetricTotals = {
   posts: number;
   reach: number | null;

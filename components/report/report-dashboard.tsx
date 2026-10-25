@@ -14,7 +14,8 @@ import {
   overlapRows,
   topMovers,
   type Mover,
-  totalInteraction as tiOf,
+  totalActions,
+  postTotal,
 } from "@/lib/report/derive";
 
 function fmt(n: number | null | undefined): string {
@@ -253,7 +254,7 @@ function MoverList({ title, tone, rows, accent }: { title: string; tone: "up" | 
             </div>
             <p className="mt-0.5 line-clamp-2 text-sm text-slate-700">{m.post.caption || "—"}</p>
             <p className="mt-1 text-[11px] text-slate-500">
-              ER {m.er != null ? (m.er * 100).toFixed(1) + "%" : "—"} · Total Interaksi {fmt(m.ti)}
+              ER {m.er != null ? (m.er * 100).toFixed(1) + "%" : "—"} · Total Actions {fmt(m.actions)}
             </p>
             <p className="mt-1 text-[11px]" style={{ color: accent }}>
               {m.reason}
@@ -375,7 +376,8 @@ export function ReportDashboard({
 
   // ---- CMO efficiency + funnel + advanced metrics (shared with the Excel) ----
   const followersBase = metrics.account?.followers ?? null;
-  const eff = efficiency(t, followersBase, posts.length);
+  const eff = efficiency(t, followersBase, posts);
+  const postImpressions = postTotal(posts, (p) => p.impressions); // post scope — never shown as an account total
   const deltas = computeDeltas(t, metrics.comparison);
   const cmp = metrics.comparison;
   const prevRate = (n?: number | null, d?: number | null) => (cmp && n != null && d != null && d > 0 ? n / d : null);
@@ -400,7 +402,7 @@ export function ReportDashboard({
       const e = m.get(p.pillar) ?? { count: 0, reach: 0, ti: 0 };
       e.count += 1;
       e.reach += p.reach ?? 0;
-      e.ti += tiOf(p);
+      e.ti += totalActions(p);
       m.set(p.pillar, e);
     }
     return [...m.entries()].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.reach - a.reach);
@@ -454,7 +456,7 @@ export function ReportDashboard({
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <Tile label="Reach" value={fmt(t?.reach)} accent={brandColor} info="reach" delta={deltas?.reach} />
-          <Tile label="Impressions" value={fmt(t?.impressions)} info="impressions" />
+          <Tile label="Impressions (post)" value={fmt(postImpressions.total)} hint={postImpressions.n ? `dari ${postImpressions.n} post · bukan total akun` : undefined} info="impressions" />
           <Tile label="Total Interaksi" value={fmt(t?.totalInteractions)} accent={accentColor} info="totalInteractions" delta={deltas?.totalInteractions} />
           <Tile label="ER (Reach)" value={pct(t?.erReach)} info="erReach" delta={deltas?.erReach} />
           <Tile label="Accounts Engaged" value={fmt(t?.accountsEngaged)} info="accountsEngaged" />
@@ -482,7 +484,7 @@ export function ReportDashboard({
           <Tile label="Content Quality Score" value={qScore != null ? qScore.toFixed(1) : "—"} accent={accentColor} hint="engagement berbobot / 1k reach" info="qualityScore" />
           <Tile label="Saves Rate" value={pct1(eff.savesRate)} hint="saved ÷ reach · sinyal simpan" info="savesRate" delta={savesRateDelta} />
           <Tile label="Shares Rate" value={pct1(eff.sharesRate)} hint="shares ÷ reach · viralitas" info="sharesRate" delta={sharesRateDelta} />
-          <Tile label="Profile Visit Rate" value={pct1(eff.pvRate)} hint="profil ÷ reach" info="pvRate" />
+          <Tile label="Profile Visit Rate" value={pct1(eff.pvRate)} hint="Σ profil ÷ Σ reach post" info="pvRate" />
           <Tile label="Follow Rate" value={pct1(eff.followRate)} hint="follows ÷ reach" info="followRate" />
           <Tile
             label="Net Follower Growth"
@@ -491,7 +493,7 @@ export function ReportDashboard({
             hint={growthRate != null ? `${pct1(growthRate)} dari basis` : "gained − lost"}
             info="netGrowth"
           />
-          <Tile label="Avg Reach / Post" value={fmt(eff.avgReach != null ? Math.round(eff.avgReach) : null)} hint="rata-rata jangkauan" info="avgReach" />
+          <Tile label="Avg Reach / Post" value={fmt(eff.avgReach != null ? Math.round(eff.avgReach) : null)} hint={eff.reachPosts ? `rata-rata dari ${eff.reachPosts} post` : "rata-rata jangkauan"} info="avgReach" />
         </div>
       </div>
     ),
@@ -581,7 +583,7 @@ export function ReportDashboard({
                     {p.name} <span className="text-slate-400">· {p.count} post</span>
                   </span>
                   <span className="text-slate-500">
-                    {fmt(p.reach)} reach · {fmt(p.ti)} interaksi
+                    {fmt(p.reach)} reach · {fmt(p.ti)} actions
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-100">
@@ -925,7 +927,7 @@ export function ReportDashboard({
                   <th className="p-2.5 text-right">Impr.</th>
                   <th className="p-2.5 text-right">Reach</th>
                   <th className="p-2.5 text-right">Reach ER</th>
-                  <th className="p-2.5 text-right">Total Int.</th>
+                  <th className="p-2.5 text-right">Total Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -980,7 +982,7 @@ function MonthRows({
         </tr>
       )}
       {posts.map((p, i) => {
-        const ti = tiOf(p);
+        const ti = totalActions(p);
         const followers = p.followersAtPeriod ?? followersBase;
         return (
           <tr key={i} className="border-b border-slate-50 last:border-0">
@@ -1021,7 +1023,7 @@ function MonthRows({
         <td className="p-2.5 text-right">{fmt(sumBy(posts, (p) => p.impressions))}</td>
         <td className="p-2.5 text-right">{fmt(sumBy(posts, (p) => p.reach))}</td>
         <td className="p-2.5"></td>
-        <td className="p-2.5 text-right">{fmt(sumBy(posts, tiOf))}</td>
+        <td className="p-2.5 text-right">{fmt(sumBy(posts, totalActions))}</td>
       </tr>
     </>
   );
