@@ -2,6 +2,7 @@
 
 import { Trash2 } from "lucide-react";
 import { deleteClient } from "@/lib/report/actions";
+import { btnCls } from "@/components/brand/styles";
 
 /** Delete a brand (with confirm). Submits the deleteClient server action. */
 export function DeleteBrandButton({ id, name }: { id: string; name: string }) {
@@ -15,12 +16,8 @@ export function DeleteBrandButton({ id, name }: { id: string; name: string }) {
       }}
     >
       <input type="hidden" name="id" value={id} />
-      <button
-        type="submit"
-        title="Hapus brand"
-        className="rounded-lg border border-red-200 px-3 py-2 text-red-500 hover:bg-red-50"
-      >
-        <Trash2 className="h-4 w-4" />
+      <button type="submit" title="Hapus brand" className={btnCls("danger", "sm", "gap-2")}>
+        <Trash2 className="size-4" aria-hidden /> Hapus
       </button>
     </form>
   );

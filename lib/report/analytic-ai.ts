@@ -17,7 +17,8 @@ export type HealthScore = {
   total: number;
   grade: "A" | "B" | "C" | "D" | "F";
   label: string;
-  color: string;
+  /** Which semantic colour the score wears (ok / warn / bad); the view maps it to a design token, so no hex lives here. */
+  tone: "ok" | "warn" | "bad";
   subScores: SubScore[];
 };
 
@@ -53,8 +54,7 @@ export function computeHealthScore(metrics: ReportMetrics): HealthScore | null {
     total >= 85 ? "A" : total >= 70 ? "B" : total >= 55 ? "C" : total >= 40 ? "D" : "F";
   const label =
     total >= 85 ? "Excellent" : total >= 70 ? "Good" : total >= 55 ? "Fair" : total >= 40 ? "Perlu Perbaikan" : "Kritis";
-  const color =
-    total >= 70 ? "#16a34a" : total >= 55 ? "#d97706" : "#dc2626";
+  const tone = total >= 70 ? "ok" : total >= 55 ? "warn" : "bad";
 
   const fmt = (v: number | null, pct = false) =>
     v == null ? "—" : pct ? (v * 100).toFixed(1) + "%" : v.toFixed(1);
@@ -63,7 +63,7 @@ export function computeHealthScore(metrics: ReportMetrics): HealthScore | null {
     total,
     grade,
     label,
-    color,
+    tone,
     subScores: [
       {
         label: "Reach Rate",

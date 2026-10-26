@@ -1,19 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { btnCls, inputCls, labelCls } from "@/components/brand/styles";
+import { cn } from "@/lib/utils";
 
 /** Read-only text field with a copy button (for share/connect links). */
 export function CopyField({ value, label }: { value: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div>
-      {label && <p className="mb-1.5 text-xs font-medium text-slate-500">{label}</p>}
-      <div className="flex items-stretch gap-2">
+      {label && <p className={labelCls}>{label}</p>}
+      <div className="flex flex-wrap items-center gap-3">
         <input
           readOnly
+          aria-label={label ?? "Link"}
           value={value}
           onFocus={(e) => e.currentTarget.select()}
-          className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-700"
+          className={cn(inputCls, "min-w-0 flex-1 basis-56 font-mono text-caption")}
         />
         <button
           type="button"
@@ -26,7 +29,7 @@ export function CopyField({ value, label }: { value: string; label?: string }) {
               /* clipboard blocked — user can select manually */
             }
           }}
-          className="shrink-0 rounded-lg bg-[#2A2870] px-3 py-2 text-xs font-semibold text-white hover:bg-[#211f5c]"
+          className={btnCls("dark", "lg")}
         >
           {copied ? "Tersalin ✓" : "Salin"}
         </button>

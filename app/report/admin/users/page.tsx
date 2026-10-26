@@ -1,14 +1,21 @@
-import Link from "next/link";
-import { ArrowLeft, Users, UserPlus, Trash2, ShieldCheck } from "lucide-react";
+import { Users, UserPlus, Trash2 } from "lucide-react";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { ADMIN_EMAILS, isAdminEmail } from "@/lib/admin/config";
 import { reportAddUser, reportDeleteUser } from "@/lib/report/actions";
+import { Card, Chip, EmptyState } from "@/components/brand/primitives";
+import { btnCls, capsCls, iconBtnCls, inputCls, labelCls, motion, pageX } from "@/components/brand/styles";
+import { cn } from "@/lib/utils";
 import { SettingsTabs } from "@/components/report/settings-tabs";
+import { IconTile, ReportPageHead } from "@/components/report/page-head";
 
 export const dynamic = "force-dynamic";
 
 type AdminUser = { id: string; email: string; name: string | null; role: string };
+
+/** Table cells: 64px rows, radius 16, Paper on hover, no rules between rows (BRAND "Table / list"). */
+const th = cn(capsCls, "px-4 py-3 text-left");
+const td = cn("h-16 px-4 group-hover:bg-paper-100 first:rounded-l-field last:rounded-r-field", motion);
 
 export default async function ReportUsersPage() {
   const me = await requireAdmin();
@@ -23,111 +30,123 @@ export default async function ReportUsersPage() {
   const envOwners = ADMIN_EMAILS.filter((e) => !tableEmails.has(e.toLowerCase()));
 
   return (
-    <div className="mx-auto max-w-4xl px-5 py-8 sm:px-8">
-      <Link href="/report/admin" className="mb-5 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800">
-        <ArrowLeft className="h-4 w-4" /> Dashboard
-      </Link>
-      <div className="mb-6 flex items-center gap-3">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#2A2870] text-white">
-          <Users className="h-5 w-5" />
-        </span>
-        <div>
-          <h1 className="text-2xl font-extrabold text-[#1B2A4A]">Setting</h1>
-          <p className="text-sm text-slate-500">Kelola admin user &amp; role akses report.thescaleup.xyz</p>
-        </div>
-      </div>
+    <div className={cn("mx-auto max-w-4xl py-10 sm:py-12", pageX)}>
+      <ReportPageHead
+        back={{ href: "/report/admin", label: "Dashboard" }}
+        title="Setting"
+        description="Kelola admin user & role akses report.thescaleup.xyz"
+        lead={
+          <IconTile>
+            <Users className="size-5" aria-hidden />
+          </IconTile>
+        }
+      />
 
       <SettingsTabs active="user" />
 
-      {/* add user */}
-      {me.perms.create && (
-        <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <UserPlus className="h-4 w-4" /> Tambah admin
-          </div>
-          <p className="mb-3 text-xs text-slate-500">
-            Admin bisa login via OTP email. Owner = akses penuh; Admin = kelola; Staff = tambah/lihat; Viewer = lihat.
-          </p>
-          <form action={reportAddUser} className="grid gap-3 sm:grid-cols-4">
-            <input name="email" type="email" required placeholder="email@domain.com"
-              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#2A2870] sm:col-span-2" />
-            <input name="name" placeholder="Nama"
-              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#2A2870]" />
-            <select name="role" defaultValue="admin"
-              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#2A2870]">
-              <option value="admin">Admin</option>
-              <option value="staff">Staff</option>
-              <option value="viewer">Viewer</option>
-            </select>
-            <button type="submit" className="rounded-lg bg-[#2A2870] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#211f5c] sm:col-span-4">
-              Tambah admin
-            </button>
-          </form>
-        </div>
-      )}
+      <div className="space-y-6">
+        {/* add user */}
+        {me.perms.create && (
+          <Card>
+            <h2 className="mb-2 flex items-center gap-3 font-title text-h3 text-ink-800">
+              <UserPlus className="size-5 text-ink-500" aria-hidden /> Tambah admin
+            </h2>
+            <p className="mb-6 max-w-chat text-small text-ink-500">Admin bisa login via OTP email. Owner = akses penuh; Admin = kelola; Staff = tambah/lihat; Viewer = lihat.</p>
+            <form action={reportAddUser} className="grid gap-4 sm:grid-cols-4">
+              <label className="sm:col-span-2">
+                <span className={labelCls}>Email</span>
+                <input name="email" type="email" required placeholder="email@domain.com" className={inputCls} />
+              </label>
+              <label>
+                <span className={labelCls}>Nama</span>
+                <input name="name" placeholder="Nama" className={inputCls} />
+              </label>
+              <label>
+                <span className={labelCls}>Role</span>
+                <select name="role" defaultValue="admin" className={inputCls}>
+                  <option value="admin">Admin</option>
+                  <option value="staff">Staff</option>
+                  <option value="viewer">Viewer</option>
+                </select>
+              </label>
+              <div className="sm:col-span-4">
+                <button type="submit" className={btnCls("dark", "lg")}>
+                  Tambah admin
+                </button>
+              </div>
+            </form>
+          </Card>
+        )}
 
-      {/* list */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <table className="w-full min-w-[560px] text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-400">
-              <th className="p-3">Email</th>
-              <th className="p-3">Nama</th>
-              <th className="p-3">Role</th>
-              <th className="p-3 text-right">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {envOwners.map((email) => (
-              <tr key={email} className="border-b border-slate-50">
-                <td className="p-3 font-medium text-[#1B2A4A]">
-                  {email}
-                  {email === me.email && <span className="ml-2 text-xs text-slate-400">(Anda)</span>}
-                </td>
-                <td className="p-3 text-slate-500">—</td>
-                <td className="p-3">
-                  <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase text-emerald-700">owner</span>
-                </td>
-                <td className="p-3 text-right text-xs text-slate-400">tetap (env)</td>
-              </tr>
-            ))}
-            {users.map((u) => {
-              const owner = isAdminEmail(u.email) || u.role === "owner";
-              const isSelf = u.email === me.email;
-              return (
-                <tr key={u.id} className="border-b border-slate-50 last:border-0">
-                  <td className="p-3 font-medium text-[#1B2A4A]">
-                    {u.email}
-                    {isSelf && <span className="ml-2 text-xs text-slate-400">(Anda)</span>}
-                  </td>
-                  <td className="p-3 text-slate-500">{u.name || "—"}</td>
-                  <td className="p-3">
-                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase text-slate-600">{u.role}</span>
-                  </td>
-                  <td className="p-3 text-right">
-                    {me.perms.delete && !owner && !isSelf ? (
-                      <form action={reportDeleteUser}>
-                        <input type="hidden" name="id" value={u.id} />
-                        <button type="submit" title="Hapus akses" className="rounded-lg border border-red-200 px-2 py-1.5 text-red-500 hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </form>
-                    ) : (
-                      <span className="text-xs text-slate-400">—</span>
-                    )}
-                  </td>
+        {/* list */}
+        <Card className="px-0 py-4 sm:px-0 sm:py-6">
+          <div className="overflow-x-auto px-3 sm:px-5">
+            <table className="w-full min-w-table-sm border-separate border-spacing-0 text-small">
+              <caption className="sr-only">Admin dan role akses</caption>
+              <thead>
+                <tr>
+                  <th className={th}>Email</th>
+                  <th className={th}>Nama</th>
+                  <th className={th}>Role</th>
+                  <th className={cn(th, "text-right")}>Aksi</th>
                 </tr>
-              );
-            })}
-            {envOwners.length === 0 && users.length === 0 && (
-              <tr>
-                <td colSpan={4} className="p-8 text-center text-sm text-slate-500">
-                  <ShieldCheck className="mx-auto mb-2 h-5 w-5 text-slate-300" /> Belum ada admin.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {envOwners.map((email) => (
+                  <tr key={email} className="group">
+                    <td className={cn(td, "font-medium text-ink-800")}>
+                      {email}
+                      {email === me.email && <span className="ml-2 text-caption font-normal text-ink-500">(Anda)</span>}
+                    </td>
+                    <td className={cn(td, "text-ink-500")}>—</td>
+                    <td className={td}>
+                      <Chip tone="ok">owner</Chip>
+                    </td>
+                    <td className={cn(td, "text-right text-caption text-ink-500")}>tetap (env)</td>
+                  </tr>
+                ))}
+                {users.map((u) => {
+                  const owner = isAdminEmail(u.email) || u.role === "owner";
+                  const isSelf = u.email === me.email;
+                  return (
+                    <tr key={u.id} className="group">
+                      <td className={cn(td, "font-medium text-ink-800")}>
+                        {u.email}
+                        {isSelf && <span className="ml-2 text-caption font-normal text-ink-500">(Anda)</span>}
+                      </td>
+                      <td className={cn(td, "text-ink-500")}>{u.name || "—"}</td>
+                      <td className={td}>
+                        <Chip tone="neutral">{u.role}</Chip>
+                      </td>
+                      <td className={cn(td, "text-right")}>
+                        {me.perms.delete && !owner && !isSelf ? (
+                          <form action={reportDeleteUser} className="inline-flex">
+                            <input type="hidden" name="id" value={u.id} />
+                            <button
+                              type="submit"
+                              aria-label={`Hapus akses ${u.email}`}
+                              title="Hapus akses"
+                              className={iconBtnCls("quiet", "border-control border-ink-200 bg-paper-0 hover:border-danger hover:text-danger")}
+                            >
+                              <Trash2 className="size-4" aria-hidden />
+                            </button>
+                          </form>
+                        ) : (
+                          <span className="text-caption text-ink-500">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {envOwners.length === 0 && users.length === 0 && (
+            <div className="px-6 pb-4 sm:px-8">
+              <EmptyState title="Belum ada admin" />
+            </div>
+          )}
+        </Card>
       </div>
     </div>
   );

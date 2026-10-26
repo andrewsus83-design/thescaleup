@@ -9,7 +9,7 @@ export type ReportScreen = "performance" | "analytic";
 /**
  * Project → Report in the Chat Room: the real report of report.thescaleup.xyz (Performance = its Report screen, Analytic =
  * its Analytic screen) with the same channels, snapshots and numbers, because it renders the same views from the same loader.
- * It keeps the report's own look inside a canvas of its own, so a number looks the same here and there.
+ * The views wear the brand design system themselves, so here they simply sit on the Room's Paper.
  * The Room's mock projects are not linked to a report brand yet (that needs the v2 database), so the channel picker is
  * how you choose the brand and the account.
  */
@@ -18,31 +18,24 @@ export async function RoomReport({ screen, search, basePath }: { screen: ReportS
   // data, so it checks the admin itself (the standalone report pages do the same).
   await requireAdmin();
   const view = await loadReportView(search, screen === "analytic" ? "analytic" : "report");
-  return (
-    // On a phone the Room's menu rail already takes 72px, so the canvas runs edge to edge (-mx-5 undoes the page padding).
-    <div className="-mx-5 rounded-none bg-[#F4F5FB] px-3 py-4 font-body text-[#1B2A4A] sm:mx-0 sm:rounded-card sm:p-6">
-      {screen === "performance" ? (
-        <>
-          <div className="mb-5">
-            <ReportActions addMode={view.addMode} embedded />
-          </div>
-          <PerformanceView view={view} basePath={basePath} embedded />
-        </>
-      ) : (
-        <AnalyticView view={view} reportHref={basePath} />
-      )}
+  return screen === "performance" ? (
+    <div className="space-y-6">
+      <ReportActions addMode={view.addMode} embedded />
+      <PerformanceView view={view} basePath={basePath} embedded />
     </div>
+  ) : (
+    <AnalyticView view={view} reportHref={basePath} />
   );
 }
 
 /** Shown while the report loads: the Zernio account list is fetched live, so the first paint can take a moment. */
 export function RoomReportSkeleton() {
   return (
-    <div role="status" aria-label="Loading the report" className="-mx-5 space-y-4 rounded-none bg-[#F4F5FB] px-3 py-4 sm:mx-0 sm:rounded-card sm:p-6">
-      <div className="h-[76px] animate-pulse rounded-2xl bg-white" />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div role="status" aria-label="Loading the report" className="space-y-6">
+      <div className="h-40 animate-pulse rounded-card bg-paper-0" />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-24 animate-pulse rounded-2xl bg-white" />
+          <div key={i} className="h-28 animate-pulse rounded-field bg-paper-0" />
         ))}
       </div>
       <span className="sr-only">Loading the report…</span>

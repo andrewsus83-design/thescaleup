@@ -194,8 +194,6 @@ export async function createClient(formData: FormData): Promise<void> {
   const profileId = String(formData.get("zernio_account_id") ?? "").trim();
   if (!zernioKey || !profileId) return;
   const label = String(formData.get("name") ?? "").trim();
-  const brand = String(formData.get("brand_color") ?? "").trim() || "#2A2870";
-  const accent = String(formData.get("accent_color") ?? "").trim() || "#38B6F0";
   const db = createSupabaseAdminClient();
   const now = new Date().toISOString();
 
@@ -215,8 +213,6 @@ export async function createClient(formData: FormData): Promise<void> {
       slug,
       name,
       ig_handle: igHandle,
-      brand_color: brand,
-      accent_color: accent,
       connect_token: randomUUID().replace(/-/g, ""),
       status: "connected",
     })
@@ -245,8 +241,6 @@ export async function updateClient(formData: FormData): Promise<void> {
   const fields: [string, string][] = [
     ["name", "name"],
     ["ig_handle", "ig_handle"],
-    ["brand_color", "brand_color"],
-    ["accent_color", "accent_color"],
     ["theme", "theme"],
     ["status", "status"],
     ["notes", "notes"],

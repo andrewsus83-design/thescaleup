@@ -1,5 +1,7 @@
+import { pageX } from "@/components/brand/styles";
 import { requireAdmin } from "@/lib/admin/auth";
 import { loadReportView, type ReportSearch } from "@/lib/report/view";
+import { cn } from "@/lib/utils";
 import { AnalyticView } from "@/components/report/analytic-view";
 import { AdminBottomNav } from "@/components/report/admin-bottom-nav";
 
@@ -11,7 +13,7 @@ export default async function AnalyticPage({ searchParams }: { searchParams: Pro
   const view = await loadReportView(await searchParams, "analytic");
 
   return (
-    <div className="mx-auto max-w-6xl px-5 pb-28 pt-8 sm:px-8">
+    <div className={cn("mx-auto max-w-6xl pb-28 pt-8 sm:pt-12", pageX)}>
       <AnalyticView view={view} reportHref="/report/admin" />
       <AdminBottomNav accountIds={view.accountIds} webIds={view.webIds} active="analytic" />
     </div>

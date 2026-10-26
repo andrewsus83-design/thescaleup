@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, PlugZap, Check, Loader2, AlertCircle } from "lucide-react";
+import { Plus, PlugZap, Check, Loader2 } from "lucide-react";
 import { checkZernioConnection, createClient } from "@/lib/report/actions";
 import type { ZernioAccount } from "@/lib/report/zernio";
+import { Alert, Tag } from "@/components/brand/primitives";
+import { btnCls, inputCls, labelCls, motion } from "@/components/brand/styles";
+import { cn } from "@/lib/utils";
 
-export function AddBrandForm({ hasClients }: { hasClients?: boolean }) {
+export function AddBrandForm() {
   const [name, setName] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [profileId, setProfileId] = useState("");
@@ -34,23 +37,19 @@ export function AddBrandForm({ hasClients }: { hasClients?: boolean }) {
   const selected = accounts?.find((a) => a.id === profileId);
 
   return (
-    <form action={createClient} className="grid gap-4">
+    <form action={createClient} className="grid gap-6">
       <label className="block">
-        <span className="mb-1.5 block text-sm font-medium text-slate-700">Nama Brand *</span>
-        <input
-          name="name"
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="mis. Cap Gajah"
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#2A2870]"
-        />
+        <span className={labelCls}>Nama Brand *</span>
+        <input name="name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="mis. Cap Gajah" className={inputCls} />
       </label>
 
-      <label className="block">
-        <span className="mb-1.5 block text-sm font-medium text-slate-700">Zernio API Key *</span>
-        <div className="flex items-stretch gap-2">
+      <div>
+        <label htmlFor="add-brand-key" className={labelCls}>
+          Zernio API Key *
+        </label>
+        <div className="flex flex-wrap items-center gap-3">
           <input
+            id="add-brand-key"
             name="zernio_api_key"
             required
             type="password"
@@ -62,97 +61,70 @@ export function AddBrandForm({ hasClients }: { hasClients?: boolean }) {
               setProfileId("");
             }}
             placeholder="zernio_..."
-            className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs outline-none focus:border-[#2A2870]"
+            className={cn(inputCls, "min-w-0 flex-1 basis-48 font-mono")}
           />
-          <button
-            type="button"
-            onClick={check}
-            disabled={checking || !apiKey.trim()}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#2A2870] px-3 py-2 text-xs font-semibold text-[#2A2870] hover:bg-[#2A2870]/5 disabled:opacity-50"
-          >
-            {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlugZap className="h-4 w-4" />}
+          <button type="button" onClick={check} disabled={checking || !apiKey.trim()} className={btnCls("secondary", "lg", "gap-2")}>
+            {checking ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <PlugZap className="size-4" aria-hidden />}
             Cek Koneksi
           </button>
         </div>
-      </label>
+      </div>
 
       {error && (
-        <div className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> <span>{error}</span>
-        </div>
+        <Alert tone="bad" role="alert">
+          {error}
+        </Alert>
       )}
 
       {accounts && accounts.length > 0 && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
-            <Check className="h-4 w-4" /> Terhubung — pilih akun:
-          </p>
+        <div className="space-y-3">
+          <Alert tone="ok" role="status" title="Terhubung.">
+            Pilih akun yang mau dilaporkan.
+          </Alert>
           <div className="grid gap-2">
             {accounts.map((a) => (
               <button
                 key={a.id}
                 type="button"
+                aria-pressed={profileId === a.id}
                 onClick={() => setProfileId(a.id)}
-                className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                  profileId === a.id ? "border-[#2A2870] bg-white" : "border-transparent bg-white/60 hover:bg-white"
-                }`}
+                className={cn(
+                  "flex min-h-14 items-center justify-between gap-3 rounded-field border-control px-4 py-3 text-left text-small",
+                  motion,
+                  profileId === a.id ? "border-ink-800 bg-paper-0" : "border-ink-200 bg-paper-0 hover:bg-paper-100",
+                )}
               >
-                <span className="flex items-center gap-2">
-                  {a.platform && (
-                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
-                      {a.platform}
-                    </span>
-                  )}
-                  <span>
-                    <span className="font-semibold text-slate-800">{a.displayName ?? a.username ?? "Akun"}</span>{" "}
-                    {a.username && <span className="text-slate-500">@{a.username}</span>}
-                    {a.followers != null && (
-                      <span className="text-slate-400"> · {a.followers.toLocaleString("id-ID")} followers</span>
-                    )}
+                <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                  {a.platform && <Tag className="uppercase">{a.platform}</Tag>}
+                  <span className="min-w-0">
+                    <span className="font-semibold text-ink-800">{a.displayName ?? a.username ?? "Akun"}</span>{" "}
+                    {a.username && <span className="text-ink-500">@{a.username}</span>}
+                    {a.followers != null && <span className="text-ink-500"> · {a.followers.toLocaleString("id-ID")} followers</span>}
                   </span>
                 </span>
-                {profileId === a.id && <Check className="h-4 w-4 text-[#2A2870]" />}
+                {profileId === a.id && <Check className="size-4 shrink-0 text-ink-800" aria-hidden />}
               </button>
             ))}
           </div>
         </div>
       )}
-      {accounts && accounts.length === 0 && (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
-          Key valid tapi belum ada akun Instagram terhubung di Zernio.
-        </p>
-      )}
+      {accounts && accounts.length === 0 && <Alert tone="warn">Key valid tapi belum ada akun Instagram terhubung di Zernio.</Alert>}
 
       <label className="block">
-        <span className="mb-1.5 block text-sm font-medium text-slate-700">Zernio Profile ID *</span>
+        <span className={labelCls}>Zernio Profile ID *</span>
         <input
           name="zernio_account_id"
           required
           value={profileId}
           onChange={(e) => setProfileId(e.target.value)}
           placeholder="klik Cek Koneksi lalu pilih akun (otomatis terisi)"
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs outline-none focus:border-[#2A2870]"
+          className={cn(inputCls, "font-mono")}
         />
       </label>
 
-      <div className="grid grid-cols-2 gap-3">
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-slate-700">Warna Brand</span>
-          <input name="brand_color" type="color" defaultValue="#2A2870" className="h-11 w-full rounded-lg border border-slate-200 px-1" />
-        </label>
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-slate-700">Warna Aksen</span>
-          <input name="accent_color" type="color" defaultValue="#38B6F0" className="h-11 w-full rounded-lg border border-slate-200 px-1" />
-        </label>
-      </div>
-
       <div>
-        <button
-          type="submit"
-          disabled={!profileId.trim()}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#2A2870] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#211f5c] disabled:opacity-50"
-        >
-          <Plus className="h-4 w-4" /> Buat Brand{selected ? ` — ${selected.displayName ?? selected.username}` : ""}
+        <button type="submit" disabled={!profileId.trim()} className={btnCls("primary", "lg", "gap-2")}>
+          <Plus className="size-4" aria-hidden /> Buat Brand{selected ? ` — ${selected.displayName ?? selected.username}` : ""}
         </button>
       </div>
     </form>

@@ -1,6 +1,8 @@
-import { LayoutGrid } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
+import { pageX } from "@/components/brand/styles";
 import { requireAdmin } from "@/lib/admin/auth";
 import { loadReportView, type ReportSearch } from "@/lib/report/view";
+import { cn } from "@/lib/utils";
 import { PerformanceView } from "@/components/report/performance-view";
 import { ReportActions } from "@/components/report/report-actions";
 import { AdminBottomNav } from "@/components/report/admin-bottom-nav";
@@ -13,16 +15,16 @@ export default async function ReportAdminDashboard({ searchParams }: { searchPar
   const view = await loadReportView(await searchParams);
 
   return (
-    <div className="mx-auto max-w-6xl px-5 pb-28 pt-8 sm:px-8">
+    <div className={cn("mx-auto max-w-6xl pb-28 pt-8 sm:pt-12", pageX)}>
       {/* header */}
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#2A2870] text-white">
-            <LayoutGrid className="h-5 w-5" />
-          </span>
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-[#1B2A4A]">ScaleUp Reports</h1>
-            <p className="text-sm text-slate-500">Report analytics per akun · {admin.email}</p>
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-6">
+        <div className="flex min-w-0 max-w-full items-center gap-4">
+          <Logo variant="primary" size={44} />
+          <div className="min-w-0">
+            <h1 className="font-title text-h2 text-ink-800">ScaleUp Reports</h1>
+            <p className="truncate text-small text-ink-500">
+              Report analytics per akun · <span className="font-mono text-caption">{admin.email}</span>
+            </p>
           </div>
         </div>
         {/* top right: Setting · Tambah */}
