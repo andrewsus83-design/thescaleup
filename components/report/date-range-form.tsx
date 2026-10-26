@@ -43,7 +43,7 @@ export function DateRangeForm({
     <form action={generateReport} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="id" value={clientId} />
       {accountId && <input type="hidden" name="account" value={accountId} />}
-      <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-white p-1.5">
+      <div className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-1.5">
         <CalendarDays className="mb-2 ml-1 h-4 w-4 text-slate-400" />
         <label className="block">
           <span className="mb-0.5 block px-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">Dari</span>

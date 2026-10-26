@@ -462,7 +462,7 @@ function DataQualityBanner({ checks }: { checks: DataCheck[] }) {
             <li key={c.id} className="flex items-start gap-2">
               <CIcon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${CHECK_TONE[c.status]}`} aria-hidden />
               <span>
-                <b className="font-semibold text-slate-800">{c.label}</b> <ScopeChip scope={c.scope} />{" "}
+                <b className="font-semibold text-slate-800">{c.label}</b> {c.scope && <ScopeChip scope={c.scope} />}{" "}
                 <span className={`font-semibold ${CHECK_TONE[c.status]}`}>{CHECK_WORD[c.status]}</span>
                 <br />
                 <span className="text-slate-500">{c.detail}</span>

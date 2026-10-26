@@ -7,9 +7,10 @@ import { useState } from "react";
 import { Check, Lock, Mail, Pin, ShieldCheck, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRoom } from "./room-provider";
-import { Alert, Btn, Card, Chip, EmptyState, PageHeader, errorCls, inputCls, labelCls, motion, pageX, pillCls } from "./ui";
+import { Alert, Btn, Card, Chip, EmptyState, PageHeader, Sheet, errorCls, inputCls, labelCls, motion, pageX, pillCls } from "./ui";
+import { BILLING_LABEL, GROUPS, PROVIDERS, isMetered, providerOf, type OwnKey, type ProviderId } from "./projects/brand-keys";
+import { KeyForm } from "./projects/key-form";
 
-type Key = { id: string; provider: string; last4: string; cap: number; active: boolean };
 type User = { email: string; role: "admin" | "member"; lang: "id" | "en"; status: "active" | "invited" | "disabled" };
 
 function Section({ id, title, hint, children }: { id: string; title: string; hint?: string; children: React.ReactNode }) {
@@ -31,12 +32,18 @@ export function SettingsScreen() {
   const [log, setLog] = useState<string[]>([]);
   const record = (text: string) => setLog((l) => [text, ...l].slice(0, 12));
 
-  const [keys, setKeys] = useState<Key[]>([
-    { id: "claude", provider: "Claude (Anthropic)", last4: "a91f", cap: 60, active: true },
-    { id: "gemini", provider: "Google Gemini", last4: "k2Q8", cap: 20, active: true },
-    { id: "perplexity", provider: "Perplexity", last4: "7c3d", cap: 15, active: true },
-    { id: "dataforseo", provider: "DataForSEO", last4: "0b2e", cap: 30, active: false },
-  ]);
+  // The workspace key per provider (the catalog is shared with Project → Integrations). A provider without an entry has no key yet.
+  const [keys, setKeys] = useState<Partial<Record<ProviderId, OwnKey>>>({
+    claude: { last4: "a91f", cap: 60, active: true },
+    gemini: { last4: "k2Q8", cap: 20, active: true },
+    perplexity: { last4: "7c3d", cap: 15, active: true },
+    dataforseo: { last4: "0b2e", cap: 30, active: false, login: "ops@example.com" },
+    firecrawl: { last4: "5nR2", cap: 20, active: true },
+    pagespeed: { last4: "Gm4x", cap: 0, active: true },
+    zernio: { last4: "Xp91", cap: 0, active: true },
+    resend: { last4: "8hQz", cap: 0, active: true },
+  });
+  const [addingKey, setAddingKey] = useState<ProviderId | null>(null);
   const [cost, setCost] = useState({ budget: "3.00", alert: "80", chatCap: "40", markup: "30", hardStop: true });
   const [users, setUsers] = useState<User[]>([
     { email: "dewi@example.com", role: "admin", lang: "id", status: "active" },
@@ -73,23 +80,69 @@ export function SettingsScreen() {
       </div>
 
       <Section id="keys" title="API keys" hint="Add a key per provider, test it, set a monthly cap, disable it. These are the workspace keys: a brand without keys of its own uses them. A brand can bring its own under Project → Integrations.">
-        <ul className={list}>
-          {keys.map((k) => (
-            <li key={k.id} className={row}>
-              <div className="min-w-0 flex-1 basis-48">
-                <p className="font-semibold">{k.provider}</p>
-                <p className="mt-0.5 font-mono text-[13px] text-ink-500">••••••••{k.last4} · cap ${k.cap}/month</p>
-              </div>
-              <Chip tone={k.active ? "ok" : "neutral"}>{k.active ? "Active" : "Disabled"}</Chip>
-              <div className="flex gap-2">
-                <Btn size="xs" variant="secondary" onClick={() => { toast(`${k.provider}: test passed (prototype)`); record(`Tested the ${k.provider} key`); }}>Test key</Btn>
-                <Btn size="xs" variant={k.active ? "danger" : "secondary"} onClick={() => { setKeys((ks) => ks.map((x) => (x.id === k.id ? { ...x, active: !x.active } : x))); record(`${k.active ? "Disabled" : "Enabled"} the ${k.provider} key`); }}>
-                  {k.active ? "Disable key" : "Enable key"}
-                </Btn>
-              </div>
-            </li>
+        <div className="space-y-8">
+          {GROUPS.map((g) => (
+            <div key={g.id}>
+              <h3 className="label-caps px-4 text-ink-500">{g.label}</h3>
+              <ul className={cn(list, "mt-2")}>
+                {PROVIDERS.filter((p) => p.group === g.id).map((p) => {
+                  const k = keys[p.id];
+                  if (p.kind === "grant") {
+                    // Search Console is read through each brand's own Google grant, so there is nothing to store here.
+                    return (
+                      <li key={p.id} className={row}>
+                        <div className="min-w-0 flex-1 basis-48">
+                          <p className="font-semibold">{p.name}</p>
+                          <p className="mt-0.5 text-[13px] text-ink-500">Granted by each brand&apos;s owner under Project → Integrations. There is no workspace key.</p>
+                        </div>
+                        <Chip tone="neutral">Per brand</Chip>
+                      </li>
+                    );
+                  }
+                  return (
+                    <li key={p.id} className={row}>
+                      <div className="min-w-0 flex-1 basis-48">
+                        <p className="font-semibold">{p.name}</p>
+                        <p className={cn("mt-0.5 text-[13px] text-ink-500", k && "font-mono")}>
+                          {k ? `••••••••${k.last4} · ${isMetered(p) ? `cap $${k.cap}/month` : BILLING_LABEL[p.billing].toLowerCase()}` : p.use}
+                        </p>
+                      </div>
+                      <Chip tone={k ? (k.active ? "ok" : "neutral") : "warn"}>{k ? (k.active ? "Active" : "Disabled") : "No key"}</Chip>
+                      <div className="flex gap-2">
+                        {k ? (
+                          <>
+                            <Btn size="xs" variant="secondary" onClick={() => { toast(`${p.name}: test passed (prototype)`); record(`Tested the ${p.name} key`); }}>Test key</Btn>
+                            <Btn size="xs" variant={k.active ? "danger" : "secondary"} onClick={() => { setKeys((ks) => ({ ...ks, [p.id]: { ...k, active: !k.active } })); record(`${k.active ? "Disabled" : "Enabled"} the ${p.name} key`); }}>
+                              {k.active ? "Disable key" : "Enable key"}
+                            </Btn>
+                          </>
+                        ) : (
+                          <Btn size="xs" variant="secondary" onClick={() => setAddingKey(p.id)}>Add key</Btn>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
+        <Sheet open={addingKey !== null} onClose={() => setAddingKey(null)} title={addingKey ? `${providerOf(addingKey).name} key` : "API key"}>
+          {addingKey && (
+            <KeyForm
+              provider={providerOf(addingKey)}
+              intro={`${providerOf(addingKey).name} usage is billed to the workspace account that owns this key. A brand with no key of its own uses it.`}
+              onCancel={() => setAddingKey(null)}
+              onSave={(key) => {
+                const name = providerOf(addingKey).name;
+                setKeys((ks) => ({ ...ks, [addingKey]: key }));
+                setAddingKey(null);
+                record(`Added the ${name} key`);
+                toast(`${name} key saved (prototype: nothing was stored)`);
+              }}
+            />
+          )}
+        </Sheet>
       </Section>
 
       <Section id="cost" title="Cost" hint="A batch copies its cost profile when it starts, so editing never changes a run in progress.">

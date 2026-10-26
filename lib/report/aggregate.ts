@@ -62,6 +62,18 @@ export function aggregateMetrics(list: ReportMetrics[], label: string): ReportMe
     .flatMap((m) => m.posts ?? [])
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
+  // Each account shows ITS latest pull, and those pulls can cover different dates; adding them up then compares unlike
+  // periods, so say so instead of printing the first account's period as if it were everyone's.
+  const periods = [...new Set(connected.map((m) => m.period).filter((p): p is string => !!p))];
+  const dataNotes = [
+    ...new Set([
+      ...connected.flatMap((m) => m.dataNotes ?? []),
+      ...(periods.length > 1
+        ? [`Periode tiap akun berbeda (${periods.join("; ")}) — angka gabungan menjumlahkan rentang tanggal yang tidak sama. Tarik data semua akun dengan rentang yang sama.`]
+        : []),
+    ]),
+  ];
+
   const df = sumNull(connected.map((m) => m.discovery?.followers));
   const dn = sumNull(connected.map((m) => m.discovery?.nonFollowers));
 
@@ -83,7 +95,7 @@ export function aggregateMetrics(list: ReportMetrics[], label: string): ReportMe
   return {
     connected: true,
     provider: "zernio",
-    period: connected[0]?.period,
+    period: periods.length > 1 ? "periode berbeda" : periods[0],
     account: { username: label, followers: sumNull(connected.map((m) => m.account?.followers)) },
     posts,
     totals,
@@ -96,6 +108,7 @@ export function aggregateMetrics(list: ReportMetrics[], label: string): ReportMe
     contactButtons: (mergeDim(connected.map((m) => m.contactButtons as { [k: string]: unknown }[] | null), "type", "value") as
       | { type: string; value: number }[]
       | null),
+    ...(dataNotes.length ? { dataNotes } : {}),
     fetchedAt: connected[0]?.fetchedAt,
   };
 }

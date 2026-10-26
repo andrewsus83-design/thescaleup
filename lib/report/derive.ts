@@ -12,7 +12,7 @@
 // once showed account reach ÷ posts and "Impressions" sat below Reach.
 // See efficiency() and postTotal().
 
-import type { PostMetric, MetricTotals, PeriodComparison } from "@/lib/report/types";
+import type { PostMetric, MetricTotals, PeriodComparison, ReelsSummary } from "@/lib/report/types";
 
 /**
  * Total Actions (client convention, Cap Gajah) = every action on a post summed:
@@ -150,6 +150,23 @@ export function bestDayTime(posts: PostMetric[]): BestTime {
   const bd = top(dayAgg), bh = top(hourAgg);
   if (!bd || !bh) return null;
   return { day: DAYS[bd.k], dayAvgReach: Math.round(bd.avg), hour: bh.k, hourAvgReach: Math.round(bh.avg) };
+}
+
+/** Aggregate video/Reels performance from the post list; null when there is no video. Used when a report is built
+ *  (lib/report/zernio.ts) and when an old snapshot is repaired (lib/report/repair.ts), so both give the same summary. */
+export function reelsSummary(posts: PostMetric[]): ReelsSummary | null {
+  const vids = posts.filter((p) => p.avgWatchTime != null || p.completionRate != null || p.format === "Reels / Video");
+  if (!vids.length) return null;
+  const nums = (k: keyof PostMetric) => vids.map((p) => p[k]).filter((v): v is number => typeof v === "number");
+  const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+  const views = nums("views");
+  const watch = nums("avgWatchTime").filter((v) => v > 0); // 0 ms = no watch data yet, not an instant skip
+  return {
+    count: vids.length,
+    totalViews: views.length ? views.reduce((a, b) => a + b, 0) : null,
+    avgWatchTimeSec: watch.length ? avg(watch)! / 1000 : null,
+    avgCompletion: avg(nums("completionRate")),
+  };
 }
 
 export type ReelRow = {

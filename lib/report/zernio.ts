@@ -1,5 +1,7 @@
 import "server-only";
 import type { PostMetric, ReportMetrics, MetricTotals } from "@/lib/report/types";
+import { reelsSummary } from "@/lib/report/derive";
+import { PIPELINE_REV } from "@/lib/report/repair";
 
 /**
  * Zernio adapter — the per-client data source that REPLACES Apify on the
@@ -53,8 +55,12 @@ function dateRange(period: string): { since?: string; until?: string } {
     const since = new Date(until.getTime() - 90 * 864e5);
     return { since: ymd(since), until: ymd(until) };
   }
-  // last_30d → let Zernio default (30 days)
-  return {};
+  // last_30d (and any other label): spell the 30 days out. Account totals, the post list and the previous-period
+  // comparison then all cover the same dates; Zernio's own defaults differ per endpoint (30 days for account
+  // insights, 90 days for the post list), which used to put 90 days of posts next to 30 days of totals.
+  const until = new Date();
+  const since = new Date(until.getTime() - 29 * 864e5);
+  return { since: ymd(since), until: ymd(until) };
 }
 
 // Valid Instagram metrics per Zernio (invalid ones like views/profile_visits 400).
@@ -161,15 +167,20 @@ function mapPosts(postsJson: Record<string, unknown> | null): PostMetric[] {
         : null;
       const watch = num(a.igReelsAvgWatchTime);
       const isVideo = watch != null || num(a.videoDurationSeconds) != null || num(a.completionRate) != null;
+      const reach = num(a.reach), views = num(a.views);
+      let impressions = num(a.impressions);
+      // A post that reached people was shown at least that often: a 0 next to reach/views means the platform has no
+      // impressions metric (TikTok reports views), not that nobody saw it.
+      if (impressions === 0 && ((reach ?? 0) > 0 || (views ?? 0) > 0)) impressions = null;
       posts.push({
         date: String(p.publishedAt ?? p.scheduledFor ?? "").slice(0, 10),
         postedAt: String(p.publishedAt ?? p.scheduledFor ?? "") || null,
         caption: String(p.content ?? "").replace(/\s+/g, " ").trim(),
         format: isVideo ? "Reels / Video" : "Post",
-        reach: num(a.reach),
-        impressions: num(a.impressions),
+        reach,
+        impressions,
         likes, comments, shares, saved: saves,
-        views: num(a.views),
+        views,
         follows: num(a.follows),
         profileVisits: num(a.profileViews),
         webClicks: num(a.clicks),
@@ -186,21 +197,41 @@ function mapPosts(postsJson: Record<string, unknown> | null): PostMetric[] {
   return posts;
 }
 
-/** Aggregate video/Reels performance from the post list. */
-function computeReels(posts: PostMetric[]) {
-  const vids = posts.filter((p) => p.avgWatchTime != null || p.completionRate != null || p.format === "Reels / Video");
-  if (!vids.length) return null;
-  const nums = (k: keyof PostMetric) => vids.map((p) => p[k]).filter((v): v is number => typeof v === "number");
-  const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
-  const views = nums("views");
-  const watch = nums("avgWatchTime").filter((v) => v > 0); // 0 ms = no watch data yet, not an instant skip
-  return {
-    count: vids.length,
-    totalViews: views.length ? views.reduce((a, b) => a + b, 0) : null,
-    avgWatchTimeSec: watch.length ? avg(watch)! / 1000 : null,
-    avgCompletion: avg(nums("completionRate")),
-  };
+/** Every post of the account published in the report range, as one `{ posts }` payload. Throws when Zernio fails.
+ *
+ *  Zernio's list endpoint (GET /v1/analytics, docs.zernio.com/core/analytics) answers "the last 90 days, 50 per page"
+ *  unless told otherwise. Without `fromDate`/`toDate` a report for an older range came back empty (the posts were
+ *  outside the 90 days) and a busy account lost its older posts to the 50 cap — while the account totals next to
+ *  them were right. So ask for the range itself, 100 per page, and read every page. */
+async function fetchPostsInRange(
+  base: string,
+  apiKey: string,
+  platform: string,
+  accountId: string,
+  since?: string,
+  until?: string,
+): Promise<{ posts: unknown[] }> {
+  const LIMIT = 100; // Zernio's maximum
+  const MAX_PAGES = 20; // a safety stop, 2,000 posts
+  const all: unknown[] = [];
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const qs = new URLSearchParams({ platform, accountId, limit: String(LIMIT), page: String(page) });
+    if (since) qs.set("fromDate", since);
+    if (until) qs.set("toDate", until);
+    const r = await fetch(`${base}/v1/analytics?${qs.toString()}`, {
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!r.ok) throw new Error(`${r.status}: ${(await r.text().catch(() => "")).slice(0, 160)}`);
+    const j = (await r.json()) as { posts?: unknown[]; pagination?: { pages?: number } };
+    const batch = Array.isArray(j.posts) ? j.posts : [];
+    all.push(...batch);
+    if (batch.length < LIMIT || page >= (Number(j.pagination?.pages) || 1)) break;
+  }
+  return { posts: all };
 }
+
+const POSTS_FAILED = "Daftar post gagal diambil dari Zernio — angka berbasis post (jumlah post, rata-rata, rate) kosong karena belum terbaca, bukan karena tidak ada post.";
 
 /** Instagram Stories: list + per-story insights → aggregate + list. */
 async function fetchStories(base: string, apiKey: string, accountId: string) {
@@ -257,7 +288,7 @@ async function fetchTikTok(
   const get = (url: string) => fetch(url, { headers: AH, cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   const [insJson, postsJson] = await Promise.all([
     get(`${base}/v1/analytics/tiktok/account-insights?accountId=${accountId}&metrics=follower_count,likes_count,video_count,followers_gained,followers_lost&metricType=total_value${range}`),
-    get(`${base}/v1/analytics?platform=tiktok&accountId=${accountId}&limit=50`),
+    fetchPostsInRange(base, apiKey, "tiktok", accountId, since, until).catch(() => null),
   ]);
   const mx = ((insJson as Record<string, unknown>)?.metrics ?? {}) as Record<string, Record<string, unknown>>;
   let posts = mapPosts(postsJson as Record<string, unknown> | null);
@@ -273,17 +304,21 @@ async function fetchTikTok(
   const totals: MetricTotals = {
     posts: posts.length,
     reach, impressions: sum("impressions"),
-    likes: num(mx.likes_count?.total) ?? sum("likes"),
+    // Post-scope sum like every other TikTok total. Zernio's likes_count is the account's LIFETIME likes (identical for
+    // every date range), which sat next to period comments/shares/saves and could exceed Total Interactions.
+    likes: sum("likes"),
     comments: sum("comments"), shares: sum("shares"), saved: sum("saved"),
     profileVisits: sum("profileVisits"), follows: sum("follows"),
     webClicks: null, accountsEngaged: null, replies: null, reposts: null,
     totalInteractions: ti, erReach: reach && ti ? ti / reach : null,
   };
   return {
-    connected: true, provider: "zernio", platform: "tiktok", period,
+    connected: true, provider: "zernio", platform: "tiktok", period: since && until ? `${since} → ${until}` : period,
     account: { id: accountId, username: acct?.username ?? null, followers: num(mx.follower_count?.total), platform: "tiktok" },
-    posts, totals, reels: computeReels(posts),
+    posts, totals, reels: reelsSummary(posts),
     followersGained: num(mx.followers_gained?.total), followersLost: num(mx.followers_lost?.total),
+    ...(postsJson ? {} : { dataNotes: [POSTS_FAILED] }),
+    rev: PIPELINE_REV,
     fetchedAt: new Date().toISOString(),
   };
 }
@@ -357,7 +392,7 @@ export async function fetchZernioMetrics(opts: {
       settle(getJson(demo("follower_demographics"))),
       settle(getJson(demo("engaged_audience_demographics"))),
       settle(fetchStories(base, apiKey!, accountId)),
-      settle(getJson(`${base}/v1/analytics?platform=instagram&accountId=${accountId}&limit=50`)),
+      settle(fetchPostsInRange(base, apiKey!, "instagram", accountId, since, until)),
     ]);
 
     // content-type breakdown (reach + interactions per POST/STORY/REEL/CAROUSEL)
@@ -425,7 +460,7 @@ export async function fetchZernioMetrics(opts: {
     let posts = mapPosts(postsJson);
     if (since && until) posts = posts.filter((p) => p.date && p.date >= since && p.date <= until);
     totals.posts = posts.length;
-    const reels = computeReels(posts);
+    const reels = reelsSummary(posts);
 
     // Zernio has no account-level impressions/profile-visits, so totals.impressions and
     // totals.profileVisits stay null here. Post sums are a different scope (only posts
@@ -500,6 +535,8 @@ export async function fetchZernioMetrics(opts: {
       reels,
       stories: (storiesData as ReportMetrics["stories"]) ?? null,
       comparison,
+      ...(postsJson ? {} : { dataNotes: [POSTS_FAILED] }),
+      rev: PIPELINE_REV,
       fetchedAt: new Date().toISOString(),
     };
   } catch (e) {
