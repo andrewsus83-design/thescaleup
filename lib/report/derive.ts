@@ -12,7 +12,7 @@
 // once showed account reach ÷ posts and "Impressions" sat below Reach.
 // See efficiency() and postTotal().
 
-import type { PostMetric, MetricTotals, PeriodComparison } from "@/lib/report/types";
+import type { PostMetric, MetricTotals, PeriodComparison, ReelsSummary } from "@/lib/report/types";
 
 /**
  * Total Actions (client convention, Cap Gajah) = every action on a post summed:
@@ -138,18 +138,40 @@ export function bestDayTime(posts: PostMetric[]): BestTime {
   const dayAgg = new Map<number, { reach: number; n: number }>();
   const hourAgg = new Map<number, { reach: number; n: number }>();
   for (const p of withTime) {
+    // Only count posts with real reach data (reach > 0). A null or 0 reach means Insights have not
+    // synced yet — treating it as 0 would drag down the average and hide the true best day/time.
+    if (!(p.reach != null && p.reach > 0)) continue;
     const d = new Date(p.postedAt as string);
     if (isNaN(d.getTime())) continue;
     const wib = new Date(d.getTime() + 7 * 3600 * 1000);
-    const day = wib.getUTCDay(), hour = wib.getUTCHours(), reach = p.reach ?? 0;
+    const day = wib.getUTCDay(), hour = wib.getUTCHours(), reach = p.reach;
     const da = dayAgg.get(day) ?? { reach: 0, n: 0 }; da.reach += reach; da.n++; dayAgg.set(day, da);
     const ha = hourAgg.get(hour) ?? { reach: 0, n: 0 }; ha.reach += reach; ha.n++; hourAgg.set(hour, ha);
   }
+  // If no post had real reach data, return null — "no data" is not the same as "best time is 0".
+  if (!dayAgg.size || !hourAgg.size) return null;
   const top = (m: Map<number, { reach: number; n: number }>) =>
     [...m.entries()].map(([k, v]) => ({ k, avg: v.reach / v.n })).sort((a, b) => b.avg - a.avg)[0];
   const bd = top(dayAgg), bh = top(hourAgg);
   if (!bd || !bh) return null;
   return { day: DAYS[bd.k], dayAvgReach: Math.round(bd.avg), hour: bh.k, hourAvgReach: Math.round(bh.avg) };
+}
+
+/** Aggregate video/Reels performance from the post list; null when there is no video. Used when a report is built
+ *  (lib/report/zernio.ts) and when an old snapshot is repaired (lib/report/repair.ts), so both give the same summary. */
+export function reelsSummary(posts: PostMetric[]): ReelsSummary | null {
+  const vids = posts.filter((p) => p.avgWatchTime != null || p.completionRate != null || p.format === "Reels / Video");
+  if (!vids.length) return null;
+  const nums = (k: keyof PostMetric) => vids.map((p) => p[k]).filter((v): v is number => typeof v === "number");
+  const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+  const views = nums("views");
+  const watch = nums("avgWatchTime").filter((v) => v > 0); // 0 ms = no watch data yet, not an instant skip
+  return {
+    count: vids.length,
+    totalViews: views.length ? views.reduce((a, b) => a + b, 0) : null,
+    avgWatchTimeSec: watch.length ? avg(watch)! / 1000 : null,
+    avgCompletion: avg(nums("completionRate")),
+  };
 }
 
 export type ReelRow = {

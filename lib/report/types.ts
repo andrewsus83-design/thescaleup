@@ -149,6 +149,11 @@ export type ReportMetrics = {
   comparison?: PeriodComparison | null; // previous equal-length window (period-over-period)
   platform?: string; // instagram | tiktok
   aiAnalysis?: { label: string; type: string; text: string }[] | null; // Claude Opus custom analysis
+  /** Plain-language caveats about THIS data (a repaired old snapshot, a post list that failed to load, mixed periods).
+   *  Shown as notes in the dashboard and the Excel; never numbers. */
+  dataNotes?: string[];
+  /** Pipeline revision that produced this payload (see PIPELINE_REV in lib/report/repair.ts); missing = before 2026-10-26. */
+  rev?: number;
   fetchedAt?: string;
 };
 
@@ -171,6 +176,9 @@ export type ReportRule = {
   color?: string; // highlight color (hex)
   note?: string;
 };
+
+/** The highlight colour a new rule starts with (a data value: it paints the rule's rows in the Excel). */
+export const DEFAULT_RULE_COLOR = "#6AA84F";
 
 /** Report/Excel template types. Default = the uploaded "Post Master - IG" (Cap Gajah). */
 export const REPORT_TEMPLATE_TYPES: { value: string; label: string; desc: string }[] = [
@@ -208,9 +216,10 @@ export const RULE_METRICS: { value: string; label: string }[] = [
   { value: "shares", label: "Shares" },
 ];
 
-export const CLIENT_STATUSES: Record<string, { label: string; badge: string }> = {
-  pending: { label: "Belum konek", badge: "bg-amber-100 text-amber-700 border-amber-200" },
-  connected: { label: "Terkoneksi", badge: "bg-sky-100 text-sky-700 border-sky-200" },
-  active: { label: "Aktif", badge: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-  paused: { label: "Dijeda", badge: "bg-slate-100 text-slate-600 border-slate-200" },
+/** A client's status and the chip tone that shows it (the view maps the tone to the brand's semantic colours: a dot plus the label). */
+export const CLIENT_STATUSES: Record<string, { label: string; tone: "warn" | "info" | "ok" | "neutral" }> = {
+  pending: { label: "Belum konek", tone: "warn" },
+  connected: { label: "Terkoneksi", tone: "info" },
+  active: { label: "Aktif", tone: "ok" },
+  paused: { label: "Dijeda", tone: "neutral" },
 };

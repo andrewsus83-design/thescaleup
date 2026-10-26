@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Archived code is kept for reference only; it is neither built nor linted.
+    "archive/**",
   ]),
 ]);
 

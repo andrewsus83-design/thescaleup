@@ -35,6 +35,8 @@ export type Project = {
 };
 
 export type TodoGroup = "week1" | "d30" | "d90" | "manual";
+/** The list a to do sits in on the board, like a Trello list. A new item starts On progress; Approved and Rejected are the admin's call on a tip. */
+export type TodoStatus = "progress" | "approved" | "rejected" | "done";
 export type Todo = {
   id: string;
   title: string;
@@ -43,7 +45,7 @@ export type Todo = {
   check?: string;
   tip?: string;
   service?: string;
-  done: boolean;
+  status: TodoStatus;
   assignee?: string;
 };
 

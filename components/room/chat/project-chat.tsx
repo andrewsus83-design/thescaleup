@@ -2,17 +2,19 @@
 
 // A chat inside one project. Every turn sees only that project's context bundle (the meter shows it),
 // answers carry chips for what they used, and anything that would change state arrives as an action card.
+// Layout (BRAND §5): from `lg` the chat sits beside the 300px context column; below that the context opens in a sheet.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Gauge, Lock } from "lucide-react";
+import { Gauge } from "lucide-react";
 import { routeMessage } from "@/lib/room/assistant";
 import { buildBundle } from "@/lib/room/context";
 import { detectLang } from "@/lib/room/intake";
 import type { Message, MessageAction, Project, UsedChip } from "@/lib/room/types";
+import { cn } from "@/lib/utils";
 import { useRoom } from "../room-provider";
 import { ProjectSwitcher } from "../project-switcher";
-import { Bar, Btn, Chip, Sheet } from "../ui";
+import { Alert, Bar, BudgetPanel, Btn, Chip, Sheet, chatX } from "../ui";
 import { Composer } from "./composer";
 import { ContextMeter } from "./context-meter";
 import { MessageView, Typing, type ActionChoice } from "./messages";
@@ -131,29 +133,38 @@ export function ProjectChat({ project }: { project: Project }) {
   };
   const onSource = (c: UsedChip | null) => {
     setHighlight(c?.kind ?? null);
-    if (!window.matchMedia("(min-width: 1280px)").matches) setSheet(true);
+    if (!window.matchMedia("(min-width: 1024px)").matches) setSheet(true);
   };
 
   return (
     <div className="flex h-full min-h-0">
-      <section className="flex min-w-0 flex-1 flex-col" aria-label={`Chat in ${project.name}`}>
-        <header className="flex flex-wrap items-center gap-3 border-b border-white/8 px-4 py-3">
-          <ProjectSwitcher />
-          {project.locked ? <Chip tone="good" icon={<Lock className="h-3 w-3" aria-hidden />}>Profile v{project.profileVersion} locked</Chip> : <Chip tone="warn">Intake mode</Chip>}
-          <Btn size="sm" variant="secondary" className="ml-auto xl:hidden" onClick={() => setSheet(true)}>
-            <Gauge className="h-4 w-4" aria-hidden /> Context
-            <span className="font-mono text-slate-300">{bundle.tokens.toLocaleString("en-US")}/{bundle.budget.toLocaleString("en-US")}</span>
+      <section className="flex min-w-0 flex-1 flex-col bg-paper-0" aria-label={`Chat in ${project.name}`}>
+        <header className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 py-3", chatX)}>
+          <ProjectSwitcher className="min-w-0 max-sm:min-w-40 max-sm:flex-1" />
+          {/* below `lg` the context lives in a sheet; on phones the button is icon-only so the header stays two short rows */}
+          <Btn size="sm" variant="secondary" aria-label="Open context" className="max-sm:w-10 max-sm:px-0 sm:order-last sm:ml-auto lg:hidden" onClick={() => setSheet(true)}>
+            <Gauge className="size-4" aria-hidden /> <span className="max-sm:hidden">Context</span>
+            <span className="font-mono text-[13px] font-medium text-ink-500 max-sm:hidden">{bundle.tokens.toLocaleString("en-US")}/{bundle.budget.toLocaleString("en-US")}</span>
           </Btn>
+          {project.locked ? (
+            <Chip tone="ok">
+              Profile <span className="font-mono">v{project.profileVersion}</span> locked
+            </Chip>
+          ) : (
+            <Chip tone="warn">Intake mode</Chip>
+          )}
         </header>
 
         {!project.locked && (
-          <p className="border-b border-warn/20 bg-warn/10 px-4 py-2 text-xs text-warn">
-            Intake mode: until an admin approves the positioning line and locks the profile, chat can only help complete and lock it (<span className="font-mono">/lock</span>).
-          </p>
+          <div className={cn("pb-3", chatX)}>
+            <Alert tone="warn" className="mx-auto max-w-chat">
+              Intake mode: until an admin approves the positioning line and locks the profile, chat can only help complete and lock it (<span className="font-mono">/lock</span>).
+            </Alert>
+          </div>
         )}
 
-        <div role="log" aria-label="Conversation" aria-live="polite" className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
-          <div className="mx-auto max-w-3xl space-y-5">
+        <div role="log" aria-label="Conversation" aria-live="polite" className={cn("min-h-0 flex-1 overflow-y-auto py-6", chatX)}>
+          <div className="mx-auto max-w-chat space-y-6">
             {thread.map((m) => (
               <MessageView key={m.id} msg={m} role={state.role} onSource={onSource} onPin={onPin} onTodo={onTodo} onAction={onAction} />
             ))}
@@ -163,21 +174,17 @@ export function ProjectChat({ project }: { project: Project }) {
         </div>
 
         {audit && (
-          <div role="status" className="mx-4 mb-3 rounded-2xl border border-coral/25 bg-coral/5 p-3.5">
-            <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 text-xs">
-              <span className="font-semibold text-slate-100">Audit running · {project.name}</span>
-              <span className="font-mono text-slate-200">${((audit.pct / 100) * 2.4).toFixed(2)} of $3.00 budget</span>
-            </div>
-            <div className="mx-auto mt-2 max-w-3xl">
-              <Bar value={audit.pct} label="Audit progress" tone={audit.pct * 0.024 >= 2.85 ? "warn" : "coral"} />
-            </div>
+          <div className={cn("pb-3", chatX)}>
+            <BudgetPanel live className="mx-auto max-w-chat" label={`Audit running · ${project.name}`} figure={`$${((audit.pct / 100) * 2.4).toFixed(2)}`} unit="of $3.00 budget">
+              <Bar value={audit.pct} label="Audit progress" tone={audit.pct * 0.024 >= 2.85 ? "warn" : "brand"} onDark />
+            </BudgetPanel>
           </div>
         )}
 
         <Composer onSend={send} disabled={thinking} role={state.role} placeholder={`Ask about ${project.name}… or type / for commands`} />
       </section>
 
-      <aside aria-label="Context meter" className="hidden w-80 shrink-0 overflow-y-auto border-l border-white/8 p-4 xl:block">
+      <aside aria-label="Context meter" className="hidden w-context shrink-0 overflow-y-auto bg-paper-100 p-6 lg:block">
         <ContextMeter project={project} highlight={highlight} />
       </aside>
       <Sheet
@@ -188,7 +195,9 @@ export function ProjectChat({ project }: { project: Project }) {
         }}
         title="What this chat can see"
       >
-        <ContextMeter project={project} highlight={highlight} />
+        <div className="rounded-card bg-paper-100 p-4">
+          <ContextMeter project={project} highlight={highlight} />
+        </div>
       </Sheet>
     </div>
   );

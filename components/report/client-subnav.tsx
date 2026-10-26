@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { segItem, segWrap } from "@/components/brand/styles";
+import { cn } from "@/lib/utils";
 
-/** Sub-navigation for a client: Overview | Setting (API) | Report. */
+/** Sub-navigation for a client: Overview | Setting (API). A BRAND segmented control: white pill, Ink when active. */
 export function ClientSubnav({
   id,
   active,
@@ -19,18 +21,12 @@ export function ClientSubnav({
     },
   ] as const;
   return (
-    <div className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1">
+    <nav aria-label="Klien" className={cn(segWrap, "flex w-full sm:inline-flex sm:w-auto")}>
       {tabs.map((t) => (
-        <Link
-          key={t.key}
-          href={t.href}
-          className={`flex-1 rounded-lg px-3 py-2 text-center text-sm font-medium transition-colors ${
-            active === t.key ? "bg-[#2A2870] text-white" : "text-slate-600 hover:bg-slate-50"
-          }`}
-        >
+        <Link key={t.key} href={t.href} aria-current={active === t.key ? "page" : undefined} className={cn(segItem(active === t.key), "flex-1 sm:flex-none")}>
           {t.label}
         </Link>
       ))}
-    </div>
+    </nav>
   );
 }

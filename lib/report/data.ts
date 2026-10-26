@@ -6,6 +6,7 @@ import {
 } from "@/lib/supabase/admin";
 import type { ReportClient, ReportSnapshot, ReportMetrics } from "@/lib/report/types";
 import { listZernioAccounts, type ZernioAccount } from "@/lib/report/zernio";
+import { repairMetrics } from "@/lib/report/repair";
 
 const COLS =
   "id, slug, name, ig_handle, logo_url, brand_color, accent_color, theme, connect_token, status, notes, created_at";
@@ -240,7 +241,8 @@ export async function getLatestSnapshot(
       id: String(data.id),
       clientId: String(data.client_id),
       period: String(data.period),
-      data: (data.data as ReportMetrics) ?? { connected: false, provider: "zernio", posts: [] },
+      // old pulls can hold provably wrong numbers (posts outside the period, TikTok lifetime likes): see lib/report/repair.ts
+      data: repairMetrics((data.data as ReportMetrics) ?? { connected: false, provider: "zernio", posts: [] }),
       source: (data.source as string) ?? "zernio",
       createdAt: String(data.created_at),
     };

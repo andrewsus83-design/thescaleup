@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
 import { BarChart3, Sparkles } from "lucide-react";
+import { motion } from "@/components/brand/styles";
+import { cn } from "@/lib/utils";
 
 interface AdminBottomNavProps {
   accountIds: string[];
@@ -16,6 +18,7 @@ function buildQuery(accountIds: string[], webIds: string[]) {
   return s ? `?${s}` : "";
 }
 
+/** The tab bar at the bottom of the standalone report (BRAND §5: tab bar, one column). The active tab is an Ink label on a Paper pill. */
 export function AdminBottomNav({ accountIds, webIds, active }: AdminBottomNavProps) {
   const q = buildQuery(accountIds, webIds);
   const tabs = [
@@ -24,7 +27,7 @@ export function AdminBottomNav({ accountIds, webIds, active }: AdminBottomNavPro
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-sm">
+    <nav aria-label="Report" className="fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-paper-0">
       <div className="mx-auto flex max-w-6xl" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         {tabs.map(({ id, label, Icon, href }) => {
           const isActive = active === id;
@@ -32,14 +35,12 @@ export function AdminBottomNav({ accountIds, webIds, active }: AdminBottomNavPro
             <Link
               key={id}
               href={href}
-              className={`relative flex flex-1 flex-col items-center gap-1 py-3 text-xs font-semibold transition-colors ${
-                isActive ? "text-[#2A2870]" : "text-slate-400 hover:text-slate-600"
-              }`}
+              aria-current={isActive ? "page" : undefined}
+              className={cn("flex flex-1 flex-col items-center gap-1 py-3 text-caption font-semibold", motion, isActive ? "text-ink-800" : "text-ink-500 hover:text-ink-800")}
             >
-              {isActive && (
-                <span className="absolute top-0 left-[30%] right-[30%] h-0.5 rounded-b-full bg-[#2A2870]" />
-              )}
-              <Icon className="h-5 w-5" />
+              <span className={cn("inline-flex h-8 w-14 items-center justify-center rounded-full", motion, isActive && "bg-paper-100")}>
+                <Icon className="size-5" aria-hidden />
+              </span>
               <span>{label}</span>
             </Link>
           );

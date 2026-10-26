@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Archived code (archive/) is kept for reference only: don't generate CSS for the classes it uses. */
+@source not "../archive";
 
 /* =========================================================================
    THE SCALEUP — BRAND DESIGN SYSTEM
@@ -41,6 +43,124 @@
   --animate-marquee: marquee 34s linear infinite;
   --animate-pulse-glow: pulse-glow 3.4s ease-in-out infinite;
   --animate-shimmer: shimmer 2.6s linear infinite;
+}
+
+/* =========================================================================
+   BRAND DESIGN SYSTEM v2.0 — light "paper" theme (BRAND.md). Used by the Chat Room and all new surfaces.
+   Everything here is ADDITIVE and uses new names, so the dark site above (`ink`, `line`, `card`, `mist`,
+   `coral`, `ember`, `sunset`, `good`/`warn`/`bad`) keeps working untouched.
+   Spacing needs no tokens: Tailwind's scale already is the 4px grid (p-1 = 4px = s-1 … p-6 = 24px = s-6 …
+   p-40 = 160px = s-40). The few layout widths from BRAND §5 are tokens below.
+   ========================================================================= */
+@theme {
+  /* ---- Scale Orange: the one main action (10%) ---- */
+  --color-brand-25: #fff8f4; /* hover of a dashed "create" card */
+  --color-brand-50: #fff0ea; /* tint background */
+  --color-brand-100: #ffd9ca; /* input focus ring */
+  --color-brand-300: #fba37f; /* primary hover on an Ink panel */
+  --color-brand-500: #f9703e; /* BRAND */
+  --color-brand-600: #e5561f; /* hover, keyboard focus ring */
+  --color-brand-700: #b8410f; /* pressed; the only orange for text on Paper */
+  --color-brand-900: #6b2509; /* text on an orange tint */
+  --color-brand-chip: #ffe4d8; /* "Found on website" chip fill */
+  --color-brand-chip-ink: #8c300a;
+
+  /* ---- Ink: text, structure, user bubble (30%). Steps are additive — plain `ink` belongs to the dark site. ---- */
+  --color-ink-900: #1a1a1a;
+  --color-ink-800: #262626; /* BRAND */
+  --color-ink-700: #3a3a3a; /* hover of an Ink button */
+  --color-ink-500: #6b6862; /* secondary text, labels on light surfaces */
+  --color-ink-300: #b8b3aa; /* labels on Ink panels, disabled text */
+  --color-ink-200: #ddd8ce; /* control borders */
+  --color-ink-100: #ebe6dc; /* subtle borders, disabled fill */
+
+  /* ---- Paper: surfaces (60% together with white) ---- */
+  --color-paper-0: #ffffff;
+  --color-paper-50: #faf8f4;
+  --color-paper-100: #f5f1ea; /* BRAND */
+  --color-paper-200: #ebe6dc;
+  --color-hairline: #f0ece4; /* the one fine divider / progress track */
+
+  /* ---- Semantic: dot/border · chip & alert fill · text ---- */
+  --color-success: #3f8f5a;
+  --color-success-bg: #e3f1e8;
+  --color-success-ink: #2b6b43;
+  --color-warning: #e0a526;
+  --color-warning-bg: #fbf0d3;
+  --color-danger: #c93c3c;
+  --color-danger-bg: #f8e0e0;
+  --color-info: #3b6fb0;
+  --color-info-bg: #e1eaf5;
+
+  /* ---- Type scale (BRAND §4). Pair with a family: `font-title text-h2`, `font-text text-body`, `font-mono text-code uppercase` ---- */
+  --text-display: 4.5rem;
+  --text-display--line-height: 1;
+  --text-display--letter-spacing: -0.035em;
+  --text-display--font-weight: 800;
+  --text-h1: 3rem;
+  --text-h1--line-height: 1.1;
+  --text-h1--letter-spacing: -0.03em;
+  --text-h1--font-weight: 800;
+  --text-h2: 2rem;
+  --text-h2--line-height: 1.15;
+  --text-h2--letter-spacing: -0.02em;
+  --text-h2--font-weight: 700;
+  --text-h3: 1.375rem;
+  --text-h3--line-height: 1.25;
+  --text-h3--letter-spacing: -0.01em;
+  --text-h3--font-weight: 700;
+  --text-body-lg: 1.25rem;
+  --text-body-lg--line-height: 1.6;
+  --text-body: 1rem;
+  --text-body--line-height: 1.6;
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.5;
+  --text-small--font-weight: 500;
+  --text-code: 0.75rem;
+  --text-code--line-height: 1.4;
+  --text-code--letter-spacing: 0.1em;
+  --text-code--font-weight: 500;
+
+  /* Sizes BRAND §7 gives to components but not to the type scale: a button label, a chip / helper / error / table cell,
+     and the Mono micro label of a tag or table header. */
+  --text-button: 0.9375rem; /* 15 button label */
+  --text-button--line-height: 1;
+  --text-caption: 0.8125rem; /* 13 chip, helper text, error, table cell */
+  --text-caption--line-height: 1.5;
+  --text-micro: 0.6875rem; /* 11 Mono tag, table header, label caps */
+  --text-micro--line-height: 1.4;
+
+  /* ---- Radius (BRAND §6). 8/12/16/24 are Tailwind's rounded-lg/xl/2xl/3xl; pill is rounded-full. ---- */
+  --radius-nav: 0.75rem; /* 12 nav item, menu item */
+  --radius-field: 1rem; /* 16 input, alert, table row */
+  --radius-panel: 1.25rem; /* 20 slash menu, budget panel */
+  --radius-bubble: 1.5rem; /* 24 chat bubble, small card */
+  --radius-card: 1.75rem; /* 28 card, panel */
+
+  /* ---- Elevation (BRAND §6): flat is a 1px border, then these two (plus the menu shadow) ---- */
+  --shadow-raised: 0 6px 24px rgb(38 38 38 / 0.1); /* composer, card, menu */
+  --shadow-menu: 0 12px 32px rgb(38 38 38 / 0.12); /* slash menu */
+  --shadow-overlay: 0 24px 64px rgb(38 38 38 / 0.16); /* card hover, modal */
+  --shadow-focus: 0 0 0 4px var(--color-brand-100); /* input focus ring (BRAND §7 Input) */
+
+  /* ---- Layout (BRAND §5) ---- */
+  --spacing-sidebar: 15rem; /* 240 desktop sidebar */
+  --spacing-rail: 4.5rem; /* 72 tablet and phone icon rail */
+  --spacing-context: 18.75rem; /* 300 context column */
+  --container-chat: 40rem; /* 640 reading width */
+  --container-table: 74rem; /* 1184 wide data table (Post Master): scrolls inside its card */
+  --container-table-sm: 45rem; /* 720 narrow data table */
+  --container-popover: 16rem; /* 256 info popover */
+
+  /* ---- Motion ---- */
+  --animate-typing: room-typing 1.2s ease-in-out infinite;
+}
+
+/* Brand fonts. `inline` because the font variables are set on the Room's wrapper (app/room/layout.tsx), not on :root.
+   Mono is the JetBrains Mono the root layout already loads as `font-mono`. */
+@theme inline {
+  --font-title: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif; /* Bricolage Grotesque 700/800 */
+  --font-text: var(--font-instrument), ui-sans-serif, system-ui, sans-serif; /* Instrument Sans 400/500/600 */
 }
 
 @keyframes fade-up {
@@ -283,4 +403,94 @@ body {
     letter-spacing: 0.22em;
     text-transform: uppercase;
   }
+}
+
+/* =========================================================================
+   BRAND v2 — utilities and the app base. Everything below the utilities is scoped to `.room-app` (the Room shell's
+   root) and `.brand-app` (the report pages' root), so the login and the public pages are not affected.
+   ========================================================================= */
+
+/* Mono caps label for table headers and sidebar group titles: Mono 500 / 11 / +0.1em / UPPERCASE (BRAND §7). */
+@utility label-caps {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: 500;
+  line-height: var(--text-micro--line-height);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* The 1.5px border of a control: outline button, field, filter pill (BRAND §7). Width only: preflight already sets solid. */
+@utility border-control {
+  border-width: 1.5px;
+}
+
+/* A scroller that scrolls without showing its bar (the phone swipe deck). */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Height of the phone swipe deck in the report (one section per screen). */
+:root {
+  --size-deck: 74dvh;
+}
+
+/* Keeps a small control's hit area at least 44x44 (BRAND §5, §9) without changing how it looks. Not for absolutely positioned hosts. */
+@utility hit-44 {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 2.75rem);
+    height: max(100%, 2.75rem);
+    transform: translate(-50%, -50%);
+  }
+}
+
+@keyframes room-typing {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+@layer base {
+  :is(.room-app, .brand-app) {
+    color-scheme: light;
+  }
+  /* BRAND §8: keyboard focus on a non-input control is a 2px Orange 600 ring, offset 2px. Inputs draw their own 4px ring. */
+  :is(.room-app, .brand-app) :where(a, button, summary, select, input[type="checkbox"], [role="tab"], [role="tabpanel"], [role="radio"], [role="checkbox"], [role="switch"], [role="option"]):focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+  }
+}
+
+/* The dark site's selection and scrollbar rules above are unlayered, so the light versions are too. */
+:is(.room-app, .brand-app) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-200) transparent;
+}
+:is(.room-app, .brand-app) ::selection {
+  background: var(--color-brand-100);
+  color: var(--color-ink-800);
+}
+:is(.room-app, .brand-app) ::-webkit-scrollbar-track {
+  background: transparent;
+}
+:is(.room-app, .brand-app) ::-webkit-scrollbar-thumb {
+  background: var(--color-ink-200);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+:is(.room-app, .brand-app) ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-300);
+  background-clip: content-box;
 }
