@@ -39,10 +39,13 @@ export function ChannelPicker({
   clients,
   accountIds,
   webIds,
+  basePath = "/report/admin",
 }: {
   clients: ClientCh[];
   accountIds: string[];
   webIds: string[];
+  /** The page that shows the report: a pick navigates there with `?accounts=…&webs=…` (the Chat Room passes its own). */
+  basePath?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -54,7 +57,7 @@ export function ChannelPicker({
     if (accounts.length) q.set("accounts", accounts.join(","));
     if (web.length) q.set("webs", web.join(","));
     const s = q.toString();
-    router.push(`/report/admin${s ? `?${s}` : ""}`);
+    router.push(`${basePath}${s ? `?${s}` : ""}`);
   }
   const allAcc = clients.flatMap((c) => c.accounts);
   function toggleAcc(id: string) {
