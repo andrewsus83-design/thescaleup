@@ -16,11 +16,11 @@ Nothing in this folder is built, type-checked or linted: `tsconfig.json` and `es
 
 - `/admin/login`, `/admin/access`, `/admin/logout` and `components/admin/login-form.tsx`: the login. They send admins to the Chat Room (`lib/admin/landing.ts`). On the report subdomain they still go to `/admin`, which `proxy.ts` maps to `/report/admin`.
 - `app/admin/[[...slug]]/route.ts`: redirects every other `/admin/*` URL to the Chat Room.
-- `lib/admin/auth.ts`, `access.ts`, `config.ts` (its `adminNav` is unused while this is archived), `builder-actions.ts`, `plan-status.ts` and `components/admin/ui.tsx`: still used by the Chat Room, the Report platform, the client dashboard and the public site.
+- `lib/admin/auth.ts`, `access.ts`, `config.ts` (its `adminNav` is unused while this is archived), `landing.ts` and `builder-actions.ts`: used by the login, the Chat Room, the Report platform and the clients' mini-sites. (`components/admin/ui.tsx` and `lib/admin/plan-status.ts` moved on to `archive/old-client-dashboard` together with the client dashboard they served.)
 
 ## What you lose while it is archived
 
-There is no screen for: processing leads (running the audit engine on a lead), reading or editing members and their reports, the master plan and calendar, the builder projects of a member, ScaleHub (Hub) articles, the API keys in `app_settings` that the old audit engine reads, and admin user management on the main host (the Report platform has its own at `/report/admin/users`). The data is untouched: every table and every key is still in Supabase and still used by the engine and the public site; only the screens are gone.
+There is no screen for: processing leads (running the audit engine on a lead), reading or editing members and their reports, the master plan and calendar, the builder projects of a member, ScaleHub (Hub) articles, the API keys in `app_settings` that the old audit engine reads, and admin user management on the main host (the Report platform has its own at `/report/admin/users`). The data is untouched: every table and every key is still in Supabase and still used by the engine and the clients' mini-sites; only the screens are gone.
 
 ## Restore
 
@@ -32,3 +32,5 @@ git rm "app/admin/[[...slug]]/route.ts"
 ```
 
 Then change `adminLanding()` in `lib/admin/landing.ts` to return `/admin` again, so the login lands on the old dashboard.
+
+The restored pages also import `components/admin/ui.tsx` and `lib/admin/plan-status.ts`; those moved to `archive/old-client-dashboard`, so copy them back from there too.

@@ -1,18 +1,15 @@
 import type { MetadataRoute } from "next";
-import { site } from "@/lib/site";
 
 export default function robots(): MetadataRoute.Robots {
-  const base = site.url.replace(/\/$/, "");
   return {
-    // Allow all crawlers (incl. AI/GEO bots) on public content; keep private areas out.
+    // Only the clients' own mini-sites (/site/…) are meant to be found. The login, the Chat Room, the report links and the
+    // rest stay out of search. (The public landing site and its sitemap are archived.)
     rules: [
       {
         userAgent: "*",
-        allow: "/",
-        disallow: ["/admin", "/dashboard", "/api"],
+        allow: "/site/",
+        disallow: "/",
       },
     ],
-    sitemap: `${base}/sitemap.xml`,
-    host: base,
   };
 }
