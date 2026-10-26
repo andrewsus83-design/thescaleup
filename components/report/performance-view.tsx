@@ -1,11 +1,14 @@
 import Link from "next/link";
-import { Plus, ExternalLink, Settings2, Layers } from "lucide-react";
+import { Plus, ExternalLink, Settings2 } from "lucide-react";
 import type { ReportView } from "@/lib/report/view";
+import { Alert, Card } from "@/components/brand/primitives";
+import { btnCls } from "@/components/brand/styles";
 import { ChannelPicker } from "@/components/report/channel-picker";
 import { ReportDashboard } from "@/components/report/report-dashboard";
 import { AddBrandForm } from "@/components/report/add-brand-form";
 import { DeleteBrandButton } from "@/components/report/delete-brand-button";
 import { DateRangeForm } from "@/components/report/date-range-form";
+import { ReportAvatar } from "@/components/report/report-avatar";
 import { WebsiteCard } from "@/components/report/website-card";
 
 /**
@@ -14,6 +17,7 @@ import { WebsiteCard } from "@/components/report/website-card";
  *  - `basePath`: where a channel pick navigates (`?accounts=…&webs=…`).
  *  - `embedded`: inside the Chat Room. The links to the brand's own pages open in a new tab (the Room stays put) and the
  *    delete button is left out; deleting a brand stays on the report platform.
+ * Brand v2: cards are white on Paper, 24px apart; "Tarik data" is the one Orange button.
  */
 export function PerformanceView({ view, basePath, embedded = false }: { view: ReportView; basePath: string; embedded?: boolean }) {
   const { configured, clients, addMode, channelList, accountIds, webIds, selectedAccounts, combined, primaryAcc, primary, metrics, configuredProviders, webCards, today, defaultSince } = view;
@@ -22,96 +26,76 @@ export function PerformanceView({ view, basePath, embedded = false }: { view: Re
   return (
     <>
       {!configured && (
-        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+        <Alert tone="warn" className="mb-6">
           Supabase belum terkonfigurasi.
-        </div>
+        </Alert>
       )}
 
       {addMode || !primary ? (
         <AddClientCard hasClients={clients.length > 0} backHref={basePath} />
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-6">
           {/* account bar — channel picker to the LEFT of the avatar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <ChannelPicker clients={channelList} accountIds={accountIds} webIds={webIds} basePath={basePath} />
-              <span
-                className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-sm font-bold text-white"
-                style={{ backgroundColor: primary.brandColor }}
-              >
-                {combined ? <Layers className="h-5 w-5" /> : primary.name.slice(0, 2).toUpperCase()}
-              </span>
-              <div>
-                <p className="font-bold text-[#1B2A4A]">
-                  {combined ? `Gabungan · ${selectedAccounts.length} akun` : primary.name}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {combined
-                    ? selectedAccounts.map((a) => (a.username ? `@${a.username}` : a.platform)).join(", ")
-                    : primaryAcc
-                      ? `${primaryAcc.platform ?? "social"}${primaryAcc.username ? ` · @${primaryAcc.username}` : ""}`
-                      : primary.slug}
-                </p>
+          <Card className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <ChannelPicker clients={channelList} accountIds={accountIds} webIds={webIds} basePath={basePath} />
+                <ReportAvatar name={primary.name} combined={combined} />
+                <div className="min-w-0">
+                  <p className="truncate font-title text-h3 text-ink-800">{combined ? `Gabungan · ${selectedAccounts.length} akun` : primary.name}</p>
+                  <p className="truncate text-small text-ink-500">
+                    {combined
+                      ? selectedAccounts.map((a) => (a.username ? `@${a.username}` : a.platform)).join(", ")
+                      : primaryAcc
+                        ? `${primaryAcc.platform ?? "social"}${primaryAcc.username ? ` · @${primaryAcc.username}` : ""}`
+                        : primary.slug}
+                  </p>
+                </div>
               </div>
+              {!combined && primaryAcc && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <Link href={`/report/admin/${primary.id}/settings`} {...out} className={btnCls("secondary", "sm", "gap-2")} title="Setting API klien">
+                    <Settings2 className="size-4" aria-hidden /> API klien
+                  </Link>
+                  <Link href={`/report/admin/${primary.id}`} {...out} className={btnCls("secondary", "sm")}>
+                    Kelola
+                  </Link>
+                  <Link href={`/report/c/${primary.slug}`} {...out} className={btnCls("secondary", "sm", "gap-2")} title="Buka laporan klien">
+                    <ExternalLink className="size-4" aria-hidden /> Laporan klien
+                  </Link>
+                  {!embedded && <DeleteBrandButton id={primary.id} name={primary.name} />}
+                </div>
+              )}
             </div>
             {!combined && primaryAcc && (
-              <div className="flex flex-wrap items-center gap-2">
-                <DateRangeForm clientId={primaryAcc.clientId} accountId={primaryAcc.id} defaultSince={defaultSince} defaultUntil={today} today={today} />
-                <Link
-                  href={`/report/admin/${primary.id}/settings`}
-                  {...out}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-slate-600 hover:bg-slate-50"
-                  title="Setting API klien"
-                >
-                  <Settings2 className="h-4 w-4" />
-                </Link>
-                <Link
-                  href={`/report/admin/${primary.id}`}
-                  {...out}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Kelola
-                </Link>
-                <Link
-                  href={`/report/c/${primary.slug}`}
-                  {...out}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-slate-600 hover:bg-slate-50"
-                  title="Buka laporan klien"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </Link>
-                {!embedded && <DeleteBrandButton id={primary.id} name={primary.name} />}
-              </div>
+              <DateRangeForm clientId={primaryAcc.clientId} accountId={primaryAcc.id} defaultSince={defaultSince} defaultUntil={today} today={today} />
             )}
-          </div>
+          </Card>
 
           {combined && (
-            <div className="rounded-2xl border border-[#2A2870]/20 bg-[#2A2870]/5 p-3 text-sm text-[#2A2870]">
-              Menampilkan <b>gabungan {selectedAccounts.length} akun</b> dari laporan terakhir tiap akun. Untuk memperbarui,
-              buka tiap akun dan klik “Tarik data”.
-            </div>
+            <Alert tone="info">
+              Menampilkan <b className="font-semibold">gabungan {selectedAccounts.length} akun</b> dari laporan terakhir tiap akun. Untuk memperbarui, buka tiap akun dan klik “Tarik data”.
+            </Alert>
           )}
 
           {/* social report */}
           {selectedAccounts.length > 0 && (
             <>
               {!combined && !configuredProviders.includes("zernio") && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                <Alert tone="warn">
                   Zernio API key untuk akun ini belum diisi.{" "}
-                  <Link href={`/report/admin/${primary.id}/settings`} {...out} className="font-semibold underline">
+                  <Link href={`/report/admin/${primary.id}/settings`} {...out} className="font-semibold text-brand-700 underline underline-offset-4 hover:text-brand-600">
                     Isi di Setting
                   </Link>{" "}
                   lalu klik “Tarik data”.
-                </div>
+                </Alert>
               )}
               {metrics ? (
-                <ReportDashboard metrics={metrics} brandColor={primary.brandColor} accentColor={primary.accentColor} showReason showChecks />
+                <ReportDashboard metrics={metrics} showReason showChecks />
               ) : (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-10 text-center">
-                  <p className="font-semibold text-slate-700">Belum ada laporan untuk {primary.name}</p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Pastikan Zernio API key &amp; Profile ID terisi, lalu klik “Tarik data”.
-                  </p>
+                <div className="rounded-card border-control border-dashed border-ink-200 p-10 text-center">
+                  <p className="font-title text-h3 text-ink-800">Belum ada laporan untuk {primary.name}</p>
+                  <p className="mt-2 text-body text-ink-500">Pastikan Zernio API key &amp; Profile ID terisi, lalu klik “Tarik data”.</p>
                 </div>
               )}
             </>
@@ -119,8 +103,8 @@ export function PerformanceView({ view, basePath, embedded = false }: { view: Re
 
           {/* web channels */}
           {webCards.length > 0 && (
-            <div className="space-y-3">
-              <p className="mt-2 text-sm font-semibold text-slate-600">Web</p>
+            <div className="space-y-4">
+              <p className="font-title text-h3 text-ink-800">Web</p>
               {webCards.map(({ client: wc, url }) => (
                 <WebsiteCard key={wc.id} clientId={wc.id} website={url} />
               ))}
@@ -134,22 +118,21 @@ export function PerformanceView({ view, basePath, embedded = false }: { view: Re
 
 function AddClientCard({ hasClients, backHref }: { hasClients: boolean; backHref: string }) {
   return (
-    <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-6">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <Plus className="h-4 w-4" /> Tambah Brand
-        </div>
+    <Card className="mx-auto max-w-xl">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-3 font-title text-h3 text-ink-800">
+          <Plus className="size-5 text-ink-500" aria-hidden /> Tambah Brand
+        </h2>
         {hasClients && (
-          <Link href={backHref} className="text-sm text-slate-500 hover:text-slate-800">
+          <Link href={backHref} className={btnCls("ghost", "sm")}>
             Kembali
           </Link>
         )}
       </div>
-      <p className="mb-4 text-xs text-slate-500">
-        Masukkan Zernio API key → klik <strong>Cek Koneksi</strong> → pilih akun Instagram. Profile ID &amp;
-        handle terisi otomatis dari Zernio.
+      <p className="mb-6 max-w-chat text-small text-ink-500">
+        Masukkan Zernio API key → klik <strong className="font-semibold text-ink-800">Cek Koneksi</strong> → pilih akun Instagram. Profile ID &amp; handle terisi otomatis dari Zernio.
       </p>
-      <AddBrandForm hasClients={hasClients} />
-    </div>
+      <AddBrandForm />
+    </Card>
   );
 }

@@ -6,6 +6,7 @@
 
 import { REPORTS } from "./mock";
 import { FIVE_W, tr } from "./intake";
+import { isOpen } from "./todos";
 import type { Lang, MessageAction, Project, Role, Todo, UsedChip } from "./types";
 
 export type Intent = "ask_report" | "change_todo" | "start_build" | "note_decision" | "command" | "off_topic" | "intake" | "unknown";
@@ -36,7 +37,7 @@ const profileChip = (p: Project): UsedChip => ({ kind: "profile", label: p.locke
 
 export function routeMessage({ text, lang, project, todos, role }: RouteInput): RouteResult {
   const t = text.trim();
-  const open = todos.filter((x) => !x.done);
+  const open = todos.filter(isOpen);
   const todoChip: UsedChip = { kind: "todo", label: `To do ${open.length}` };
 
   // ---- slash commands
@@ -106,8 +107,8 @@ export function routeMessage({ text, lang, project, todos, role }: RouteInput): 
     return {
       intent: "change_todo",
       text: open.length
-        ? tr(lang, `There are ${open.length} open to dos. Nearest first:\n${next}\nTick them off in Project → To do, or add one with /todo.`, `Ada ${open.length} tugas terbuka. Yang terdekat:\n${next}\nCentang di Project → To do, atau tambah dengan /todo.`)
-        : tr(lang, "Every to do is done. Add a new one with /todo.", "Semua tugas selesai. Tambah yang baru dengan /todo."),
+        ? tr(lang, `There are ${open.length} open to dos. Nearest first:\n${next}\nMove them across the board in Project → To do, or add one with /todo.`, `Ada ${open.length} tugas terbuka. Yang terdekat:\n${next}\nPindahkan statusnya di Project → To do, atau tambah dengan /todo.`)
+        : tr(lang, "Nothing is open: every to do is done or rejected. Add a new one with /todo.", "Tidak ada yang terbuka: semua tugas sudah selesai atau ditolak. Tambah yang baru dengan /todo."),
       used: [todoChip],
     };
   }

@@ -121,6 +121,15 @@
   --text-code--letter-spacing: 0.1em;
   --text-code--font-weight: 500;
 
+  /* Sizes BRAND §7 gives to components but not to the type scale: a button label, a chip / helper / error / table cell,
+     and the Mono micro label of a tag or table header. */
+  --text-button: 0.9375rem; /* 15 button label */
+  --text-button--line-height: 1;
+  --text-caption: 0.8125rem; /* 13 chip, helper text, error, table cell */
+  --text-caption--line-height: 1.5;
+  --text-micro: 0.6875rem; /* 11 Mono tag, table header, label caps */
+  --text-micro--line-height: 1.4;
+
   /* ---- Radius (BRAND §6). 8/12/16/24 are Tailwind's rounded-lg/xl/2xl/3xl; pill is rounded-full. ---- */
   --radius-nav: 0.75rem; /* 12 nav item, menu item */
   --radius-field: 1rem; /* 16 input, alert, table row */
@@ -132,12 +141,16 @@
   --shadow-raised: 0 6px 24px rgb(38 38 38 / 0.1); /* composer, card, menu */
   --shadow-menu: 0 12px 32px rgb(38 38 38 / 0.12); /* slash menu */
   --shadow-overlay: 0 24px 64px rgb(38 38 38 / 0.16); /* card hover, modal */
+  --shadow-focus: 0 0 0 4px var(--color-brand-100); /* input focus ring (BRAND §7 Input) */
 
   /* ---- Layout (BRAND §5) ---- */
   --spacing-sidebar: 15rem; /* 240 desktop sidebar */
   --spacing-rail: 4.5rem; /* 72 tablet and phone icon rail */
   --spacing-context: 18.75rem; /* 300 context column */
   --container-chat: 40rem; /* 640 reading width */
+  --container-table: 74rem; /* 1184 wide data table (Post Master): scrolls inside its card */
+  --container-table-sm: 45rem; /* 720 narrow data table */
+  --container-popover: 16rem; /* 256 info popover */
 
   /* ---- Motion ---- */
   --animate-typing: room-typing 1.2s ease-in-out infinite;
@@ -393,18 +406,36 @@ body {
 }
 
 /* =========================================================================
-   BRAND v2 — utilities and the Chat Room base. Everything below the utilities is scoped to `.room-app`
-   (the Room shell's root), so /admin, /dashboard, /report and the public pages are not affected.
+   BRAND v2 — utilities and the app base. Everything below the utilities is scoped to `.room-app` (the Room shell's
+   root) and `.brand-app` (the report pages' root), so the login and the public pages are not affected.
    ========================================================================= */
 
 /* Mono caps label for table headers and sidebar group titles: Mono 500 / 11 / +0.1em / UPPERCASE (BRAND §7). */
 @utility label-caps {
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-micro);
   font-weight: 500;
-  line-height: 1.4;
+  line-height: var(--text-micro--line-height);
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+/* The 1.5px border of a control: outline button, field, filter pill (BRAND §7). Width only: preflight already sets solid. */
+@utility border-control {
+  border-width: 1.5px;
+}
+
+/* A scroller that scrolls without showing its bar (the phone swipe deck). */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Height of the phone swipe deck in the report (one section per screen). */
+:root {
+  --size-deck: 74dvh;
 }
 
 /* Keeps a small control's hit area at least 44x44 (BRAND §5, §9) without changing how it looks. Not for absolutely positioned hosts. */
@@ -432,34 +463,34 @@ body {
 }
 
 @layer base {
-  .room-app {
+  :is(.room-app, .brand-app) {
     color-scheme: light;
   }
   /* BRAND §8: keyboard focus on a non-input control is a 2px Orange 600 ring, offset 2px. Inputs draw their own 4px ring. */
-  .room-app :where(a, button, summary, select, input[type="checkbox"], [role="tab"], [role="tabpanel"], [role="radio"], [role="checkbox"], [role="switch"], [role="option"]):focus-visible {
+  :is(.room-app, .brand-app) :where(a, button, summary, select, input[type="checkbox"], [role="tab"], [role="tabpanel"], [role="radio"], [role="checkbox"], [role="switch"], [role="option"]):focus-visible {
     outline: 2px solid var(--color-brand-600);
     outline-offset: 2px;
   }
 }
 
-/* The dark site's selection and scrollbar rules above are unlayered, so the Room's light versions are too. */
-.room-app {
+/* The dark site's selection and scrollbar rules above are unlayered, so the light versions are too. */
+:is(.room-app, .brand-app) {
   scrollbar-width: thin;
   scrollbar-color: var(--color-ink-200) transparent;
 }
-.room-app ::selection {
+:is(.room-app, .brand-app) ::selection {
   background: var(--color-brand-100);
   color: var(--color-ink-800);
 }
-.room-app ::-webkit-scrollbar-track {
+:is(.room-app, .brand-app) ::-webkit-scrollbar-track {
   background: transparent;
 }
-.room-app ::-webkit-scrollbar-thumb {
+:is(.room-app, .brand-app) ::-webkit-scrollbar-thumb {
   background: var(--color-ink-200);
   border: 3px solid transparent;
   background-clip: content-box;
 }
-.room-app ::-webkit-scrollbar-thumb:hover {
+:is(.room-app, .brand-app) ::-webkit-scrollbar-thumb:hover {
   background: var(--color-ink-300);
   background-clip: content-box;
 }

@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, MessagesSquare, Plus, Search } from "lucide-react";
+import { isOpen } from "@/lib/room/todos";
 import { cn } from "@/lib/utils";
 import { useRoom } from "../room-provider";
 import { Btn, Card, Chip, EmptyState, PageHeader, btnCls, inputCls, pageX, type Tone } from "../ui";
@@ -68,7 +69,7 @@ export function ProjectsScreen() {
 
       <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3" aria-label="Projects">
         {list.map((p) => {
-          const openTodos = (state.todos[p.id] ?? []).filter((t) => !t.done).length;
+          const openTodos = (state.todos[p.id] ?? []).filter(isOpen).length;
           return (
             <li key={p.id} className="flex">
               <Card interactive className="flex w-full flex-col">

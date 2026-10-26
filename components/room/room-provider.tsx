@@ -16,6 +16,7 @@ import {
   nextReport,
   todosFromReport,
 } from "@/lib/room/mock";
+import { statusChronicle } from "@/lib/room/todos";
 import type {
   Asset,
   Build,
@@ -28,6 +29,7 @@ import type {
   ReportData,
   Role,
   Todo,
+  TodoStatus,
 } from "@/lib/room/types";
 
 export type AuditRun = { projectId: string; pct: number } | null;
@@ -59,7 +61,7 @@ type Action =
   | { t: "projectSave"; project: Project }
   | { t: "projectCreate"; project: Project; welcome: Message; cid: string }
   | { t: "lock"; id: string; cid: string; msg: Message }
-  | { t: "todoToggle"; id: string; todoId: string; cid: string }
+  | { t: "todoStatus"; id: string; todoId: string; status: TodoStatus; cid: string }
   | { t: "todoAdd"; id: string; todo: Todo; cid: string }
   | { t: "todoAssign"; id: string; todoId: string; assignee: string }
   | { t: "chronicle"; id: string; entry: ChronicleEntry }
@@ -113,15 +115,15 @@ function reducer(s: State, a: Action): State {
         chronicle: prepend(s.chronicle, a.id, entry(a.cid, "profile", "Profile locked (positioning line approved)")),
         threads: { ...s.threads, [a.id]: [...(s.threads[a.id] ?? []), a.msg] },
       };
-    case "todoToggle": {
+    case "todoStatus": {
       const list = s.todos[a.id] ?? [];
       const t = list.find((x) => x.id === a.todoId);
-      if (!t) return s;
-      const done = !t.done;
+      if (!t || t.status === a.status) return s;
+      // every move is a decision worth keeping (approved, rejected, done, reopened), so every move is written
       return {
         ...s,
-        todos: { ...s.todos, [a.id]: list.map((x) => (x.id === a.todoId ? { ...x, done } : x)) },
-        chronicle: done ? prepend(s.chronicle, a.id, entry(a.cid, "todo", `To do done: ${t.title}`)) : s.chronicle,
+        todos: { ...s.todos, [a.id]: list.map((x) => (x.id === a.todoId ? { ...x, status: a.status } : x)) },
+        chronicle: prepend(s.chronicle, a.id, entry(a.cid, "todo", statusChronicle(a.status, t.title))),
       };
     }
     case "todoAdd":
@@ -175,7 +177,7 @@ function reducer(s: State, a: Action): State {
       // publishing marks the to do done, writes the chronicle and saves the output back as an asset
       return {
         ...next,
-        todos: { ...s.todos, [a.id]: (s.todos[a.id] ?? []).map((t) => (t.id === b.todoId ? { ...t, done: true } : t)) },
+        todos: { ...s.todos, [a.id]: (s.todos[a.id] ?? []).map((t) => (t.id === b.todoId ? { ...t, status: "done" as const } : t)) },
         assets: { ...s.assets, [a.id]: [{ id: a.aid, title: `${b.title} v${b.version}.html`, kind: "document", tags: ["build", "published"], byBuilder: true }, ...(s.assets[a.id] ?? [])] },
         chronicle: prepend(s.chronicle, a.id, entry(a.cid, "build", `Build published: ${b.title}`)),
       };
@@ -221,7 +223,7 @@ export type RoomApi = {
   saveProject: (p: Project) => void;
   createProject: (p: Project, welcome: Message) => void;
   lockProfile: (id: string, msg: Message) => void;
-  toggleTodo: (id: string, todoId: string) => void;
+  setTodoStatus: (id: string, todoId: string, status: TodoStatus) => void;
   addTodo: (id: string, title: string) => void;
   assignTodo: (id: string, todoId: string, assignee: string) => void;
   addChronicle: (id: string, kind: ChronicleKind, text: string) => void;
@@ -322,8 +324,8 @@ export function RoomProvider({
       saveProject: (project) => dispatch({ t: "projectSave", project }),
       createProject: (project, welcome) => dispatch({ t: "projectCreate", project, welcome, cid: uid() }),
       lockProfile: (id, msg) => dispatch({ t: "lock", id, cid: uid(), msg }),
-      toggleTodo: (id, todoId) => dispatch({ t: "todoToggle", id, todoId, cid: uid() }),
-      addTodo: (id, title) => dispatch({ t: "todoAdd", id, todo: { id: uid(), title, group: "manual", done: false }, cid: uid() }),
+      setTodoStatus: (id, todoId, status) => dispatch({ t: "todoStatus", id, todoId, status, cid: uid() }),
+      addTodo: (id, title) => dispatch({ t: "todoAdd", id, todo: { id: uid(), title, group: "manual", status: "progress" }, cid: uid() }),
       assignTodo: (id, todoId, assignee) => dispatch({ t: "todoAssign", id, todoId, assignee }),
       addChronicle: (id, kind, text) => dispatch({ t: "chronicle", id, entry: entry(uid(), kind, text) }),
       togglePin: (id) => dispatch({ t: "pin", id }),

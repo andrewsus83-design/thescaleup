@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Check, Layers, Share2, Globe, RotateCw, Music2, Megaphone } from "lucide-react";
+import { btnCls, capsCls, motion } from "@/components/brand/styles";
+import { cn } from "@/lib/utils";
 
 type Account = { id: string; platform: string; username?: string | null };
 type ClientCh = { id: string; name: string; accounts: Account[]; web: boolean };
@@ -28,9 +30,9 @@ function platformLabel(p: string) {
 }
 function platformIcon(p: string) {
   const pl = (p || "").toLowerCase();
-  if (isAds(pl)) return <Megaphone className="h-4 w-4 text-amber-500" />;
-  if (pl.includes("tiktok")) return <Music2 className="h-4 w-4 text-slate-800" />;
-  return <Share2 className="h-4 w-4 text-pink-500" />;
+  if (isAds(pl)) return <Megaphone className="size-4 shrink-0 text-ink-500" aria-hidden />;
+  if (pl.includes("tiktok")) return <Music2 className="size-4 shrink-0 text-ink-500" aria-hidden />;
+  return <Share2 className="size-4 shrink-0 text-ink-500" aria-hidden />;
 }
 
 /** Channel picker (accordion): per client, tick connected accounts (Instagram,
@@ -74,7 +76,8 @@ export function ChannelPicker({
   }
   function toggleWeb(id: string) {
     const w = new Set(webIds);
-    w.has(id) ? w.delete(id) : w.add(id);
+    if (w.has(id)) w.delete(id);
+    else w.add(id);
     go(accountIds, [...w]);
   }
 
@@ -92,35 +95,37 @@ export function ChannelPicker({
         : `${totalSel} channel`;
 
   const Row = ({ on, onClick, icon, text, sub }: { on: boolean; onClick: () => void; icon: React.ReactNode; text: string; sub?: string }) => (
-    <button type="button" onClick={onClick} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50">
-      <span className={`flex h-4 w-4 items-center justify-center rounded border ${on ? "border-[#2A2870] bg-[#2A2870] text-white" : "border-slate-300"}`}>
-        {on && <Check className="h-3 w-3" />}
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={on}
+      onClick={onClick}
+      className={cn("flex min-h-11 w-full items-center gap-3 rounded-nav px-3 text-left text-small text-ink-800 hover:bg-paper-0", motion)}
+    >
+      <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-lg border-control", on ? "border-brand-500 bg-brand-500 text-ink-800" : "border-ink-200 bg-paper-0")}>
+        {on && <Check className="size-4" aria-hidden />}
       </span>
       {icon}
       <span className="flex-1 truncate">
         {text}
-        {sub && <span className="text-slate-400"> · {sub}</span>}
+        {sub && <span className="text-ink-500"> · {sub}</span>}
       </span>
     </button>
   );
 
   return (
     <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-2.5 text-sm font-semibold text-[#1B2A4A] hover:bg-slate-50"
-      >
-        {totalSel > 1 && <Layers className="h-4 w-4 text-[#2A2870]" />}
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={btnCls("secondary", "md", "gap-3")}>
+        {totalSel > 1 && <Layers className="size-4" aria-hidden />}
         {label}
-        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={cn("size-4 text-ink-500 transition-transform", open && "rotate-180")} aria-hidden />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-20 mt-1 max-h-96 w-80 overflow-auto rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
-            <div className="flex items-center justify-between px-1 pb-1.5">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Pilih channel (social &amp; web)</p>
+          <div className="absolute left-0 z-20 mt-2 max-h-96 w-72 overflow-auto rounded-panel border border-hairline bg-paper-0 p-3 shadow-menu sm:w-80">
+            <div className="flex items-center justify-between gap-3 pb-3">
+              <p className={capsCls}>Pilih channel (social &amp; web)</p>
               <button
                 type="button"
                 onClick={() => {
@@ -128,16 +133,16 @@ export function ChannelPicker({
                   router.refresh();
                   setTimeout(() => setRefreshing(false), 1200);
                 }}
-                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-[#2A2870] hover:bg-slate-50"
+                className={btnCls("secondary", "xs", "gap-2")}
                 title="Muat ulang daftar akun dari Zernio"
               >
-                <RotateCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} /> Refresh
+                <RotateCw className={cn("size-4", refreshing && "animate-spin")} aria-hidden /> Refresh
               </button>
             </div>
             {clients.map((c) => (
-              <div key={c.id} className="mb-1 rounded-lg border border-slate-100 p-1.5">
-                <p className="px-1 pb-1 text-xs font-bold text-[#1B2A4A]">{c.name}</p>
-                {c.accounts.length === 0 && <p className="px-1 pb-1 text-[11px] text-slate-400">Belum ada akun social. Klik Refresh.</p>}
+              <div key={c.id} className="mb-2 rounded-field bg-paper-100 p-2 last:mb-0">
+                <p className="px-3 pb-1 pt-2 font-title text-small font-bold text-ink-800">{c.name}</p>
+                {c.accounts.length === 0 && <p className="px-3 pb-2 text-caption text-ink-500">Belum ada akun social. Klik Refresh.</p>}
                 {c.accounts.map((a) => (
                   <Row
                     key={a.id}
@@ -151,7 +156,7 @@ export function ChannelPicker({
                 <Row
                   on={webIds.includes(c.id)}
                   onClick={() => toggleWeb(c.id)}
-                  icon={<Globe className="h-4 w-4 text-[#2A2870]" />}
+                  icon={<Globe className="size-4 shrink-0 text-ink-500" aria-hidden />}
                   text="Web"
                   sub={c.web ? "terhubung" : "belum ada"}
                 />

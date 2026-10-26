@@ -2,6 +2,7 @@
 // Core sections are always included; pinned knowledge fills whatever budget is left, workspace
 // rules first. Anything that does not fit is dropped (and counted), never silently truncated.
 
+import { isOpen } from "./todos";
 import type { KnowledgeItem, Project, Todo } from "./types";
 
 export const DEFAULT_BUDGET = 6000; // tokens — an admin setting in the real product
@@ -36,7 +37,7 @@ export function buildBundle(input: {
 }): Bundle {
   const budget = input.budget ?? DEFAULT_BUDGET;
   const { project } = input;
-  const open = input.todos.filter((t) => !t.done);
+  const open = input.todos.filter(isOpen);
 
   const sections: BundleSection[] = [
     { id: "project", label: "Project", detail: `${project.name} · ${project.status}`, tokens: 40 },
