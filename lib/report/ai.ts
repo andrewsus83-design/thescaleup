@@ -1,4 +1,5 @@
 import "server-only";
+import Anthropic from "@anthropic-ai/sdk";
 import type { ReportMetrics, ReportCustomParam, PostMetric } from "@/lib/report/types";
 
 /**
@@ -17,15 +18,14 @@ export async function suggestPillars(apiKey: string | null, posts: PostMetric[])
     'Balas HANYA JSON array valid: [{"i":<index>,"pillar":"<pillar>"}]. Tanpa teks lain.';
   const user = `POSTS:\n${JSON.stringify(items)}`;
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: "claude-opus-5", max_tokens: 1200, system, messages: [{ role: "user", content: user }] }),
-      cache: "no-store",
+    const client = new Anthropic({ apiKey });
+    const resp = await client.messages.create({
+      model: "claude-opus-5",
+      max_tokens: 1200,
+      system,
+      messages: [{ role: "user", content: user }],
     });
-    if (!res.ok) return;
-    const j = (await res.json()) as { content?: { text?: string }[] };
-    const out = (j.content ?? []).map((b) => b.text ?? "").join("");
+    const out = resp.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
     const match = out.match(/\[[\s\S]*\]/);
     const parsed = JSON.parse(match ? match[0] : out) as { i: number; pillar: string }[];
     for (const r of Array.isArray(parsed) ? parsed : []) {
@@ -91,18 +91,14 @@ export async function analyzeReportWithClaude(
     'Balas HANYA JSON array valid: [{"id":"<id>","text":"<analisa>"}]. Tanpa teks lain.';
   const user = `DATA LAPORAN:\n${JSON.stringify(data)}\n\nPARAMETER YANG DIMINTA:\n${list}`;
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: "claude-opus-5", max_tokens: 2500, system, messages: [{ role: "user", content: user }] }),
-      cache: "no-store",
+    const client = new Anthropic({ apiKey });
+    const resp = await client.messages.create({
+      model: "claude-opus-5",
+      max_tokens: 2500,
+      system,
+      messages: [{ role: "user", content: user }],
     });
-    if (!res.ok) {
-      const body = (await res.text().catch(() => "")).slice(0, 140);
-      return params.map((p) => ({ label: p.label, type: p.type, text: `Analisa AI gagal (${res.status}). ${body}` }));
-    }
-    const j = (await res.json()) as { content?: { text?: string }[] };
-    const out = (j.content ?? []).map((b) => b.text ?? "").join("");
+    const out = resp.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
     let parsed: { id: string; text: string }[] = [];
     const match = out.match(/\[[\s\S]*\]/);
     try {
