@@ -5,13 +5,12 @@
 // chronicle and saves the output back as an asset. The preview is a sandboxed iframe (no scripts).
 
 import { useState } from "react";
-import { Check, Eye, Hammer, TriangleAlert } from "lucide-react";
-import { PageHeader } from "@/components/admin/ui";
+import { Eye, Hammer } from "lucide-react";
 import type { Build, Project } from "@/lib/room/types";
 import { cn } from "@/lib/utils";
 import { NeedProject, ProjectSwitcher } from "./project-switcher";
 import { useRoom } from "./room-provider";
-import { Btn, Chip, Sheet } from "./ui";
+import { Alert, Btn, Card, Chip, Dot, EmptyState, PageHeader, Sheet, pageX } from "./ui";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
 
@@ -25,6 +24,8 @@ const STAGES: { key: Build["stage"]; label: string }[] = [
   { key: "review", label: "Review" },
   { key: "published", label: "Published" },
 ];
+
+const caps = "font-mono text-code uppercase text-ink-500";
 
 export function BuilderScreen() {
   const { activeProject } = useRoom();
@@ -41,103 +42,108 @@ function BuilderFor({ project }: { project: Project }) {
 
   if (!project.locked) {
     return (
-      <div className="mx-auto max-w-3xl px-5 py-8">
+      <div className={cn("mx-auto max-w-3xl py-10 sm:py-12", pageX)}>
         <PageHeader title="Builder" description={`Builds for ${project.name}`} action={<ProjectSwitcher />} />
-        <p className="rounded-2xl border border-warn/30 bg-warn/10 px-4 py-4 text-sm text-warn">
-          Builds read the locked profile, and {project.name} is still in intake mode. Lock the profile first (an admin approves the positioning line, then /lock in the chat).
-        </p>
+        <Alert tone="warn">
+          Builds read the locked profile, and {project.name} is still in intake mode. Lock the profile first (an admin approves the positioning line, then <span className="font-mono">/lock</span> in the chat).
+        </Alert>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-5 py-8">
+    <div className={cn("mx-auto max-w-5xl py-10 sm:py-12", pageX)}>
       <PageHeader title="Builder" description={`Web and content builds for ${project.name}. Every build starts from a to do and is versioned.`} action={<ProjectSwitcher />} />
 
-      <p className="mb-6 flex items-start gap-3 rounded-2xl border border-warn/25 bg-warn/5 px-4 py-3.5 text-sm text-warn">
-        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-        <span>
-          <strong>Scope for version 1:</strong> single pages that fix failed checks (FAQ, About with the 5W, schema, titles) and content drafts from topics. Whole-site generation comes after the pilot shows demand.
-        </span>
-      </p>
+      <Alert tone="warn" title="Scope for version 1:" className="mb-8">
+        single pages that fix failed checks (FAQ, About with the 5W, schema, titles) and content drafts from topics. Whole-site generation comes after the pilot shows demand.
+      </Alert>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2">
         {[
           { name: "Web builder", from: "A failed check or to do, such as a missing FAQ page or schema", out: "Page blocks rendered to HTML, with a preview", formats: "Page · FAQ · About · Landing page", publish: "The client's own domain through a hosting project, or export" },
           { name: "Content builder", from: "A topic from the topic bank, with channel and format", out: "Brief, copy and a visual spec per channel", formats: "Post · Short video script · FAQ · Blog", publish: "Export, or hand off to scheduling" },
         ].map((c) => (
-          <section key={c.name} className="rounded-2xl border border-white/8 bg-card/40 p-5" aria-label={c.name}>
-            <h2 className="font-display text-base font-bold">{c.name}</h2>
-            <dl className="mt-3 space-y-2 text-sm">
-              {[["Starts from", c.from], ["Output", c.out], ["Formats", c.formats], ["Publish", c.publish]].map(([k, v]) => (
-                <div key={k} className="grid grid-cols-[88px_1fr] gap-3">
-                  <dt className="text-xs text-slate-400">{k}</dt>
-                  <dd className="text-slate-100">{v}</dd>
-                </div>
-              ))}
-            </dl>
+          <section key={c.name} aria-label={c.name}>
+            <Card className="h-full">
+              <h2 className="font-title text-h3 text-ink-800">{c.name}</h2>
+              <dl className="mt-5 space-y-4">
+                {[["Starts from", c.from], ["Output", c.out], ["Formats", c.formats], ["Publish", c.publish]].map(([k, v]) => (
+                  <div key={k} className="grid gap-1 sm:grid-cols-[6.5rem_1fr] sm:gap-4">
+                    <dt className="label-caps text-ink-500 sm:pt-1">{k}</dt>
+                    <dd className="text-[15px] leading-[1.5] text-ink-800">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Card>
           </section>
         ))}
       </div>
 
-      <section className="mt-8" aria-label="Ready to build">
-        <h2 className="mb-3 font-mono text-[0.68rem] font-semibold uppercase tracking-wider text-slate-400">Ready to build · {ready.length}</h2>
+      <section className="mt-16" aria-label="Ready to build">
+        <h2 className={cn(caps, "mb-4 px-1")}>Ready to build · {ready.length}</h2>
         {ready.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-center text-sm text-slate-400">No open to do is waiting for a build.</p>
+          <EmptyState title="No open to do is waiting for a build." />
         ) : (
-          <ul className="space-y-2.5">
+          <ul className="space-y-3">
             {ready.map((t) => (
-              <li key={t.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/8 bg-card/40 px-4 py-3.5">
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{t.title}</p>
-                  <p className="text-xs text-slate-400">{t.service} · fixes “{t.check}”</p>
-                </div>
-                <Btn size="sm" variant="primary" onClick={() => api.startBuild(project.id, t)}>
-                  <Hammer className="h-3.5 w-3.5" aria-hidden /> Start build
-                </Btn>
+              <li key={t.id}>
+                <Card small className="flex flex-wrap items-center gap-x-4 gap-y-3">
+                  <div className="min-w-0 flex-1 basis-56">
+                    <p className="font-semibold">{t.title}</p>
+                    <p className="mt-0.5 text-[14px] text-ink-500">{t.service} · fixes “{t.check}”</p>
+                  </div>
+                  {/* several rows, none is "the" main action — outline keeps Orange rare */}
+                  <Btn size="sm" variant="secondary" onClick={() => api.startBuild(project.id, t)}>
+                    <Hammer className="size-4" aria-hidden /> Start build
+                  </Btn>
+                </Card>
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      <section className="mt-8" aria-label="Builds">
-        <h2 className="mb-3 font-mono text-[0.68rem] font-semibold uppercase tracking-wider text-slate-400">Builds · {builds.length}</h2>
+      <section className="mt-16" aria-label="Builds">
+        <h2 className={cn(caps, "mb-4 px-1")}>Builds · {builds.length}</h2>
         {builds.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-center text-sm text-slate-400">No builds yet. Start one from a to do above, or with /build in the chat.</p>
+          <EmptyState title="No builds yet." hint="Start one from a to do above, or with /build in the chat." />
         ) : (
           <ul className="space-y-3">
             {builds.map((b) => {
               const at = STAGES.findIndex((s) => s.key === b.stage);
               return (
-                <li key={b.id} className="rounded-2xl border border-white/8 bg-card/40 p-4">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <p className="min-w-0 flex-1 font-semibold">{b.title}</p>
-                    <Chip tone="neutral">{b.kind === "web" ? "Web" : "Content"} · v{b.version}</Chip>
-                  </div>
-                  <ol className="mt-3 flex items-center gap-2" aria-label="Stage">
-                    {STAGES.map((s, i) => (
-                      <li key={s.key} className="flex items-center gap-2" aria-current={i === at ? "step" : undefined}>
-                        <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium", i < at || (i === at && b.stage === "published") ? "border-good/30 bg-good/10 text-good" : i === at ? "border-coral/40 bg-coral/10 text-coral" : "border-white/10 text-slate-400")}>
-                          {(i < at || (i === at && b.stage === "published")) && <Check className="h-3 w-3" aria-hidden />}
-                          {s.label}
-                        </span>
-                        {i < STAGES.length - 1 && <span aria-hidden className="h-px w-5 bg-white/15" />}
-                      </li>
-                    ))}
-                  </ol>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <Btn size="sm" variant="secondary" onClick={() => setPreview(b)}>
-                      <Eye className="h-3.5 w-3.5" aria-hidden /> Preview
-                    </Btn>
-                    {b.stage !== "published" ? (
-                      <Btn size="sm" variant="primary" onClick={() => { api.advanceBuild(project.id, b.id); api.toast(b.stage === "draft" ? "Sent to review" : "Published — to do marked done, saved to Assets"); }}>
-                        {b.stage === "draft" ? "Send to review" : "Publish"}
+                <li key={b.id}>
+                  <Card small>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                      <p className="min-w-0 flex-1 basis-56 font-semibold">{b.title}</p>
+                      <Chip tone="neutral">
+                        {b.kind === "web" ? "Web" : "Content"} · <span className="font-mono">v{b.version}</span>
+                      </Chip>
+                    </div>
+                    <ol className="mt-4 flex flex-wrap items-center gap-2" aria-label="Stage">
+                      {STAGES.map((s, i) => (
+                        <li key={s.key} className="flex items-center gap-2" aria-current={i === at ? "step" : undefined}>
+                          <Chip tone={i < at || (i === at && b.stage === "published") ? "ok" : i === at ? "brand" : "neutral"}>{s.label}</Chip>
+                          {i < STAGES.length - 1 && <span aria-hidden className="h-px w-5 bg-ink-200" />}
+                        </li>
+                      ))}
+                    </ol>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <Btn size="sm" variant="secondary" onClick={() => setPreview(b)}>
+                        <Eye className="size-4" aria-hidden /> Open preview
                       </Btn>
-                    ) : (
-                      <span className="text-xs text-good">To do marked done · output saved to Assets · chronicle updated</span>
-                    )}
-                  </div>
+                      {b.stage !== "published" ? (
+                        <Btn size="sm" variant="dark" onClick={() => { api.advanceBuild(project.id, b.id); api.toast(b.stage === "draft" ? "Sent to review" : "Published — to do marked done, saved to Assets"); }}>
+                          {b.stage === "draft" ? "Send to review" : "Publish build"}
+                        </Btn>
+                      ) : (
+                        <span className="inline-flex items-center gap-2 text-[14px] text-ink-500">
+                          <Dot className="bg-success" /> To do marked done · output saved to Assets · chronicle updated
+                        </span>
+                      )}
+                    </div>
+                  </Card>
                 </li>
               );
             })}
@@ -148,8 +154,8 @@ function BuilderFor({ project }: { project: Project }) {
       <Sheet open={!!preview} onClose={() => setPreview(null)} title="Preview — draft page">
         {preview && (
           <>
-            <iframe title="Build preview" sandbox="" srcDoc={previewHtml(project, preview)} className="h-[50dvh] w-full rounded-xl border border-white/10 bg-white" />
-            <p className="mt-3 text-xs text-slate-400">Sandboxed preview: scripts, forms and navigation are blocked, so generated HTML is safe to look at before it is published.</p>
+            <iframe title="Build preview" sandbox="" srcDoc={previewHtml(project, preview)} className="h-[50dvh] w-full rounded-field border border-hairline bg-paper-0" />
+            <p className="mt-4 text-[13px] leading-[1.5] text-ink-500">Sandboxed preview: scripts, forms and navigation are blocked, so generated HTML is safe to look at before it is published.</p>
           </>
         )}
       </Sheet>

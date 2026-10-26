@@ -6,20 +6,34 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, MessagesSquare, Plus, Search } from "lucide-react";
-import { PageHeader } from "@/components/admin/ui";
+import { cn } from "@/lib/utils";
 import { useRoom } from "../room-provider";
-import { Btn, Chip, inputCls, type Tone } from "../ui";
+import { Btn, Card, Chip, EmptyState, PageHeader, btnCls, inputCls, pageX, type Tone } from "../ui";
 import { useIntakeStarter } from "../chat/use-intake";
 import { useRouter } from "next/navigation";
 
+/** The status next to the big score (so the number itself is not repeated): dot + label. */
 export function ScoreChip({ score }: { score: number | null }) {
   if (score == null) return <Chip tone="neutral">No audit yet</Chip>;
-  const tone: Tone = score < 40 ? "bad" : score < 70 ? "warn" : "good";
+  const tone: Tone = score < 40 ? "bad" : score < 70 ? "warn" : "ok";
   const label = score < 40 ? "Critical" : score < 70 ? "Needs work" : "Healthy";
+  return <Chip tone={tone}>{label}</Chip>;
+}
+
+/** BRAND "Skor": the number in Title 800 (tracking −4%) with `/ 100` in Mono 13. */
+export function ScoreNumber({ score, className }: { score: number | null; className?: string }) {
   return (
-    <Chip tone={tone}>
-      <span className="font-mono font-semibold">{score}</span>/100 · {label}
-    </Chip>
+    <p className={cn("font-title font-extrabold leading-none tracking-[-0.04em] text-ink-800", className)}>
+      {score == null ? (
+        <>
+          <span aria-hidden className="text-ink-300">—</span>
+          <span className="sr-only">No score yet</span>
+        </>
+      ) : (
+        score
+      )}
+      <span className="ml-1.5 font-mono text-[13px] font-medium tracking-normal text-ink-500">/ 100</span>
+    </p>
   );
 }
 
@@ -32,77 +46,82 @@ export function ProjectsScreen() {
   const list = state.projects.filter((p) => p.status === "active" && (!needle || p.name.toLowerCase().includes(needle) || p.website.includes(needle)));
 
   return (
-    <div className="mx-auto max-w-5xl px-5 py-8">
+    <div className={cn("mx-auto max-w-5xl py-10 sm:py-12", pageX)}>
       <PageHeader
         title="Project"
         description="Every brand you work on: its latest score, open to dos and last activity."
         action={
-          <Btn variant="primary" onClick={() => startIntake()}>
-            <Plus className="h-4 w-4" aria-hidden /> New brand
+          <Btn size="lg" variant="primary" onClick={() => startIntake()}>
+            <Plus className="size-5" aria-hidden /> Create brand
           </Btn>
         }
       />
 
-      <div className="relative mb-5 max-w-md">
+      <div className="relative mb-8 max-w-md">
         <label htmlFor="proj-search" className="sr-only">
           Search projects
         </label>
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
-        <input id="proj-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search projects" className={`${inputCls} pl-10`} />
+        <Search className="pointer-events-none absolute left-5 top-1/2 size-5 -translate-y-1/2 text-ink-500" aria-hidden />
+        <input id="proj-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search projects" className={cn(inputCls, "pl-12")} />
       </div>
 
-      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Projects">
+      <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3" aria-label="Projects">
         {list.map((p) => {
           const openTodos = (state.todos[p.id] ?? []).filter((t) => !t.done).length;
           return (
-            <li key={p.id} className="flex flex-col rounded-2xl border border-white/8 bg-card/40 p-5">
-              <div className="flex items-start justify-between gap-3">
+            <li key={p.id} className="flex">
+              <Card interactive className="flex w-full flex-col">
                 <div className="min-w-0">
-                  <h2 className="truncate font-display text-lg font-bold">
-                    <Link href={href(`/projects/${p.id}`)} className="rounded hover:text-coral focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/70">
+                  <h2 className="font-title text-h3 text-ink-800">
+                    {/* padded to a 47px-high target without moving anything */}
+                    <Link href={href(`/projects/${p.id}`)} className="-my-2.5 block truncate rounded-nav py-2.5 hover:text-brand-700 hover:underline hover:underline-offset-4">
                       {p.name}
                     </Link>
                   </h2>
-                  <p className="truncate text-xs text-slate-400">{p.website}</p>
+                  <p className="mt-1 truncate text-[14px] text-ink-500">{p.website}</p>
                 </div>
-                {p.locked ? <Chip tone="good">Profile v{p.profileVersion}</Chip> : <Chip tone="warn">Intake mode</Chip>}
-              </div>
-              <div className="mt-4">
-                <ScoreChip score={p.score} />
-              </div>
-              <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <dt className="text-xs text-slate-400">Open to dos</dt>
-                  <dd className="mt-0.5 font-display text-xl font-bold">{openTodos}</dd>
+                <ScoreNumber score={p.score} className="mt-6 text-h1" />
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <ScoreChip score={p.score} />
+                  {p.locked ? (
+                    <Chip tone="ok">
+                      Profile <span className="font-mono">v{p.profileVersion}</span>
+                    </Chip>
+                  ) : (
+                    <Chip tone="warn">Intake mode</Chip>
+                  )}
                 </div>
-                <div>
-                  <dt className="text-xs text-slate-400">Last activity</dt>
-                  <dd className="mt-0.5 font-medium text-slate-100">{p.lastActivity}</dd>
+                <dl className="mt-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-4">
+                  <div>
+                    <dt className="label-caps whitespace-nowrap text-ink-500">Open to dos</dt>
+                    <dd className="mt-1 font-title text-h3 text-ink-800">{openTodos}</dd>
+                  </div>
+                  <div>
+                    <dt className="label-caps whitespace-nowrap text-ink-500">Last activity</dt>
+                    <dd className="mt-1 text-[15px] font-semibold text-ink-800">{p.lastActivity}</dd>
+                  </div>
+                </dl>
+                <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-6">
+                  <Btn
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      open(p.id);
+                      router.push(href("/chat"));
+                    }}
+                  >
+                    <MessagesSquare className="size-4" aria-hidden /> Open chat
+                  </Btn>
+                  <Link href={href(`/projects/${p.id}`)} className={btnCls("ghost", "sm")}>
+                    View details <ArrowRight className="size-4" aria-hidden />
+                  </Link>
                 </div>
-              </dl>
-              <div className="mt-5 flex gap-2 pt-1">
-                <Btn
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    open(p.id);
-                    router.push(href("/chat"));
-                  }}
-                >
-                  <MessagesSquare className="h-4 w-4" aria-hidden /> Open chat
-                </Btn>
-                <Link
-                  href={href(`/projects/${p.id}`)}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-xl px-3 text-xs font-medium text-slate-200 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/70"
-                >
-                  Details <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                </Link>
-              </div>
+              </Card>
             </li>
           );
         })}
       </ul>
-      {list.length === 0 && <p className="rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-slate-400">No project matches “{q}”.</p>}
+      {list.length === 0 && <EmptyState title={`No project matches “${q}”.`} />}
     </div>
   );
 }
