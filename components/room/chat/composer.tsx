@@ -1,13 +1,22 @@
 "use client";
 
-// Message box: quick-action chips (Update to do · Add note · Start build) and slash commands
-// (/lock /audit /todo /build) with a keyboard-driven menu. Enter sends, Shift+Enter adds a line.
+// Message box (BRAND.md §7 "Chat"): a white pill with a 44px Orange send button, quick-action chips above it (Update to do ·
+// Add note · Start build) and slash commands (/lock /audit /todo /build) with a keyboard-driven menu.
+// Enter sends, Shift+Enter adds a line.
 
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowUp, ClipboardPlus, Hammer, StickyNote } from "lucide-react";
 import { COMMANDS } from "@/lib/room/assistant";
 import type { Role } from "@/lib/room/types";
 import { cn } from "@/lib/utils";
+import { IconBtn, chatX, motion } from "../ui";
+
+const PHONE = "(max-width: 639px)";
+const subscribePhone = (cb: () => void) => {
+  const mq = window.matchMedia(PHONE);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+};
 
 export function Composer({
   onSend,
@@ -28,6 +37,9 @@ export function Composer({
   const [dismissed, setDismissed] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   const listId = useId();
+  // on a phone the placeholder keeps only its first clause, so it is never cut off mid-word (the hint line below says the rest)
+  const phone = useSyncExternalStore(subscribePhone, () => window.matchMedia(PHONE).matches, () => false);
+  const shownPlaceholder = phone ? placeholder.replace(/\s*(…|—|,).*$/, "…") : placeholder;
 
   const matches = COMMANDS.filter((c) => c.cmd.startsWith(text.trim().toLowerCase()));
   const menuOpen = mode === "project" && /^\/\S*$/.test(text) && !dismissed && matches.length > 0;
@@ -75,29 +87,33 @@ export function Composer({
     }
   };
 
-  const chip =
-    "inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:border-coral/40 hover:text-coral focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/70 disabled:opacity-50";
+  // quick-action chip: 36px, Ink-200 border, Paper on hover
+  const chip = cn(
+    "hit-44 inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border-[1.5px] border-ink-200 bg-paper-0 px-4 text-[13px] font-semibold leading-none text-ink-800 hover:bg-paper-100 disabled:pointer-events-none disabled:border-ink-100 disabled:text-ink-300",
+    motion,
+  );
 
   return (
-    <div className="border-t border-white/8 bg-obsidian px-4 pb-4 pt-3">
-      <div className="mx-auto max-w-3xl">
+    <div className={cn("bg-paper-0 pb-5 pt-3", chatX)}>
+      <div className="mx-auto max-w-chat">
         {mode === "project" && (
-          <div className="mb-2.5 flex flex-wrap gap-2" aria-label="Quick actions">
+          // one scrollable row on phones so the conversation keeps its height; wraps from `sm`
+          <div className="-mx-5 mb-3 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0" role="group" aria-label="Quick actions">
             <button type="button" className={chip} disabled={disabled} onClick={() => { set("/todo "); ref.current?.focus(); }}>
-              <ClipboardPlus className="h-3.5 w-3.5" aria-hidden /> Update to do
+              <ClipboardPlus className="size-4" aria-hidden /> Update to do
             </button>
             <button type="button" className={chip} disabled={disabled} onClick={() => { set("Note: "); ref.current?.focus(); }}>
-              <StickyNote className="h-3.5 w-3.5" aria-hidden /> Add note
+              <StickyNote className="size-4" aria-hidden /> Add note
             </button>
             <button type="button" className={chip} disabled={disabled} onClick={() => send("/build")}>
-              <Hammer className="h-3.5 w-3.5" aria-hidden /> Start build
+              <Hammer className="size-4" aria-hidden /> Start build
             </button>
           </div>
         )}
 
         <div className="relative">
           {menuOpen && (
-            <ul id={listId} role="listbox" aria-label="Commands" className="absolute bottom-full left-0 z-20 mb-2 w-full max-w-sm overflow-hidden rounded-2xl border border-white/10 bg-surface p-1.5 shadow-2xl">
+            <ul id={listId} role="listbox" aria-label="Commands" className="absolute bottom-full left-0 z-20 mb-3 w-full max-w-sm rounded-panel border border-hairline bg-paper-0 p-2 shadow-menu">
               {matches.map((c, i) => (
                 <li key={c.cmd} id={`${listId}-${i}`} role="option" aria-selected={i === idx}>
                   <button
@@ -105,10 +121,10 @@ export function Composer({
                     tabIndex={-1}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => pick(c.cmd)}
-                    className={cn("flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm", i === idx ? "bg-coral/10 text-coral" : "text-slate-200 hover:bg-white/5")}
+                    className={cn("flex w-full items-center justify-between gap-4 rounded-nav px-4 py-3 text-left", motion, i === idx ? "bg-paper-100" : "hover:bg-paper-100")}
                   >
-                    <span className="font-mono font-semibold">{c.cmd}</span>
-                    <span className="truncate text-xs text-slate-400">
+                    <span className="font-mono text-[14px] font-medium">{c.cmd}</span>
+                    <span className="truncate text-[13px] text-ink-500">
                       {c.hint}
                       {c.adminOnly && role !== "admin" ? " · admin only" : ""}
                     </span>
@@ -118,13 +134,19 @@ export function Composer({
             </ul>
           )}
 
-          <div className="flex items-end gap-2 rounded-2xl border border-white/12 bg-card/60 p-2 focus-within:border-coral/50">
+          <div
+            className={cn(
+              "flex items-end gap-2 rounded-card border border-ink-100 bg-paper-0 py-2 pl-6 pr-2 shadow-raised",
+              "focus-within:border-ink-800 focus-within:shadow-[0_0_0_4px_var(--color-brand-100),0_6px_24px_rgb(38_38_38/0.1)]",
+              motion,
+            )}
+          >
             <textarea
               ref={ref}
               value={text}
               rows={1}
               disabled={disabled}
-              placeholder={placeholder}
+              placeholder={shownPlaceholder}
               aria-label="Message"
               role="combobox"
               aria-expanded={menuOpen}
@@ -133,20 +155,18 @@ export function Composer({
               aria-autocomplete="list"
               onChange={(e) => set(e.target.value)}
               onKeyDown={onKeyDown}
-              className="max-h-40 min-h-[40px] flex-1 resize-none bg-transparent px-2 py-2 text-sm text-mist placeholder:text-slate-400 focus-visible:outline-none disabled:opacity-60"
+              className="max-h-40 min-h-11 flex-1 resize-none bg-transparent py-2.5 text-body leading-6 text-ink-800 outline-none placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap placeholder:text-ink-500 disabled:text-ink-300"
             />
-            <button
-              type="button"
-              aria-label="Send"
-              disabled={disabled || !text.trim()}
-              onClick={() => send()}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-coral text-ink transition-colors hover:bg-coral-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/70 disabled:pointer-events-none disabled:opacity-40"
-            >
-              <ArrowUp className="h-5 w-5" aria-hidden />
-            </button>
+            <IconBtn label="Send" variant="primary" disabled={disabled || !text.trim()} onClick={() => send()}>
+              <ArrowUp className="size-5" aria-hidden />
+            </IconBtn>
           </div>
         </div>
-        {mode === "project" && <p className="mt-2 text-xs text-slate-400">Type / for commands · Enter to send · Shift+Enter for a new line</p>}
+        {mode === "project" && (
+          <p className="mt-3 hidden text-[13px] text-ink-500 sm:block">
+            Type <span className="font-mono">/</span> for commands · Enter to send · Shift+Enter for a new line
+          </p>
+        )}
       </div>
     </div>
   );

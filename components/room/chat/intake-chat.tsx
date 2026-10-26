@@ -5,14 +5,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FilePlus2, Save } from "lucide-react";
+import { ChevronDown, Save } from "lucide-react";
 import { answer, detectLang, editField, MAX_QUESTIONS, canCreate, question, readingNote, toProject, tr } from "@/lib/room/intake";
 import type { FieldKey, Lang, MessageAction } from "@/lib/room/types";
+import { cn } from "@/lib/utils";
 import { useRoom } from "../room-provider";
-import { Btn, Chip } from "../ui";
+import { Btn, Chip, chatX } from "../ui";
 import { Composer } from "./composer";
 import { MessageView, Typing, type ActionChoice } from "./messages";
-import { ProfileCard } from "./profile-card";
+import { ProfileCard, ROWS, StatusChip, fieldKind, valueOf } from "./profile-card";
 
 export function IntakeChat() {
   const api = useRoom();
@@ -103,37 +104,49 @@ export function IntakeChat() {
 
   return (
     <div className="flex h-full min-h-0">
-      <section className="flex min-w-0 flex-1 flex-col" aria-label="New brand intake">
-        <header className="flex flex-wrap items-center gap-3 border-b border-white/8 px-4 py-3">
-          <Chip tone="coral" icon={<FilePlus2 className="h-3 w-3" aria-hidden />}>New brand{s.draftId ? " · resuming draft" : ""}</Chip>
-          <span className="text-xs text-slate-300">
-            Question {Math.min(s.asked + (confirming ? 0 : 1), MAX_QUESTIONS)} of at most {MAX_QUESTIONS}
+      <section className="flex min-w-0 flex-1 flex-col bg-paper-0" aria-label="New brand intake">
+        <header className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 py-3", chatX)}>
+          <Chip tone="brand">New brand{s.draftId ? " · resuming draft" : ""}</Chip>
+          <span className="text-[13px] text-ink-500">
+            Question <span className="font-mono">{Math.min(s.asked + (confirming ? 0 : 1), MAX_QUESTIONS)}</span> of at most <span className="font-mono">{MAX_QUESTIONS}</span>
           </span>
           <Btn size="sm" variant="ghost" className="ml-auto" onClick={leave}>
-            <Save className="h-4 w-4" aria-hidden /> Save draft &amp; exit
+            <Save className="size-4" aria-hidden /> Save draft &amp; exit
           </Btn>
         </header>
 
-        <div role="log" aria-label="Conversation" aria-live="polite" className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
-          <div className="mx-auto max-w-3xl space-y-5">
+        <div role="log" aria-label="Conversation" aria-live="polite" className={cn("min-h-0 flex-1 overflow-y-auto py-6", chatX)}>
+          <div className="mx-auto max-w-chat space-y-6">
             {state.intakeLog.map((m) => (
               <MessageView key={m.id} msg={m} role={state.role} readOnly onAction={onAction} />
             ))}
             {busy && <Typing label={tr(lang, "Reading the website and socials…", "Membaca website dan media sosial…")} />}
 
             {confirming && (
-              <div className="rounded-2xl border border-coral/30 bg-coral/5 p-4">
-                <h2 className="font-display text-base font-bold">{tr(lang, "Create this brand?", "Buat brand ini?")}</h2>
-                <p className="mt-1.5 text-sm text-slate-200">
-                  <span className="font-semibold">{s.profile.brand}</span> · {s.profile.website} ·{" "}
-                  {s.profile.noAccounts ? tr(lang, "no social accounts", "tanpa akun sosial") : s.profile.handles?.join(" ")}
-                </p>
-                <p className="mt-1 text-xs text-slate-300">
+              // BRAND "Confirm card": Title 800 26, rows of label (grey) — value + status, then one Orange button (flex-1) and an outline one
+              <section aria-labelledby="confirm-title" className="rounded-card border border-hairline bg-paper-0 p-6 shadow-raised sm:p-8">
+                <h2 id="confirm-title" className="font-title text-[26px] font-extrabold leading-[1.15] tracking-[-0.02em] text-ink-800">
+                  {tr(lang, "Create this brand?", "Buat brand ini?")}
+                </h2>
+                <dl className="mt-6 space-y-4">
+                  {ROWS.filter((r) => r.key === "brand" || r.key === "website" || r.key === "handles").map((r) => (
+                    <div key={r.key} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                      <dt className="text-[14px] text-ink-500">{lang === "id" ? r.id : r.en}</dt>
+                      <dd className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2">
+                        <span className={cn("min-w-0 break-words text-[15px] text-ink-800", r.key === "brand" ? "font-semibold" : "font-mono text-[14px]")}>
+                          {r.key === "handles" && s.profile.noAccounts ? tr(lang, "no social accounts", "tanpa akun sosial") : valueOf(s.profile, r.key)}
+                        </span>
+                        <StatusChip kind={fieldKind(s, r.key)} lang={lang} />
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="mt-6 text-[13px] leading-[1.5] text-ink-500">
                   {tr(lang, "Nothing appears in Project until you create it. Creating does not start an audit — an admin still has to approve the positioning line and lock the profile.", "Belum ada yang muncul di Project sampai Anda membuatnya. Membuat tidak memulai audit — admin tetap harus menyetujui kalimat positioning dan mengunci profil.")}
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Btn variant="primary" disabled={!canCreate(s)} onClick={create}>
-                    {tr(lang, "Create", "Buat")}
+                <div className="mt-6 flex flex-wrap items-center gap-3">
+                  <Btn variant="primary" className="min-w-40 flex-1" disabled={!canCreate(s)} onClick={create}>
+                    {tr(lang, "Create brand", "Buat brand")}
                   </Btn>
                   <Btn
                     variant="secondary"
@@ -142,23 +155,24 @@ export function IntakeChat() {
                       requestAnimationFrame(() => cardRef.current?.scrollIntoView({ block: "center" }));
                     }}
                   >
-                    {tr(lang, "Edit", "Ubah")}
+                    {tr(lang, "Edit details", "Ubah detail")}
                   </Btn>
                   <Btn variant="ghost" onClick={leave}>
                     {tr(lang, "Cancel", "Batal")}
                   </Btn>
                 </div>
-              </div>
+              </section>
             )}
             <div ref={endRef} />
           </div>
         </div>
 
         {/* below xl the card folds into the page; at xl it sits beside the chat */}
-        <div ref={cardRef} className="mx-4 mb-2 xl:hidden">
-          <details open={cardOpen || confirming} onToggle={(e) => setCardOpen((e.currentTarget as HTMLDetailsElement).open)} className="rounded-2xl border border-white/10 bg-card/40">
-            <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/70 [&::-webkit-details-marker]:hidden">
-              {tr(lang, "Profile card", "Kartu profil")} <span className="font-normal text-slate-300">· {filled}/8</span>
+        <div ref={cardRef} className={cn("pb-3 xl:hidden", chatX)}>
+          <details open={cardOpen || confirming} onToggle={(e) => setCardOpen((e.currentTarget as HTMLDetailsElement).open)} className="group mx-auto max-w-chat rounded-bubble bg-paper-100">
+            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-bubble px-5 py-4 text-[15px] font-semibold [&::-webkit-details-marker]:hidden">
+              {tr(lang, "Profile card", "Kartu profil")} <span className="font-mono text-[13px] font-medium text-ink-500">· {filled}/8</span>
+              <ChevronDown className="ml-auto size-5 text-ink-500 group-open:rotate-180" aria-hidden />
             </summary>
             <div className="max-h-[50dvh] overflow-y-auto p-3 pt-0">
               <ProfileCard state={s} lang={lang} editable={confirming} onEdit={edit} />
@@ -174,7 +188,7 @@ export function IntakeChat() {
         />
       </section>
 
-      <aside aria-label="Profile card" className="hidden w-96 shrink-0 overflow-y-auto border-l border-white/8 p-4 xl:block">
+      <aside aria-label="Profile card" className="hidden w-[22rem] shrink-0 overflow-y-auto bg-paper-100 p-6 xl:block">
         <ProfileCard state={s} lang={lang} editable={confirming} onEdit={edit} />
       </aside>
     </div>
