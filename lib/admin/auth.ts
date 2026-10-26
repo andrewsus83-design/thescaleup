@@ -77,6 +77,13 @@ export async function getAdminUser(): Promise<AdminUser | null> {
   const email = user?.email?.toLowerCase() ?? null;
   if (!user || !email) return null;
 
+  // Enforce MFA: if the user has enrolled TOTP factors but the session is only
+  // AAL1, they must complete the second factor before accessing the admin area.
+  const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aalData && aalData.nextLevel === "aal2" && aalData.currentLevel !== "aal2") {
+    redirect("/admin/mfa");
+  }
+
   // Owner allowlist (env) — always full access.
   if (isAdminEmail(email)) {
     return { id: user.id, email, role: "owner", perms: OWNER_PERMS };

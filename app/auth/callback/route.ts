@@ -17,9 +17,10 @@ export async function GET(request: Request) {
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      // Redirect to next (validated: must start with / to prevent open redirect).
-      const safe = next.startsWith("/") ? next : "/admin/login";
-      return NextResponse.redirect(`${origin}${safe}`);
+      // After OTP login the session is AAL1; redirect to MFA step.
+      // The MFA page will redirect to the admin area once AAL2 is reached.
+      const dest = next.startsWith("/") ? next : "/admin/mfa";
+      return NextResponse.redirect(`${origin}${dest}`);
     }
   }
 
