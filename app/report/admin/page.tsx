@@ -128,6 +128,7 @@ export default async function ReportAdminDashboard({
             <Plus className="h-4 w-4" /> Tambah
           </Link>
           {!addMode && <RefreshButton />}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- /admin/logout is a route handler; the old-admin catch-all makes the rule see /admin/* as pages */}
           <a
             href="/admin/logout"
             className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-red-600"

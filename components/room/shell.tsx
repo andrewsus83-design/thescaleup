@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, FolderKanban, Hammer, Images, LogOut, MessageSquarePlus, MessagesSquare, Settings } from "lucide-react";
+import { FolderKanban, Hammer, Images, LogOut, MessageSquarePlus, MessagesSquare, Settings } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { RECENT_THREADS } from "@/lib/room/mock";
 import type { Role } from "@/lib/room/types";
@@ -127,11 +127,9 @@ function Frame({ email, role, children }: { email: string; role: string; childre
             <p className="truncate text-[14px] font-semibold">{email}</p>
             <p className="label-caps mt-1 text-brand-700">{role}</p>
           </div>
-          <a href="/admin" className={menuItem(false)}>
-            <ArrowLeft className="size-5 shrink-0" aria-hidden />
-            Admin
-          </a>
-          <a href="/admin/logout" className={cn(menuItem(false), "hidden lg:flex")}>
+          {/* a plain <a>: /admin/logout is a route handler that ends the session, so no client-side navigation or prefetch */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- the old-admin catch-all makes the rule see /admin/* as pages */}
+          <a href="/admin/logout" className={menuItem(false)}>
             <LogOut className="size-5 shrink-0" aria-hidden />
             Keluar
           </a>

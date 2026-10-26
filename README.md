@@ -9,6 +9,13 @@ This repository currently contains **Platform 1 — the public landing page &
 blog** (marketing + lead generation). The Admin backend and Client dashboard,
 plus the analysis engine, are built on the same Supabase instance.
 
+## Staff app
+
+After logging in, admins land on the **Chat Room** (`/room/chat`). The old admin
+dashboard was archived on 2026-10-26: `archive/old-admin-dashboard/` says what it
+held and how to restore it. `/admin/login`, `/admin/access` and `/admin/logout`
+remain the login; any other `/admin/*` URL redirects to the Chat Room.
+
 ## Stack
 
 - **Next.js 16** (App Router, React 19) · **TypeScript**
