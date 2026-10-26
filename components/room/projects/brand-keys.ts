@@ -80,21 +80,9 @@ export type BrandKeys = Partial<Record<ProviderId, OwnKey>>;
 export const WORKSPACE_CAP = 40;
 
 /** This month's spend per brand and provider, in USD. Brands created in the prototype start at zero. */
-const USAGE: Record<string, Partial<Record<ProviderId, number>>> = {
-  "kopi-senja": { claude: 3.1, gemini: 1.2, dataforseo: 0.75, perplexity: 0.9, serpapi: 0.12, firecrawl: 0.48, apify: 0.2 },
-  "batik-laras": { claude: 1.4, gemini: 0.6, perplexity: 0.35, firecrawl: 0.22 },
-};
+const USAGE: Record<string, Partial<Record<ProviderId, number>>> = {};
 
-/** Kopi Senja brings its own Claude and Zernio keys and a Search Console grant; Batik Laras has a Firecrawl key that is switched off.
- *  Together with the brands that bring nothing, every state is visible in the prototype. */
-const INITIAL_KEYS: Record<string, BrandKeys> = {
-  "kopi-senja": {
-    claude: { last4: "x4Qm", cap: 25, active: true },
-    zernio: { last4: "9vTe", cap: 0, active: true },
-    gsc: { last4: "", cap: 0, active: true, property: "sc-domain:kopisenja.id" },
-  },
-  "batik-laras": { firecrawl: { last4: "m3Wd", cap: 15, active: false } },
-};
+const INITIAL_KEYS: Record<string, BrandKeys> = {};
 
 export const initialKeys = (projectId: string): BrandKeys => INITIAL_KEYS[projectId] ?? {};
 export const spendOf = (projectId: string, provider: ProviderId) => USAGE[projectId]?.[provider] ?? 0;
