@@ -11,16 +11,16 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/admin/login";
+  // Default to /admin/mfa — after magic-link login the session is AAL1 and
+  // needs the TOTP second factor before entering the admin area.
+  const next = searchParams.get("next") ?? "/admin/mfa";
 
   if (code) {
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      // After OTP login the session is AAL1; redirect to MFA step.
-      // The MFA page will redirect to the admin area once AAL2 is reached.
-      const dest = next.startsWith("/") ? next : "/admin/mfa";
-      return NextResponse.redirect(`${origin}${dest}`);
+      const safe = next.startsWith("/") ? next : "/admin/mfa";
+      return NextResponse.redirect(`${origin}${safe}`);
     }
   }
 
