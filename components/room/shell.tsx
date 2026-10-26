@@ -6,13 +6,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, FolderKanban, Hammer, Images, LogOut, MessageSquarePlus, MessagesSquare, Settings } from "lucide-react";
+import { FolderKanban, Hammer, Images, LogOut, MessageSquarePlus, MessagesSquare, Settings } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { RECENT_THREADS } from "@/lib/room/mock";
 import type { Role } from "@/lib/room/types";
 import { cn } from "@/lib/utils";
 import { RoomProvider, useRoom } from "./room-provider";
-import { Dot, Segmented, motion } from "./ui";
+import { Dot, motion } from "./ui";
 
 export const NAV = [
   { key: "chat", label: "Chat", path: "/chat", icon: MessagesSquare },
@@ -56,7 +56,7 @@ const menuItem = (active: boolean) =>
 function Frame({ email, role, children }: { email: string; role: string; children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { state, href, basePath, canPreviewRole, setRole, open, setIntake, activeProject, toastText } = useRoom();
+  const { state, href, basePath, open, setIntake, activeProject, toastText } = useRoom();
 
   const items = NAV.filter((n) => !("adminOnly" in n && n.adminOnly) || state.role === "admin");
   const isActive = (p: string) => pathname === `${basePath}${p}` || pathname.startsWith(`${basePath}${p}/`);
@@ -127,41 +127,16 @@ function Frame({ email, role, children }: { email: string; role: string; childre
             <p className="truncate text-[14px] font-semibold">{email}</p>
             <p className="label-caps mt-1 text-brand-700">{role}</p>
           </div>
-          <a href="/admin" className={menuItem(false)}>
-            <ArrowLeft className="size-5 shrink-0" aria-hidden />
-            Admin
-          </a>
-          <a href="/admin/logout" className={cn(menuItem(false), "hidden lg:flex")}>
+          {/* a plain <a>: /admin/logout is a route handler that ends the session, so no client-side navigation or prefetch */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- the old-admin catch-all makes the rule see /admin/* as pages */}
+          <a href="/admin/logout" className={menuItem(false)}>
             <LogOut className="size-5 shrink-0" aria-hidden />
             Keluar
           </a>
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-warning-bg px-5 py-2 text-[13px] leading-[1.5] sm:px-8 lg:px-12">
-          <span className="flex items-center gap-3">
-            <Dot className="bg-warning" />
-            Prototype — mock data and canned replies. Nothing is saved or sent.
-          </span>
-          {canPreviewRole && (
-            <span className="flex items-center gap-3">
-              Preview as
-              <Segmented
-                label="Preview as"
-                size="sm"
-                value={state.role}
-                onChange={setRole}
-                options={[
-                  { value: "admin", label: "Admin" },
-                  { value: "member", label: "Member" },
-                ]}
-              />
-            </span>
-          )}
-        </div>
-        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
-      </div>
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</main>
 
       <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-5">
         {toastText && <div className="pointer-events-auto max-w-md rounded-bubble bg-ink-800 px-6 py-3 text-[14px] font-medium text-paper-100 shadow-menu">{toastText}</div>}

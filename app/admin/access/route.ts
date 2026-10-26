@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyCodeRole, accessCookieName, sessionCookieValue } from "@/lib/admin/access";
 import { isAdminEmail } from "@/lib/admin/config";
 import { isRegisteredAdmin } from "@/lib/admin/auth";
+import { adminLanding } from "@/lib/admin/landing";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
   const allowed = role === "owner" ? isAdminEmail(email) : await isRegisteredAdmin(email);
   if (!allowed) return fail(2); // email not registered for this code
 
-  const res = NextResponse.redirect(new URL("/admin", request.url));
+  const res = NextResponse.redirect(new URL(adminLanding(request.headers.get("host")), request.url));
   res.cookies.set(accessCookieName(), sessionCookieValue(role, email), {
     httpOnly: true,
     secure: true,

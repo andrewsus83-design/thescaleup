@@ -1,9 +1,16 @@
 "use client";
 
+// The admin login, in the brand v2 look (BRAND.md): light paper surface, Bricolage + Instrument Sans, one Orange action.
+// Email OTP is the primary way in; the shared access code (email + code) stays as a fallback. After logging in, admins land
+// on the Chat Room (lib/admin/landing.ts). The same page serves the report subdomain.
+
 import { useState } from "react";
-import { ArrowRight, Loader2, Mail, KeyRound, ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { Logo } from "@/components/landing/logo";
+import { adminLanding } from "@/lib/admin/landing";
+import { Logo } from "@/components/brand/logo";
+import { Alert, Btn, Card, inputCls, labelCls } from "@/components/room/ui";
+import { cn } from "@/lib/utils";
 
 export function AdminLoginForm({ codeFallback = false, initialError }: { codeFallback?: boolean; initialError?: string }) {
   const [step, setStep] = useState<"email" | "otp">("email");
@@ -11,6 +18,8 @@ export function AdminLoginForm({ codeFallback = false, initialError }: { codeFal
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(initialError ?? null);
+  // only an OTP step that failed marks its field invalid (initialError comes from the access-code form)
+  const [otpFailed, setOtpFailed] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
 
   const supabase = createSupabaseBrowserClient();
@@ -18,6 +27,7 @@ export function AdminLoginForm({ codeFallback = false, initialError }: { codeFal
   async function sendOtp(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setOtpFailed(false);
     setInfo(null);
     const addr = email.trim().toLowerCase();
     if (!addr) return;
@@ -29,6 +39,7 @@ export function AdminLoginForm({ codeFallback = false, initialError }: { codeFal
     setLoading(false);
     if (error) {
       setError(error.message);
+      setOtpFailed(true);
       return;
     }
     setStep("otp");
@@ -38,6 +49,7 @@ export function AdminLoginForm({ codeFallback = false, initialError }: { codeFal
   async function verify(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setOtpFailed(false);
     setLoading(true);
     const { error } = await supabase.auth.verifyOtp({
       email: email.trim().toLowerCase(),
@@ -47,150 +59,148 @@ export function AdminLoginForm({ codeFallback = false, initialError }: { codeFal
     if (error) {
       setLoading(false);
       setError(error.message);
+      setOtpFailed(true);
       return;
     }
-    // Full navigation so the server picks up the fresh session cookies.
-    window.location.assign("/admin");
+    // Full navigation so the server picks up the fresh session cookies. Admins land on the Chat Room.
+    window.location.assign(adminLanding(window.location.hostname));
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-hero-glow px-6">
-      <div className="pointer-events-none absolute inset-0 bg-grid-lines [mask-image:radial-gradient(55%_55%_at_50%_40%,#000,transparent)]" />
-      <div className="relative z-10 w-full max-w-md">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <Logo />
-          <h1 className="mt-6 font-display text-2xl font-extrabold text-mist">
-            Admin Backend
-          </h1>
-          <p className="mt-1.5 text-sm text-slate-400">
-            Masuk dengan email terdaftar via kode OTP.
-          </p>
+    <div className="room-app fixed inset-0 z-10 overflow-y-auto bg-paper-100 font-text text-body text-ink-800 antialiased">
+      <div className="mx-auto flex min-h-full w-full max-w-[30rem] flex-col justify-center px-5 py-12">
+        <div className="mb-10 flex flex-col items-center text-center">
+          <Logo variant="lockup" size={32} />
+          <h1 className="mt-10 font-title text-balance text-h2 text-ink-800">Masuk ke Chat Room</h1>
+          <p className="mt-3 text-pretty text-body text-ink-500">Masuk dengan email admin terdaftar lewat kode OTP.</p>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-card/60 p-7 backdrop-blur-xl">
+        <Card>
+          {(error || info) && (
+            <div className="mb-6">
+              {error ? (
+                <Alert tone="bad" role="alert">
+                  <span id="login-error">{error}</span>
+                </Alert>
+              ) : (
+                <Alert tone="ok" role="status">
+                  {info}
+                </Alert>
+              )}
+            </div>
+          )}
+
           {step === "email" ? (
-            <form onSubmit={sendOtp} className="space-y-4">
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-300">
+            <form onSubmit={sendOtp} className="space-y-6">
+              <div>
+                <label htmlFor="admin-email" className={labelCls}>
                   Email admin
-                </span>
-                <div className="flex items-center rounded-2xl border border-white/10 bg-obsidian/50 focus-within:border-coral/50 focus-within:ring-2 focus-within:ring-coral/20">
-                  <Mail className="ml-4 h-4 w-4 text-slate-500" />
-                  <input
-                    type="email"
-                    required
-                    autoFocus
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="andrewsus83@gmail.com"
-                    className="w-full bg-transparent px-3 py-3.5 text-base text-mist placeholder:text-slate-600 focus:outline-none"
-                  />
-                </div>
-              </label>
-              <button
-                type="submit"
-                disabled={loading}
-                className="group flex h-12 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-br from-coral-soft via-coral to-sunset font-display font-semibold text-white glow-coral transition-all hover:brightness-110 disabled:opacity-60"
-              >
+                </label>
+                <input
+                  id="admin-email"
+                  type="email"
+                  required
+                  autoFocus
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="nama@email.com"
+                  className={inputCls}
+                  aria-invalid={otpFailed}
+                  aria-describedby={otpFailed ? "login-error" : undefined}
+                />
+              </div>
+              <Btn type="submit" variant="primary" size="lg" className="w-full" disabled={loading}>
                 {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="size-5 animate-spin" aria-label="Mengirim kode" />
                 ) : (
                   <>
                     Kirim kode OTP
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                    <ArrowRight className="size-5" aria-hidden />
                   </>
                 )}
-              </button>
+              </Btn>
             </form>
           ) : (
-            <form onSubmit={verify} className="space-y-4">
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-300">
+            <form onSubmit={verify} className="space-y-6">
+              <div>
+                <label htmlFor="admin-otp" className={labelCls}>
                   Kode OTP
-                </span>
-                <div className="flex items-center rounded-2xl border border-white/10 bg-obsidian/50 focus-within:border-coral/50 focus-within:ring-2 focus-within:ring-coral/20">
-                  <KeyRound className="ml-4 h-4 w-4 text-slate-500" />
-                  <input
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    required
-                    autoFocus
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    placeholder="123456"
-                    className="w-full bg-transparent px-3 py-3.5 font-mono text-lg tracking-[0.3em] text-mist placeholder:text-slate-600 focus:outline-none"
-                  />
-                </div>
-              </label>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-br from-coral-soft via-coral to-sunset font-display font-semibold text-white glow-coral transition-all hover:brightness-110 disabled:opacity-60"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "Masuk"
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setStep("email");
-                  setCode("");
-                  setError(null);
-                  setInfo(null);
-                }}
-                className="flex w-full items-center justify-center gap-1.5 text-sm text-slate-400 hover:text-slate-200"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Ganti email
-              </button>
+                </label>
+                <input
+                  id="admin-otp"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  required
+                  autoFocus
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="123456"
+                  className={cn(inputCls, "font-mono text-[20px] tracking-[0.3em]")}
+                  aria-invalid={otpFailed}
+                  aria-describedby={otpFailed ? "login-error" : undefined}
+                />
+              </div>
+              <Btn type="submit" variant="primary" size="lg" className="w-full" disabled={loading}>
+                {loading ? <Loader2 className="size-5 animate-spin" aria-label="Memeriksa kode" /> : "Masuk"}
+              </Btn>
+              <div className="flex justify-center">
+                <Btn
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setStep("email");
+                    setCode("");
+                    setError(null);
+                    setOtpFailed(false);
+                    setInfo(null);
+                  }}
+                >
+                  <ArrowLeft className="size-4" aria-hidden />
+                  Ganti email
+                </Btn>
+              </div>
             </form>
           )}
 
-          {info && <p className="mt-4 text-sm text-good">{info}</p>}
-          {error && <p className="mt-4 text-sm text-bad">{error}</p>}
-
           {codeFallback && (
-            <div className="mt-5 border-t border-white/10 pt-4">
-              <p className="mb-2 flex items-center gap-2 text-xs text-slate-400">
-                <span className="h-px flex-1 bg-white/10" /> atau email + kode akses <span className="h-px flex-1 bg-white/10" />
+            <div className="mt-8">
+              <p className="label-caps mb-5 flex items-center gap-3 text-ink-500">
+                <span className="h-px flex-1 bg-hairline" />
+                atau email + kode akses
+                <span className="h-px flex-1 bg-hairline" />
               </p>
-              <form method="post" action="/admin/access" className="space-y-2">
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  defaultValue={email}
-                  placeholder="Email terdaftar"
-                  className="w-full rounded-xl border border-white/10 bg-obsidian/50 px-3 py-2.5 text-sm text-mist placeholder:text-slate-600 focus:border-coral/50 focus:outline-none"
-                />
-                <div className="flex items-center gap-2">
+              <form method="post" action="/admin/access" className="space-y-4">
+                <div>
+                  <label htmlFor="access-email" className={labelCls}>
+                    Email terdaftar
+                  </label>
                   <input
-                    type="password"
-                    name="code"
+                    id="access-email"
+                    type="email"
+                    name="email"
                     required
-                    autoComplete="off"
-                    placeholder="Kode akses"
-                    className="flex-1 rounded-xl border border-white/10 bg-obsidian/50 px-3 py-2.5 text-sm text-mist placeholder:text-slate-600 focus:border-coral/50 focus:outline-none"
+                    autoComplete="email"
+                    defaultValue={email}
+                    placeholder="nama@email.com"
+                    className={inputCls}
                   />
-                  <button
-                    type="submit"
-                    className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-mist hover:bg-white/15"
-                  >
-                    Masuk
-                  </button>
                 </div>
+                <div>
+                  <label htmlFor="access-code" className={labelCls}>
+                    Kode akses
+                  </label>
+                  <input id="access-code" type="password" name="code" required autoComplete="off" placeholder="Kode akses" className={inputCls} />
+                </div>
+                <Btn type="submit" variant="secondary" size="lg" className="w-full">
+                  Masuk dengan kode
+                </Btn>
               </form>
-              <p className="mt-1.5 text-[11px] text-slate-500">Masukкан email terdaftar Anda + kode akses.</p>
             </div>
           )}
-        </div>
+        </Card>
 
-        <p className="mt-6 text-center text-xs text-slate-600">
-          Hanya email admin terdaftar yang dapat mengakses backend.
-        </p>
+        <p className="mt-6 text-center text-[13px] text-ink-500">Hanya email admin terdaftar yang dapat masuk.</p>
       </div>
     </div>
   );

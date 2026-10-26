@@ -1,13 +1,7 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Instrument_Sans } from "next/font/google";
 import { requireAdmin } from "@/lib/admin/auth";
+import { bricolage, instrument } from "@/lib/brand-fonts";
 import { RoomShell } from "@/components/room/shell";
-
-// Brand v2 type (BRAND.md §4): Bricolage Grotesque for titles, Instrument Sans for reading. JetBrains Mono for
-// commands, numbers and caps labels is already loaded by the root layout (--font-jbmono). Both fonts are scoped
-// to this layout, so the rest of the site doesn't download them.
-const bricolage = Bricolage_Grotesque({ subsets: ["latin"], axes: ["opsz"], variable: "--font-bricolage", display: "swap" });
-const instrument = Instrument_Sans({ subsets: ["latin"], variable: "--font-instrument", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Chat Room",
@@ -15,7 +9,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/** Staff only — same gate as /admin. The menu lives on the left (see components/room/shell.tsx). */
+/** Staff only (the admin gate). This is where admins land after login; the menu lives on the left (see components/room/shell.tsx). */
 export default async function RoomLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAdmin();
   return (

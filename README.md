@@ -5,9 +5,18 @@ info; a multi-API pipeline + a "virtual executive board" of AI agents (CMO, CBO,
 CTO, Creative + a Red Team verifier) returns a business health score, revenue
 leak analysis, and a done-for-you scale-up roadmap.
 
-This repository currently contains **Platform 1 — the public landing page &
-blog** (marketing + lead generation). The Admin backend and Client dashboard,
-plus the analysis engine, are built on the same Supabase instance.
+This repository holds the staff app (the login and the Chat Room), the Report
+platform, and the clients' public booking pages and mini-sites, all on one
+Supabase instance. The original public landing page & blog (marketing + lead
+generation) is archived.
+
+## What the site is now
+
+For now the site is just the **login**: `/` goes to `/admin/login`, and after logging in an
+admin lands on the **Chat Room** (`/room/chat`). Clients have no portal: they only get a
+report link (the Report platform's client page `/report/c/<slug>`, or a static report in
+`public/r/`). The old landing site, the old admin dashboard and the client dashboard were
+archived on 2026-10-26: see `archive/README.md` for what each held and how to restore it.
 
 ## Stack
 
@@ -28,18 +37,15 @@ plus the analysis engine, are built on the same Supabase instance.
 
 ```
 app/
-  page.tsx              Landing (home)
-  cara-kerja/           How it works
-  executive-board/      The AI executive board
-  faq/                  FAQ
-  blog/ , blog/[slug]/  Blog index + articles (Article JSON-LD)
-  mulai/                Full-screen Typeform-style 5-step onboarding
-  dashboard/            Client dashboard (placeholder)
-  api/lead/             Lead capture endpoint (→ Supabase `leads`)
-components/
-  landing/  ui/  fx/  onboarding/
-lib/                    site.ts (content), blog.ts, utils.ts
-supabase/migrations/    leads table
+  page.tsx              "/" → the login
+  admin/                login, access-code and logout routes (+ a redirect for old /admin/* URLs)
+  room/                 the Chat Room (admins only)
+  report/               the Report platform: /report/admin, and the client link /report/c/<slug>
+  book/ , site/         public booking pages and the clients' mini-sites
+components/             room/ (Chat Room), brand/ (logo), report/, booking/, builders/, admin/ (login form)
+lib/                    admin/ (auth), room/ (mock data), report/, engine/, builders/, supabase/
+archive/                the old landing site, admin dashboard and client dashboard (not built)
+supabase/migrations/    schema
 ```
 
 ## Local development

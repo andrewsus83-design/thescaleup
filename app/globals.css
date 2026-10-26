@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Archived code (archive/) is kept for reference only: don't generate CSS for the classes it uses. */
+@source not "../archive";
 
 /* =========================================================================
    THE SCALEUP — BRAND DESIGN SYSTEM
