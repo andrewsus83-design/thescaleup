@@ -3,19 +3,6 @@
 import { useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-/**
- * Client-side auth callback handler.
- *
- * admin.generateLink() can produce two redirect formats depending on the
- * Supabase project settings:
- *   - Implicit flow: /auth/callback#access_token=…&refresh_token=…
- *   - PKCE code:     /auth/callback?code=…
- *
- * The server-side page.tsx handles the ?code= case first; if it fails (no
- * PKCE verifier in cookies because this was not browser-initiated), we fall
- * through here and try both paths client-side, where the browser client can
- * exchange tokens without requiring a stored verifier.
- */
 export default function AuthCallbackClient() {
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
