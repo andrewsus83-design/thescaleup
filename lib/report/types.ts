@@ -149,6 +149,11 @@ export type ReportMetrics = {
   comparison?: PeriodComparison | null; // previous equal-length window (period-over-period)
   platform?: string; // instagram | tiktok
   aiAnalysis?: { label: string; type: string; text: string }[] | null; // Claude Opus custom analysis
+  /** Plain-language caveats about THIS data (a repaired old snapshot, a post list that failed to load, mixed periods).
+   *  Shown as notes in the dashboard and the Excel; never numbers. */
+  dataNotes?: string[];
+  /** Pipeline revision that produced this payload (see PIPELINE_REV in lib/report/repair.ts); missing = before 2026-10-26. */
+  rev?: number;
   fetchedAt?: string;
 };
 

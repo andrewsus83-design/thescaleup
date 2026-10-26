@@ -10,7 +10,8 @@ import type { Scope } from "@/lib/report/metric-info";
 import { postHasData } from "@/lib/report/derive";
 
 export type CheckStatus = "pass" | "warn" | "fail" | "skip";
-export type DataCheck = { id: string; scope: Scope; label: string; status: CheckStatus; detail: string };
+/** `scope` is null for a caveat about the data as a whole (see ReportMetrics.dataNotes), which belongs to no single scope. */
+export type DataCheck = { id: string; scope: Scope | null; label: string; status: CheckStatus; detail: string };
 
 const n = (v: number) => v.toLocaleString("id-ID");
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -30,8 +31,12 @@ export function runChecks(m: ReportMetrics): DataCheck[] {
   const posts = m.posts ?? [];
   const ig = (m.platform ?? "instagram") === "instagram";
   const out: DataCheck[] = [];
-  const add = (id: string, scope: Scope, label: string, status: CheckStatus, detail: string) =>
+  const add = (id: string, scope: Scope | null, label: string, status: CheckStatus, detail: string) =>
     out.push({ id, scope, label, status, detail });
+
+  // 0 · what the pipeline itself knows is off with this pull (a repaired old snapshot, a post list that failed to load,
+  //     mixed periods). Admin-only like every check here: clients get the numbers, not the housekeeping.
+  (m.dataNotes ?? []).forEach((text, i) => add(`data_note_${i}`, null, "Catatan data", "warn", text));
 
   // 1 · A — the account total must cover its own components
   {

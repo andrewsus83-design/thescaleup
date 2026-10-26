@@ -1,6 +1,6 @@
 import "server-only";
 import type { ReportMetrics } from "@/lib/report/types";
-import { efficiency, qualityScore } from "@/lib/report/derive";
+import { efficiency, postHasData, qualityScore } from "@/lib/report/derive";
 
 /* ─────────────────────── Health Score ─────────────────────── */
 
@@ -26,6 +26,8 @@ export function computeHealthScore(metrics: ReportMetrics): HealthScore | null {
 
   const posts = metrics.posts ?? [];
   const t = metrics.totals;
+  // No reach and no post with insights means there is nothing to score: grading zeros would call "no data" a "critical" account.
+  if (!((t?.reach ?? 0) > 0) && !posts.some(postHasData)) return null;
   const followers = metrics.account?.followers ?? null;
   const eff = efficiency(t, followers, posts);
   const cqs = qualityScore(posts) ?? 0;
