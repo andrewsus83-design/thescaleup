@@ -103,8 +103,55 @@ export function computeHealthScore(metrics: ReportMetrics): HealthScore | null {
 
 /* ─────────────────────── AI helpers ─────────────────────── */
 
+// In-process result cache: keyed by a hash of the compact data payload.
+// Prevents duplicate Anthropic calls when the Analytic tab is re-navigated
+// within the same serverless instance.  TTL 24h, max 500 entries per cache.
+const CACHE_TTL = 24 * 60 * 60 * 1000;
+const CACHE_MAX = 500;
+type CacheEntry<T> = { v: T; at: number };
+function _makeCache<T>() { return new Map<string, CacheEntry<T>>(); }
+function _get<T>(cache: Map<string, CacheEntry<T>>, key: string): T | null {
+  const e = cache.get(key);
+  if (!e) return null;
+  if (Date.now() - e.at > CACHE_TTL) { cache.delete(key); return null; }
+  return e.v;
+}
+function _set<T>(cache: Map<string, CacheEntry<T>>, key: string, v: T) {
+  if (cache.size >= CACHE_MAX) {
+    const old = [...cache.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+    if (old) cache.delete(old[0]);
+  }
+  cache.set(key, { v, at: Date.now() });
+}
+// Simple djb2-based hash of a JSON payload — good enough as a cache key.
+function _hashKey(data: unknown): string {
+  const s = JSON.stringify(data);
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+const _tipCache = _makeCache<CMOTip[]>();
+const _researchCache = _makeCache<ResearchCard[]>();
+
+function extractHashtags(caption: string): string[] {
+  return [...caption.matchAll(/#([a-zA-Z0-9_]{2,50})/g)]
+    .map((m) => m[1].toLowerCase())
+    .filter((t, i, a) => a.indexOf(t) === i)
+    .slice(0, 10);
+}
+
 function compact(m: ReportMetrics) {
   const posts = m.posts ?? [];
+  // Aggregate hashtag frequency across all posts so the AI can identify keyword patterns.
+  const tagFreq: Record<string, number> = {};
+  for (const p of posts) {
+    for (const t of extractHashtags(p.caption ?? "")) tagFreq[t] = (tagFreq[t] ?? 0) + 1;
+  }
+  const topHashtags = Object.entries(tagFreq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([tag, count]) => ({ tag, count }));
+
   return {
     platform: m.platform,
     period: m.period,
@@ -118,12 +165,15 @@ function compact(m: ReportMetrics) {
     followersGained: m.followersGained,
     followersLost: m.followersLost,
     byContentType: m.byContentType,
+    topHashtags,
     topPosts: posts
       .slice()
       .sort((a, b) => (b.reach ?? 0) - (a.reach ?? 0))
       .slice(0, 5)
       .map((p) => ({
-        caption: (p.caption ?? "").slice(0, 80),
+        // 200 chars — long enough to capture hashtag blocks at caption end
+        caption: (p.caption ?? "").slice(0, 200),
+        hashtags: extractHashtags(p.caption ?? ""),
         reach: p.reach,
         saved: p.saved,
         shares: p.shares,
@@ -131,11 +181,16 @@ function compact(m: ReportMetrics) {
   };
 }
 
+// MODEL STRATEGY:
+//  Haiku  — fast & cheap, for repetitive structured output (CMO tips).
+//  Sonnet — balanced, for nuanced analytical cards (SEO/GEO/Social research).
+//  Opus   — reserved for one-off complex generation (engine audit in lib/engine).
 async function callClaude<T>(
   apiKey: string,
   system: string,
   user: string,
   fallback: T,
+  opts: { model: string; maxTokens: number },
 ): Promise<T> {
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -146,12 +201,11 @@ async function callClaude<T>(
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-opus-5",
-        max_tokens: 1500,
+        model: opts.model,
+        max_tokens: opts.maxTokens,
         system,
         messages: [{ role: "user", content: user }],
       }),
-      cache: "no-store",
     });
     if (!res.ok) return fallback;
     const j = (await res.json()) as { content?: { text?: string }[] };
@@ -172,13 +226,24 @@ export async function generateCMOTips(
   metrics: ReportMetrics,
 ): Promise<CMOTip[]> {
   if (!apiKey || !metrics.connected) return [];
+  const payload = compact(metrics);
+  const cacheKey = _hashKey(payload);
+  const cached = _get(_tipCache, cacheKey);
+  if (cached) return cached;
   const system =
     "Anda CMO senior & digital marketing strategist berpengalaman. " +
     "Berdasar data laporan sosial media, buat TEPAT 5 tips & tricks yang KONKRET, ACTIONABLE, " +
-    "merujuk langsung ke angka/data yang ada. Jangan mengarang data. Bahasa Indonesia. " +
+    "merujuk langsung ke angka/data yang ada. Jangan mengarang data. " +
+    "Jika data tidak mencukupi untuk sebuah tips, tulis 'Data belum cukup.' pada field body. " +
+    "Bahasa Indonesia. " +
     'Balas HANYA JSON array valid: [{"emoji":"<1 emoji>","title":"<judul max 6 kata>","body":"<satu kalimat aksi dgn angka spesifik>"}]. Tanpa teks lain.';
-  const user = `DATA:\n${JSON.stringify(compact(metrics))}\n\nBuat 5 tips CMO + digital marketing.`;
-  return callClaude<CMOTip[]>(apiKey, system, user, []);
+  const user = `DATA:\n${JSON.stringify(payload)}\n\nBuat 5 tips CMO + digital marketing.`;
+  const result = await callClaude<CMOTip[]>(apiKey, system, user, [], {
+    model: "claude-haiku-5-5",
+    maxTokens: 600,
+  });
+  if (result.length) _set(_tipCache, cacheKey, result);
+  return result;
 }
 
 /* ─────────────────────── SEO/GEO/Social Research ─────────────────────── */
@@ -194,13 +259,38 @@ export async function generateResearch(
   metrics: ReportMetrics,
 ): Promise<ResearchCard[]> {
   if (!apiKey || !metrics.connected) return [];
+  const payload = compact(metrics);
+  const cacheKey = _hashKey(payload);
+  const cached = _get(_researchCache, cacheKey);
+  if (cached) return cached;
+
+  // GEO insight is only meaningful when there is a real content library (≥3 months or ≥20 posts).
+  // For smaller accounts, a third Social Search card is more actionable.
+  const posts = metrics.posts ?? [];
+  const hasContentDepth = posts.length >= 20;
+
+  const cardSpec = hasContentDepth
+    ? "1 SEO, 1 GEO, 2 Social Search"
+    : "1 SEO, 3 Social Search (platform yang berbeda jika data tersedia)";
+  const geoNote = hasContentDepth
+    ? "1 GEO (Generative Engine Optimization — agar dikutip ChatGPT/Gemini/Perplexity). "
+    : "";
+
   const system =
-    "Anda SEO/GEO/social search strategist senior. Berdasar data akun sosial, buat TEPAT 4 insight: " +
-    "1 SEO (konten sosial → organic search Google), " +
-    "1 GEO (Generative Engine Optimization — dikutip ChatGPT/Gemini/Perplexity), " +
-    "2 Social Search (optimasi ditemukan via search TikTok/IG/YouTube). " +
-    "Bahasa Indonesia. Setiap insight berbasis data yang diberikan. " +
-    'Balas HANYA JSON array: [{"category":"SEO"|"GEO"|"Social Search","insight":"<temuan 1 kalimat>","action":"<rekomendasi 1 kalimat>"}]. Tanpa teks lain.';
-  const user = `DATA:\n${JSON.stringify(compact(metrics))}\n\nBuat 4 research insights.`;
-  return callClaude<ResearchCard[]>(apiKey, system, user, []);
+    "Anda SEO/GEO/social search strategist senior untuk agensi digital marketing di Indonesia. " +
+    `Berdasar data akun sosial, buat TEPAT 4 insight: ${cardSpec}. ` +
+    "1 SEO (bagaimana konten sosial ini bisa muncul di organic search Google). " +
+    geoNote +
+    "Social Search: optimasi agar konten ditemukan lewat search TikTok, IG Explore, atau YouTube. " +
+    "Setiap insight HARUS merujuk angka atau pola spesifik dari data (reach, saved, hashtag, dsb). " +
+    "Jika data tidak cukup untuk sebuah kategori, tulis insight: 'Data belum cukup untuk ini.' " +
+    "Hindari saran generik tanpa angka. Bahasa Indonesia. " +
+    'Balas HANYA JSON array: [{"category":"SEO"|"GEO"|"Social Search","insight":"<temuan 1-2 kalimat berbasis data>","action":"<rekomendasi konkret 1 kalimat dengan angka>"}]. Tanpa teks lain.';
+  const user = `DATA:\n${JSON.stringify(payload)}\n\nBuat 4 research insights.`;
+  const result = await callClaude<ResearchCard[]>(apiKey, system, user, [], {
+    model: "claude-sonnet-5-5",
+    maxTokens: 900,
+  });
+  if (result.length) _set(_researchCache, cacheKey, result);
+  return result;
 }

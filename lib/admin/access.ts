@@ -90,9 +90,6 @@ export async function adminAccess(): Promise<AccessInfo> {
   if (!v) return null;
   const parsed = readSessionCookie(v);
   if (parsed) return parsed;
-  // legacy: raw owner-code hash cookie (pre email-binding)
-  const o = OWNER_CODE();
-  if (o && safeEqual(v, tokenFor(o))) return { role: "owner" };
   return null;
 }
 
