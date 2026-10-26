@@ -52,7 +52,13 @@ export async function reportAddUser(formData: FormData): Promise<void> {
   if (!me.perms.create || !isSupabaseAdminConfigured()) return;
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!email) return;
-  const role = String(formData.get("role") ?? "staff");
+  const requestedRole = String(formData.get("role") ?? "staff");
+  // Privilege escalation guard: only users with delete permission can grant owner/admin roles.
+  // Without this, a member (create-only) could add a new owner row and bypass all role checks.
+  const canGrantElevated = me.perms.delete || me.role === "owner";
+  const role = (requestedRole === "owner" || requestedRole === "admin") && !canGrantElevated
+    ? "staff"
+    : requestedRole;
   // sensible default perms by role (owner/admin = full, staff = read+create, viewer = read)
   const preset =
     role === "owner" || role === "admin"
