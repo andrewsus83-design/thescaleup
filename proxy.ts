@@ -14,6 +14,15 @@ import type { NextRequest } from "next/server";
  */
 export function proxy(request: NextRequest) {
   const host = (request.headers.get("host") ?? "").toLowerCase();
+
+  // staging.* opens the new workspace (the Chat Room) instead of the old landing page.
+  // Temporary: replaced by APP_MODE=v2 once the new database is wired in.
+  if (host.startsWith("staging.") && request.nextUrl.pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/room/chat";
+    return NextResponse.redirect(url);
+  }
+
   if (!host.startsWith("report.")) return NextResponse.next();
 
   const { pathname } = request.nextUrl;
