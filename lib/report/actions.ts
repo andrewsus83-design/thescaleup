@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin/auth";
+import { revokeAdminSessions } from "@/lib/admin/access";
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { fetchZernioMetrics, listZernioAccounts, type ZernioAccount } from "@/lib/report/zernio";
 import { resolveClientZernioKey } from "@/lib/report/data";
@@ -88,7 +89,10 @@ export async function reportDeleteUser(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   const db = createSupabaseAdminClient();
+  // Fetch email first so we can revoke sessions after deletion.
+  const { data: row } = await db.from("admin_users").select("email").eq("id", id).maybeSingle();
   await db.from("admin_users").delete().eq("id", id);
+  if (row?.email) await revokeAdminSessions(row.email);
   revalidatePath("/report/admin/users");
 }
 
@@ -414,6 +418,39 @@ export async function clearClientSetting(formData: FormData): Promise<void> {
   const db = createSupabaseAdminClient();
   await db.from("report_client_settings").delete().eq("client_id", id).eq("key", key);
   revalidatePath(`/report/admin/${id}/settings`);
+}
+
+/* ─── M4: server-side key save for Room → Project → Integrations ─────────── */
+
+/**
+ * Save a provider API key for a brand (client).  Called from the Room key form
+ * once the prototype is wired; the full key goes straight to report_client_settings
+ * server-side and is never returned to the browser — only the last 4 chars come back
+ * (the caller stores those in local state for display).
+ *
+ * Returns { last4 } on success, or throws on auth / validation failure.
+ */
+export async function saveOwnKey(
+  clientId: string,
+  provider: string,
+  fullKey: string,
+): Promise<{ last4: string }> {
+  await requireAdmin();
+  if (!isSupabaseAdminConfigured()) throw new Error("DB not configured");
+  const key = fullKey.trim();
+  if (!key || key.length < 8) throw new Error("Key too short");
+  // Validate provider is an allowed setting key (prevents arbitrary column injection).
+  const allowed = CLIENT_PROVIDERS.map((p) => p.key);
+  if (!allowed.includes(provider)) throw new Error("Unknown provider");
+  const db = createSupabaseAdminClient();
+  await db
+    .from("report_client_settings")
+    .upsert(
+      { client_id: clientId, key: provider, value: key, updated_at: new Date().toISOString() },
+      { onConflict: "client_id,key" },
+    );
+  revalidatePath(`/report/admin/${clientId}/settings`);
+  return { last4: key.slice(-4) };
 }
 
 /* --------------------------------- reports -------------------------------- */
