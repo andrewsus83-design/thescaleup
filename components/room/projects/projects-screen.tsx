@@ -11,6 +11,7 @@ import { useRoom } from "../room-provider";
 import { Btn, Card, Chip, EmptyState, PageHeader, btnCls, inputCls, pageX, type Tone } from "../ui";
 import { useIntakeStarter } from "../chat/use-intake";
 import { useRouter } from "next/navigation";
+import { costThisMonth, usd } from "./brand-keys";
 
 /** The status next to the big score (so the number itself is not repeated): dot + label. */
 export function ScoreChip({ score }: { score: number | null }) {
@@ -99,6 +100,10 @@ export function ProjectsScreen() {
                   <div>
                     <dt className="label-caps whitespace-nowrap text-ink-500">Last activity</dt>
                     <dd className="mt-1 text-[15px] font-semibold text-ink-800">{p.lastActivity}</dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="label-caps text-ink-500">Cost this month</dt>
+                    <dd className="mt-1 font-mono text-[15px] font-semibold text-ink-800">{usd(costThisMonth(p.id))}</dd>
                   </div>
                 </dl>
                 <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-6">

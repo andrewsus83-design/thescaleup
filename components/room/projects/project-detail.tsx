@@ -10,13 +10,16 @@ import type { ChronicleKind, Project } from "@/lib/room/types";
 import { cn } from "@/lib/utils";
 import { useRoom } from "../room-provider";
 import { Alert, Bar, Btn, BudgetPanel, Card, Chip, EmptyState, PageHeader, Sheet, btnCls, errorCls, inputCls, labelCls, motion, pageX, pillCls, segItem, segWrap, textareaCls } from "../ui";
+import { initialKeys, type BrandKeys } from "./brand-keys";
+import { IntegrationsTab } from "./integrations";
 import { ScoreChip, ScoreNumber } from "./projects-screen";
 
-type Tab = "report" | "todo" | "chronicle";
+type Tab = "report" | "todo" | "chronicle" | "integrations";
 const TABS: { key: Tab; label: string }[] = [
   { key: "report", label: "Report" },
   { key: "todo", label: "To do" },
   { key: "chronicle", label: "Chronicle" },
+  { key: "integrations", label: "Integrations" },
 ];
 
 /** Section label: Mono caps. */
@@ -27,7 +30,9 @@ export function ProjectDetail({ id }: { id: string }) {
   const router = useRouter();
   const project = state.projects.find((p) => p.id === id && p.status === "active");
   const [tab, setTab] = useState<Tab>("report");
-  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ report: null, todo: null, chronicle: null });
+  // the brand's own API keys live here, not in the tab, so switching tabs doesn't forget them (prototype: in memory only)
+  const [brandKeys, setBrandKeys] = useState<BrandKeys>(() => initialKeys(id));
+  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ report: null, todo: null, chronicle: null, integrations: null });
 
   if (!project) {
     return (
@@ -111,6 +116,7 @@ export function ProjectDetail({ id }: { id: string }) {
         {tab === "report" && <ReportTab project={project} goTodo={() => setTab("todo")} />}
         {tab === "todo" && <TodoTab project={project} />}
         {tab === "chronicle" && <ChronicleTab project={project} />}
+        {tab === "integrations" && <IntegrationsTab project={project} keys={brandKeys} onChange={setBrandKeys} />}
       </div>
     </div>
   );
@@ -477,6 +483,7 @@ const KINDS: { key: ChronicleKind | "all"; label: string }[] = [
   { key: "build", label: "Build" },
   { key: "decision", label: "Decision" },
   { key: "file", label: "File" },
+  { key: "settings", label: "Settings" },
   { key: "note", label: "Note" },
 ];
 

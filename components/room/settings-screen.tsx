@@ -72,7 +72,7 @@ export function SettingsScreen() {
         </Alert>
       </div>
 
-      <Section id="keys" title="API keys" hint="Add a key per provider, test it, set a monthly cap, disable it.">
+      <Section id="keys" title="API keys" hint="Add a key per provider, test it, set a monthly cap, disable it. These are the workspace keys: a brand without keys of its own uses them. A brand can bring its own under Project → Integrations.">
         <ul className={list}>
           {keys.map((k) => (
             <li key={k.id} className={row}>
