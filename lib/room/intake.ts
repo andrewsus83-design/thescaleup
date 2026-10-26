@@ -97,12 +97,25 @@ const UNKNOWN = /^(unknown|don'?t know|not sure|skip|-|tidak tahu|belum tahu|gak
 
 export function parseHandles(text: string): string[] {
   const out: string[] = [];
-  for (const raw of text.split(/[\s,;]+|\band\b|\bdan\b/i)) {
+  // Split only on commas, semicolons and newlines — not on spaces — so a handle with dots inside
+  // (sweet.and.sour) stays whole, and free-text sentences ("we mostly use instagram") are not
+  // tokenised into fake handles. Spaces are only split when the token starts with @ or is a URL.
+  for (const raw of text.split(/[,;\n]+/)) {
     let t = raw.trim();
     if (!t) continue;
     const url = /(?:instagram|tiktok|facebook|x|twitter)\.com\/@?([a-z0-9._]+)/i.exec(t);
-    t = (url ? url[1] : t).replace(/^@+/, "");
-    if (/^[a-z0-9._]{2,30}$/i.test(t)) out.push(`@${t}`);
+    if (url) {
+      // Social URL: extract the username part.
+      const handle = url[1].replace(/^@+/, "");
+      if (/^[a-z0-9._]{2,30}$/i.test(handle)) out.push(`@${handle}`);
+    } else {
+      // Non-URL token: only accept it if it starts with @ (an explicit handle), or if the whole
+      // token matches the handle pattern AND contains no spaces (avoids treating words as handles).
+      const stripped = t.replace(/^@+/, "");
+      if (t.startsWith("@") && /^[a-z0-9._]{2,30}$/i.test(stripped)) {
+        out.push(`@${stripped}`);
+      }
+    }
   }
   return [...new Set(out)].slice(0, 6);
 }
