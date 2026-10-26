@@ -3,17 +3,19 @@
 // One project: Report, To do, Chronicle and Integrations next to the project's chat (Assets and Builder are their own tabs).
 // The Report tab is the real report of report.thescaleup.xyz (Performance and Analytic): the server renders it
 // (components/report/room-report.tsx) and hands it in as `report`; this file only frames it and switches between the two screens.
+// The To do tab is a Trello-style board (./todo-board.tsx).
 
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Check, ExternalLink, Hammer, Images, MessagesSquare } from "lucide-react";
+import { ArrowLeft, ExternalLink, Images, MessagesSquare } from "lucide-react";
 import type { ChronicleKind, Project } from "@/lib/room/types";
 import { cn } from "@/lib/utils";
 import { useRoom } from "../room-provider";
-import { Btn, Chip, EmptyState, PageHeader, btnCls, inputCls, motion, pageX, pillCls, segItem, segWrap } from "../ui";
+import { Btn, Chip, EmptyState, PageHeader, btnCls, inputCls, pageX, pillCls, segItem, segWrap } from "../ui";
 import { initialKeys, type BrandKeys } from "./brand-keys";
 import { IntegrationsTab } from "./integrations";
+import { TodoBoard } from "./todo-board";
 
 type Tab = "report" | "todo" | "chronicle" | "integrations";
 const TABS: { key: Tab; label: string }[] = [
@@ -22,9 +24,6 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "chronicle", label: "Chronicle" },
   { key: "integrations", label: "Integrations" },
 ];
-
-/** Section label: Mono caps. */
-const caps = "font-mono text-code uppercase text-ink-500";
 
 export function ProjectDetail({ id, report }: { id: string; report: React.ReactNode }) {
   const { state, href, open } = useRoom();
@@ -115,7 +114,7 @@ export function ProjectDetail({ id, report }: { id: string; report: React.ReactN
 
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} tabIndex={0} className="rounded-card">
         {tab === "report" && <ReportPanel projectId={project.id} report={report} />}
-        {tab === "todo" && <TodoTab project={project} />}
+        {tab === "todo" && <TodoBoard project={project} />}
         {tab === "chronicle" && <ChronicleTab project={project} />}
         {tab === "integrations" && <IntegrationsTab project={project} keys={brandKeys} onChange={setBrandKeys} />}
       </div>
@@ -170,110 +169,10 @@ function ReportPanel({ projectId, report }: { projectId: string; report: React.R
           Open on report.thescaleup.xyz <ExternalLink className="size-4" aria-hidden />
         </a>
       </div>
-      <p className="max-w-chat text-pretty text-[13px] leading-[1.5] text-ink-500">
+      <p className="max-w-chat text-pretty text-caption text-ink-500">
         This is the live report: the same brands, accounts and numbers as report.thescaleup.xyz. Projects are not linked to a report brand yet, so choose the brand and account in the channel list.
       </p>
       {report}
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------------------------------ To do
-const GROUPS: { key: "week1" | "d30" | "d90" | "manual"; label: string }[] = [
-  { key: "week1", label: "Week 1" },
-  { key: "d30", label: "30 days" },
-  { key: "d90", label: "90 days" },
-  { key: "manual", label: "Manual" },
-];
-const PEOPLE = ["Dewi", "Andre", "Sari"];
-
-function TodoTab({ project }: { project: Project }) {
-  const api = useRoom();
-  const router = useRouter();
-  const todos = api.state.todos[project.id] ?? [];
-  const builds = api.state.builds[project.id] ?? [];
-  if (!todos.length) return <EmptyState title="No to dos yet" hint="The first audit turns its insights into a Week 1 plan. You can also add one from the chat with /todo." />;
-
-  return (
-    <div className="space-y-12">
-      {GROUPS.map((g) => {
-        const items = todos.filter((t) => t.group === g.key);
-        if (!items.length) return null;
-        return (
-          <section key={g.key} aria-label={g.label}>
-            <h3 className={cn(caps, "mb-4 px-1")}>
-              {g.label} · {items.filter((t) => !t.done).length} open
-            </h3>
-            <ul className="space-y-3">
-              {items.map((t) => {
-                const canBuild = /builder/i.test(t.service ?? "") && !t.done && !builds.some((b) => b.todoId === t.id);
-                return (
-                  <li key={t.id} className="rounded-bubble border border-hairline bg-paper-0 p-5">
-                    <div className="flex items-start gap-4">
-                      <button
-                        type="button"
-                        role="checkbox"
-                        aria-checked={t.done}
-                        aria-label={`${t.done ? "Reopen" : "Mark done"}: ${t.title}`}
-                        onClick={() => api.toggleTodo(project.id, t.id)}
-                        className={cn(
-                          "hit-44 mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-lg border-[1.5px]",
-                          motion,
-                          t.done ? "border-success bg-success-bg text-success-ink" : "border-ink-200 text-transparent hover:border-ink-500",
-                        )}
-                      >
-                        <Check className="size-4" aria-hidden />
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <p className={cn("text-[16px] font-semibold leading-[1.5]", t.done && "text-ink-500 line-through")}>{t.title}</p>
-                        {t.check && (
-                          <dl className="mt-2 grid gap-x-4 gap-y-1 text-[14px] leading-[1.5] sm:grid-cols-[auto_1fr]">
-                            <dt className="text-ink-500">Failed check</dt>
-                            <dd>{t.check}</dd>
-                            <dt className="text-ink-500">Tip</dt>
-                            <dd>{t.tip}</dd>
-                            <dt className="text-ink-500">Fixed by</dt>
-                            <dd>{t.service}</dd>
-                          </dl>
-                        )}
-                        {!t.check && <p className="mt-1 text-[14px] text-ink-500">Manual item</p>}
-                      </div>
-                    </div>
-                    <div className="mt-4 flex flex-wrap items-center gap-3 pl-10">
-                      <label className="flex items-center gap-3 text-[13px] font-semibold text-ink-500">
-                        Assign
-                        <select
-                          value={t.assignee ?? ""}
-                          onChange={(e) => api.assignTodo(project.id, t.id, e.target.value)}
-                          className={cn("h-11 rounded-full border-[1.5px] border-ink-200 bg-paper-0 px-4 text-[14px] font-semibold text-ink-800 hover:bg-paper-100", motion)}
-                        >
-                          <option value="">Unassigned</option>
-                          {PEOPLE.map((p) => (
-                            <option key={p} value={p}>{p}</option>
-                          ))}
-                        </select>
-                      </label>
-                      {canBuild && (
-                        <Btn
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => {
-                            api.startBuild(project.id, t);
-                            api.open(project.id);
-                            router.push(api.href("/builder"));
-                          }}
-                        >
-                          <Hammer className="size-4" aria-hidden /> Start a build
-                        </Btn>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        );
-      })}
     </div>
   );
 }

@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { Eye, Hammer } from "lucide-react";
+import { isOpen } from "@/lib/room/todos";
 import type { Build, Project } from "@/lib/room/types";
 import { cn } from "@/lib/utils";
 import { NeedProject, ProjectSwitcher } from "./project-switcher";
@@ -38,7 +39,7 @@ function BuilderFor({ project }: { project: Project }) {
   const todos = api.state.todos[project.id] ?? [];
   const builds = api.state.builds[project.id] ?? [];
   const [preview, setPreview] = useState<Build | null>(null);
-  const ready = todos.filter((t) => /builder/i.test(t.service ?? "") && !t.done && !builds.some((b) => b.todoId === t.id));
+  const ready = todos.filter((t) => /builder/i.test(t.service ?? "") && isOpen(t) && !builds.some((b) => b.todoId === t.id));
 
   if (!project.locked) {
     return (

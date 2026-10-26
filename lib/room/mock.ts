@@ -62,19 +62,19 @@ export const INITIAL_PROJECTS: Project[] = [
 
 export const INITIAL_TODOS: Record<string, Todo[]> = {
   "kopi-senja": [
-    { id: "t1", title: "Add a FAQ page (hours, delivery, allergens)", group: "week1", check: "FAQ page exists", tip: "10–12 real customer questions, one short answer each, with FAQPage schema.", service: "Web builder · FAQ page", done: false },
-    { id: "t2", title: "Add LocalBusiness schema to the homepage", group: "week1", check: "LocalBusiness schema on the homepage", tip: "Name, address, opening hours, phone and geo coordinates.", service: "Web builder · schema", done: false },
-    { id: "t3", title: "Allow search crawlers in robots.txt", group: "week1", check: "robots.txt allows search crawlers", tip: "Allow OAI-SearchBot and PerplexityBot so AI answers can cite the site.", service: "Technical fix", done: false },
-    { id: "t4", title: "Link booking from the Instagram bio", group: "week1", check: "Bio links to booking", tip: "One link, tagged so bookings can be traced to Instagram.", service: "Content builder · profile copy", done: false },
-    { id: "t5", title: "Rewrite the About page around the 5W", group: "d30", check: "About page answers who, what and where", tip: "Lead with who it is for and what it does.", service: "Web builder · About", done: false },
-    { id: "t6", title: "Publish four how-to posts from the topic bank", group: "d30", check: "Fresh content in the last 30 days", tip: "One post a week, each answering a question customers ask.", service: "Content builder · blog", done: false },
-    { id: "t7", title: "Show price and availability on product pages", group: "d30", check: "Product pages show a price", tip: "Price in rupiah and an in-stock flag.", service: "Web builder · landing page", done: false },
-    { id: "t8", title: "Collect 20 Google reviews", group: "d90", check: "Review volume vs competitors", tip: "A QR code at the counter and one ask per order.", service: "Manual", done: false },
-    { id: "t9", title: "Call the supplier about the new roast", group: "manual", done: false },
+    { id: "t1", title: "Add a FAQ page (hours, delivery, allergens)", group: "week1", check: "FAQ page exists", tip: "10–12 real customer questions, one short answer each, with FAQPage schema.", service: "Web builder · FAQ page", status: "progress" },
+    { id: "t2", title: "Add LocalBusiness schema to the homepage", group: "week1", check: "LocalBusiness schema on the homepage", tip: "Name, address, opening hours, phone and geo coordinates.", service: "Web builder · schema", status: "progress" },
+    { id: "t3", title: "Allow search crawlers in robots.txt", group: "week1", check: "robots.txt allows search crawlers", tip: "Allow OAI-SearchBot and PerplexityBot so AI answers can cite the site.", service: "Technical fix", status: "done" },
+    { id: "t4", title: "Link booking from the Instagram bio", group: "week1", check: "Bio links to booking", tip: "One link, tagged so bookings can be traced to Instagram.", service: "Content builder · profile copy", status: "progress" },
+    { id: "t5", title: "Rewrite the About page around the 5W", group: "d30", check: "About page answers who, what and where", tip: "Lead with who it is for and what it does.", service: "Web builder · About", status: "approved" },
+    { id: "t6", title: "Publish four how-to posts from the topic bank", group: "d30", check: "Fresh content in the last 30 days", tip: "One post a week, each answering a question customers ask.", service: "Content builder · blog", status: "progress" },
+    { id: "t7", title: "Show price and availability on product pages", group: "d30", check: "Product pages show a price", tip: "Price in rupiah and an in-stock flag.", service: "Web builder · landing page", status: "approved" },
+    { id: "t8", title: "Collect 20 Google reviews", group: "d90", check: "Review volume vs competitors", tip: "A QR code at the counter and one ask per order.", service: "Manual", status: "rejected" },
+    { id: "t9", title: "Call the supplier about the new roast", group: "manual", status: "done" },
   ],
   "batik-laras": [
-    { id: "b1", title: "Add Product schema to the 12 best sellers", group: "week1", check: "Product schema on product pages", tip: "Name, price, availability, image.", service: "Web builder · schema", done: false },
-    { id: "b2", title: "Write the About page with the artisan stories", group: "d30", check: "About page answers who and why", tip: "One short profile per artisan.", service: "Web builder · About", done: false },
+    { id: "b1", title: "Add Product schema to the 12 best sellers", group: "week1", check: "Product schema on product pages", tip: "Name, price, availability, image.", service: "Web builder · schema", status: "progress" },
+    { id: "b2", title: "Write the About page with the artisan stories", group: "d30", check: "About page answers who and why", tip: "One short profile per artisan.", service: "Web builder · About", status: "approved" },
   ],
 };
 
@@ -190,7 +190,7 @@ export function todosFromReport(report: ReportData, mkId: () => string): Todo[] 
     check: i.title,
     tip: i.evidence,
     service: i.priority === 3 ? "Content builder · profile copy" : "Web builder · page or schema",
-    done: false,
+    status: "progress" as const,
   }));
 }
 
