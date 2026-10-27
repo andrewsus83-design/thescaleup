@@ -5,6 +5,7 @@
 // can show key status without ever receiving the secret back.
 
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
+import { encryptValue } from "@/lib/room/crypto";
 import type { OwnKey, ProviderId } from "@/components/room/projects/brand-keys";
 
 export async function loadRoomKeys(): Promise<Partial<Record<ProviderId, OwnKey>>> {
@@ -33,7 +34,7 @@ export async function saveRoomKey(providerId: ProviderId, fullKey: string, meta:
   const now = new Date().toISOString();
   const { error } = await db.from("app_settings").upsert(
     [
-      { key: String(providerId), value: fullKey, updated_at: now },
+      { key: String(providerId), value: encryptValue(fullKey), updated_at: now },
       { key: `room_meta:${providerId}`, value: JSON.stringify(meta), updated_at: now },
     ],
     { onConflict: "key" },

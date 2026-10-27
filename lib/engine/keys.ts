@@ -3,6 +3,7 @@ import {
   createSupabaseAdminClient,
   isSupabaseAdminConfigured,
 } from "@/lib/supabase/admin";
+import { decryptValue } from "@/lib/room/crypto";
 
 export type ApiKeys = {
   claude?: string;
@@ -27,7 +28,7 @@ export async function getApiKeys(): Promise<ApiKeys> {
       const db = createSupabaseAdminClient();
       const { data } = await db.from("app_settings").select("key, value");
       for (const r of data ?? []) {
-        if (r.key && r.value) settings[r.key as string] = r.value as string;
+        if (r.key && r.value) settings[r.key as string] = decryptValue(r.value as string);
       }
     } catch {
       // app_settings table may not exist yet — fall back to env.
