@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { Btn, errorCls, inputCls, labelCls } from "../ui";
 import { isMetered, type OwnKey, type Provider } from "./brand-keys";
 
-export function KeyForm({ provider, intro, current, onSave, onCancel }: { provider: Provider; intro: string; current?: OwnKey; onSave: (k: OwnKey) => void; onCancel: () => void }) {
+export function KeyForm({ provider, intro, current, onSave, onCancel }: { provider: Provider; intro: string; current?: OwnKey; onSave: (k: OwnKey, secret?: string) => void; onCancel: () => void }) {
   const grant = provider.kind === "grant";
   const metered = isMetered(provider);
   const [secret, setSecret] = useState("");
@@ -34,7 +34,7 @@ export function KeyForm({ provider, intro, current, onSave, onCancel }: { provid
     if (metered && (!Number.isFinite(amount) || amount <= 0)) next.cap = "Enter a monthly cap in USD, for example 25.";
     setErrs(next);
     if (Object.keys(next).length) return;
-    onSave({ last4: key.slice(-4), cap: metered ? amount : 0, active: true, ...(provider.login ? { login: login.trim() } : {}) });
+    onSave({ last4: key.slice(-4), cap: metered ? amount : 0, active: true, ...(provider.login ? { login: login.trim() } : {}) }, key);
   };
 
   return (

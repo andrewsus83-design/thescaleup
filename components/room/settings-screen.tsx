@@ -1,15 +1,16 @@
 "use client";
 
 // Setting tab (admin only): what the AI can use, what it can spend, and how the pipeline runs.
-// Prototype: every control is live in the page but nothing is saved, and no key value is ever shown.
+// Workspace API keys are persisted via lib/room/key-actions.ts → app_settings table.
 
 import { useState } from "react";
 import { Check, Lock, Mail, Pin, ShieldCheck, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRoom } from "./room-provider";
-import { Alert, Btn, Card, Chip, EmptyState, PageHeader, Sheet, errorCls, inputCls, labelCls, motion, pageX, pillCls } from "./ui";
+import { Btn, Card, Chip, EmptyState, PageHeader, Sheet, errorCls, inputCls, labelCls, motion, pageX, pillCls } from "./ui";
 import { BILLING_LABEL, GROUPS, PROVIDERS, isMetered, providerOf, type OwnKey, type ProviderId } from "./projects/brand-keys";
 import { KeyForm } from "./projects/key-form";
+import { removeRoomKey, saveRoomKey, updateRoomKeyMeta } from "@/lib/room/key-actions";
 
 type User = { email: string; role: "admin" | "member"; lang: "id" | "en"; status: "active" | "invited" | "disabled" };
 
@@ -27,22 +28,13 @@ function Section({ id, title, hint, children }: { id: string; title: string; hin
 const list = "-mx-2 sm:-mx-4";
 const row = cn("flex min-h-16 flex-wrap items-center gap-x-4 gap-y-2 rounded-field px-4 py-3 hover:bg-paper-100", motion);
 
-export function SettingsScreen() {
+export function SettingsScreen({ initialKeys = {} }: { initialKeys?: Partial<Record<ProviderId, OwnKey>> }) {
   const { state, togglePin, toast } = useRoom();
   const [log, setLog] = useState<string[]>([]);
   const record = (text: string) => setLog((l) => [text, ...l].slice(0, 12));
 
-  // The workspace key per provider (the catalog is shared with Project → Integrations). A provider without an entry has no key yet.
-  const [keys, setKeys] = useState<Partial<Record<ProviderId, OwnKey>>>({
-    claude: { last4: "a91f", cap: 60, active: true },
-    gemini: { last4: "k2Q8", cap: 20, active: true },
-    perplexity: { last4: "7c3d", cap: 15, active: true },
-    dataforseo: { last4: "0b2e", cap: 30, active: false, login: "ops@example.com" },
-    firecrawl: { last4: "5nR2", cap: 20, active: true },
-    pagespeed: { last4: "Gm4x", cap: 0, active: true },
-    zernio: { last4: "Xp91", cap: 0, active: true },
-    resend: { last4: "8hQz", cap: 0, active: true },
-  });
+  // Workspace keys — loaded from app_settings by the server page, persisted via key-actions.
+  const [keys, setKeys] = useState<Partial<Record<ProviderId, OwnKey>>>(initialKeys);
   const [addingKey, setAddingKey] = useState<ProviderId | null>(null);
   const [cost, setCost] = useState({ budget: "3.00", alert: "80", chatCap: "40", markup: "30", hardStop: true });
   const [users, setUsers] = useState<User[]>([
@@ -74,9 +66,6 @@ export function SettingsScreen() {
     <div className={cn("mx-auto max-w-4xl space-y-16 py-10 sm:py-12", pageX)}>
       <div>
         <PageHeader title="Setting" description="Control what the AI can use, what it can spend and how the pipeline runs. Nothing here needs a deploy." />
-        <Alert tone="warn" title="Prototype:" className="-mt-2">
-          these controls respond but nothing is saved. In the product, keys live in Supabase Vault — the table keeps only a reference and the last 4 characters, and the UI never shows or returns a key.
-        </Alert>
       </div>
 
       <Section id="keys" title="API keys" hint="Add a key per provider, test it, set a monthly cap, disable it. These are the workspace keys: a brand without keys of its own uses them. A brand can bring its own under Project → Integrations.">
@@ -112,8 +101,28 @@ export function SettingsScreen() {
                         {k ? (
                           <>
                             <Btn size="xs" variant="secondary" onClick={() => { toast(`${p.name}: test passed (prototype)`); record(`Tested the ${p.name} key`); }}>Test key</Btn>
-                            <Btn size="xs" variant={k.active ? "danger" : "secondary"} onClick={() => { setKeys((ks) => ({ ...ks, [p.id]: { ...k, active: !k.active } })); record(`${k.active ? "Disabled" : "Enabled"} the ${p.name} key`); }}>
+                            <Btn
+                              size="xs"
+                              variant={k.active ? "danger" : "secondary"}
+                              onClick={async () => {
+                                const next = { ...k, active: !k.active };
+                                setKeys((ks) => ({ ...ks, [p.id]: next }));
+                                record(`${k.active ? "Disabled" : "Enabled"} the ${p.name} key`);
+                                await updateRoomKeyMeta(p.id, { active: !k.active });
+                              }}
+                            >
                               {k.active ? "Disable key" : "Enable key"}
+                            </Btn>
+                            <Btn
+                              size="xs"
+                              variant="ghost"
+                              onClick={async () => {
+                                setKeys((ks) => { const next = { ...ks }; delete next[p.id]; return next; });
+                                record(`Removed the ${p.name} key`);
+                                await removeRoomKey(p.id);
+                              }}
+                            >
+                              Remove key
                             </Btn>
                           </>
                         ) : (
@@ -133,12 +142,18 @@ export function SettingsScreen() {
               provider={providerOf(addingKey)}
               intro={`${providerOf(addingKey).name} usage is billed to the workspace account that owns this key. A brand with no key of its own uses it.`}
               onCancel={() => setAddingKey(null)}
-              onSave={(key) => {
-                const name = providerOf(addingKey).name;
-                setKeys((ks) => ({ ...ks, [addingKey]: key }));
+              onSave={async (key, secret) => {
+                const pid = addingKey;
+                const name = providerOf(pid).name;
+                setKeys((ks) => ({ ...ks, [pid]: key }));
                 setAddingKey(null);
                 record(`Added the ${name} key`);
-                toast(`${name} key saved (prototype: nothing was stored)`);
+                if (secret) {
+                  await saveRoomKey(pid, secret, key);
+                  toast(`${name} key saved`);
+                } else {
+                  toast(`${name} access saved`);
+                }
               }}
             />
           )}
