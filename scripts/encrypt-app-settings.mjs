@@ -10,15 +10,6 @@ import { createCipheriv, randomBytes } from "crypto";
 
 const PREFIX = "enc:v1:";
 
-function encryptValue(plaintext, keyBuf) {
-  const iv = randomBytes(12);
-  const { createCipheriv } = await import("crypto");
-  const cipher = createCipheriv("aes-256-gcm", keyBuf, iv);
-  const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return `${PREFIX}${iv.toString("hex")}:${ciphertext.toString("hex")}:${tag.toString("hex")}`;
-}
-
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const encHex = process.env.ROOM_ENCRYPTION_KEY;
