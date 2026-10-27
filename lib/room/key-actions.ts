@@ -28,16 +28,23 @@ export async function loadRoomKeys(): Promise<Partial<Record<ProviderId, OwnKey>
 }
 
 export async function saveRoomKey(providerId: ProviderId, fullKey: string, meta: OwnKey): Promise<void> {
-  if (!isSupabaseAdminConfigured()) return;
+  if (!isSupabaseAdminConfigured()) {
+    console.error("[saveRoomKey] Supabase admin not configured — SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing");
+    return;
+  }
   const db = createSupabaseAdminClient();
   const now = new Date().toISOString();
-  await db.from("app_settings").upsert(
+  const { error } = await db.from("app_settings").upsert(
     [
       { key: String(providerId), value: fullKey, updated_at: now },
       { key: `room_meta:${providerId}`, value: JSON.stringify(meta), updated_at: now },
     ],
     { onConflict: "key" },
   );
+  if (error) {
+    console.error("[saveRoomKey] upsert failed:", error.message, error.details);
+    throw new Error(`Failed to save key for ${providerId}: ${error.message}`);
+  }
 }
 
 export async function updateRoomKeyMeta(providerId: ProviderId, patch: Partial<OwnKey>): Promise<void> {
@@ -46,10 +53,11 @@ export async function updateRoomKeyMeta(providerId: ProviderId, patch: Partial<O
   const metaKey = `room_meta:${providerId}`;
   const { data } = await db.from("app_settings").select("value").eq("key", metaKey).maybeSingle();
   const current: OwnKey = data ? (JSON.parse(data.value ?? "{}") as OwnKey) : { last4: "", cap: 0, active: true };
-  await db.from("app_settings").upsert(
+  const { error } = await db.from("app_settings").upsert(
     { key: metaKey, value: JSON.stringify({ ...current, ...patch }), updated_at: new Date().toISOString() },
     { onConflict: "key" },
   );
+  if (error) console.error("[updateRoomKeyMeta] upsert failed:", error.message);
 }
 
 export async function removeRoomKey(providerId: ProviderId): Promise<void> {
