@@ -34,13 +34,15 @@ export async function saveRoomKey(providerId: ProviderId, fullKey: string, meta:
   }
   const db = createSupabaseAdminClient();
   const now = new Date().toISOString();
-  const { error } = await db.from("app_settings").upsert(
+  console.log("[saveRoomKey] upserting for provider:", String(providerId));
+  const { data, error, status, statusText } = await db.from("app_settings").upsert(
     [
       { key: String(providerId), value: fullKey, updated_at: now },
       { key: `room_meta:${providerId}`, value: JSON.stringify(meta), updated_at: now },
     ],
     { onConflict: "key" },
   );
+  console.log("[saveRoomKey] result:", { status, statusText, data, error: error?.message });
   if (error) {
     console.error("[saveRoomKey] upsert failed:", error.message, error.details);
     throw new Error(`Failed to save key for ${providerId}: ${error.message}`);
