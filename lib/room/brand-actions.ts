@@ -26,7 +26,7 @@ export async function createBrand(project: Project): Promise<string | null> {
         name: project.name,
         ig_handle: project.profile.handles?.[0]?.replace(/^@/, "") ?? null,
         status: project.status === "active" ? "active" : "pending",
-        notes: JSON.stringify({ profile: project.profile, sources: project.sources }),
+        notes: JSON.stringify({ profile: project.profile, sources: project.sources, locked: project.locked, profileVersion: project.profileVersion }),
         updated_at: new Date().toISOString(),
       },
       { onConflict: "slug" },
@@ -64,6 +64,13 @@ export async function loadBrands(): Promise<Project[]> {
     } catch {
       /* ignore parse errors */
     }
+    let locked = false;
+    let profileVersion: number | null = null;
+    try {
+      const parsed2 = JSON.parse(row.notes ?? "{}") as { locked?: boolean; profileVersion?: number };
+      locked = parsed2.locked === true;
+      profileVersion = typeof parsed2.profileVersion === "number" ? parsed2.profileVersion : null;
+    } catch { /* ignore */ }
     return {
       id: row.slug as string,
       dbId: row.id as string,
@@ -72,8 +79,8 @@ export async function loadBrands(): Promise<Project[]> {
       status: (row.status === "active" ? "active" : "draft") as "active" | "draft",
       profile,
       sources,
-      locked: false,
-      profileVersion: null,
+      locked,
+      profileVersion,
       score: null,
       lastActivity: row.updated_at as string,
     } satisfies Project;
