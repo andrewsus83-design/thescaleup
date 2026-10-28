@@ -28,8 +28,10 @@ const TABS: { key: Tab; label: string }[] = [
 export function ProjectDetail({ id, report }: { id: string; report: React.ReactNode }) {
   const { state, href, open, setBrandKey, deleteBrandKey } = useRoom();
   const router = useRouter();
+  const params = useSearchParams();
   const project = state.projects.find((p) => p.id === id && p.status === "active");
-  const [tab, setTab] = useState<Tab>("report");
+  const initialTab = (params.get("tab") as Tab | null);
+  const [tab, setTab] = useState<Tab>(TABS.some((t) => t.key === initialTab) ? (initialTab as Tab) : "report");
   const brandKeys: BrandKeys = (state.brandKeys[id] ?? {}) as BrandKeys;
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ report: null, todo: null, chronicle: null, integrations: null });
 
@@ -112,7 +114,7 @@ export function ProjectDetail({ id, report }: { id: string; report: React.ReactN
       </div>
 
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} tabIndex={0} className="rounded-card">
-        {tab === "report" && <ReportPanel projectId={project.id} report={report} />}
+        {tab === "report" && <ReportPanel report={report} />}
         {tab === "todo" && <TodoBoard project={project} />}
         {tab === "chronicle" && <ChronicleTab project={project} />}
         {tab === "integrations" && (
@@ -129,48 +131,21 @@ export function ProjectDetail({ id, report }: { id: string; report: React.ReactN
 }
 
 // ------------------------------------------------------------------------------------------ Report
-/** The two screens of report.thescaleup.xyz. The screen and the channel are in the URL, so a reload or a shared link lands on the same view. */
-const REPORT_SCREENS = [
-  { key: "performance", label: "Performance" },
-  { key: "analytic", label: "Analytic" },
-] as const;
-
 const REPORT_HOST = process.env.NEXT_PUBLIC_REPORT_URL ?? "https://report.thescaleup.xyz";
 
-function ReportPanel({ projectId, report }: { projectId: string; report: React.ReactNode }) {
-  const { href } = useRoom();
+function ReportPanel({ report }: { report: React.ReactNode }) {
   const params = useSearchParams();
-  const analytic = params.get("view") === "analytic";
-  const base = href(`/projects/${projectId}`);
-  /** Same channels, other screen. */
-  const to = (screen: (typeof REPORT_SCREENS)[number]["key"]) => {
-    const q = new URLSearchParams(params.toString());
-    if (screen === "analytic") q.set("view", "analytic");
-    else q.delete("view");
-    const s = q.toString();
-    return s ? `${base}?${s}` : base;
-  };
-  /** The same screen and channels on the report platform itself, to compare the two side by side. */
+  /** The same channels on the report platform itself, to compare side by side. */
   const original = (() => {
     const q = new URLSearchParams();
     for (const k of ["accounts", "account", "webs"]) if (params.get(k)) q.set(k, params.get(k)!);
     const s = q.toString();
-    return `${REPORT_HOST}/admin${analytic ? "/analytic" : ""}${s ? `?${s}` : ""}`;
+    return `${REPORT_HOST}/admin${s ? `?${s}` : ""}`;
   })();
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-        <nav aria-label="Report screens" className={cn(segWrap, "max-w-full")}>
-          {REPORT_SCREENS.map((s) => {
-            const active = (s.key === "analytic") === analytic;
-            return (
-              <Link key={s.key} href={to(s.key)} scroll={false} aria-current={active ? "page" : undefined} className={cn(segItem(active), "px-4 sm:px-5")}>
-                {s.label}
-              </Link>
-            );
-          })}
-        </nav>
+      <div className="flex justify-end">
         <a href={original} target="_blank" rel="noreferrer" className={btnCls("ghost", "sm")}>
           Open on report.thescaleup.xyz <ExternalLink className="size-4" aria-hidden />
         </a>
