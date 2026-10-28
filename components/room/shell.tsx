@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FileText, FolderKanban, Globe, Hammer, Images, LogOut, MessageSquarePlus, MessagesSquare, Plus, Settings } from "lucide-react";
+import { FileText, FolderKanban, Globe, Hammer, Images, LayoutGrid, LogOut, MessageSquarePlus, MessagesSquare, Plus, Settings } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { RECENT_THREADS } from "@/lib/room/mock";
 import type { Role } from "@/lib/room/types";
@@ -19,12 +19,15 @@ export const NAV = [
   { key: "projects", label: "Project", path: "/projects", icon: FolderKanban },
   { key: "builder", label: "Builder", path: "/builder", icon: Hammer },
   { key: "assets", label: "Assets", path: "/assets", icon: Images },
-  { key: "settings", label: "Setting", path: "/settings", icon: Settings, adminOnly: true },
 ] as const;
 
 const BUILDER_SUB = [
   { key: "web", label: "Web Builder", path: "/builder/web", icon: Globe },
   { key: "content", label: "Content Builder", path: "/builder/content", icon: FileText },
+] as const;
+
+const PROJECT_SUB_STATIC = [
+  { key: "setting", label: "Setting", path: "/settings", icon: Settings },
 ] as const;
 
 export function RoomShell({
@@ -103,8 +106,16 @@ function Frame({ email, role, children }: { email: string; role: string; childre
             const Icon = n.icon;
             const active = isActive(n.path);
             const isBuilder = n.key === "builder";
+            const isProjects = n.key === "projects";
             // Nav items are visually muted when no project is selected
             const muted = !activeProject;
+            // Project sub-menu: Integrations links to project detail, Setting links to /settings
+            const projectSub = activeProject
+              ? [
+                  { key: "integrations", label: "Integrations", path: href(`/projects/${activeProject.id}?tab=integrations`), icon: LayoutGrid },
+                  ...PROJECT_SUB_STATIC.map((s) => ({ ...s, path: href(s.path) })),
+                ]
+              : [];
             return (
               <div key={n.key}>
                 <Link
@@ -125,6 +136,32 @@ function Frame({ email, role, children }: { email: string; role: string; childre
                         <li key={sub.key}>
                           <Link
                             href={href(sub.path)}
+                            aria-current={subActive ? "page" : undefined}
+                            className={cn(
+                              "flex h-9 w-full items-center gap-2.5 rounded-nav pl-10 pr-3 text-[14px] font-medium",
+                              motion,
+                              subActive ? "bg-paper-100 text-ink-800" : "text-ink-500 hover:bg-paper-100 hover:text-ink-700",
+                            )}
+                          >
+                            <sub.icon className={cn("size-4 shrink-0", subActive && "text-brand-700")} aria-hidden />
+                            {sub.label}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {isProjects && active && activeProject && (
+                  <ul className="mt-0.5 hidden flex-col gap-0.5 lg:flex" aria-label="Project options">
+                    {projectSub.map((sub) => {
+                      const subActive =
+                        sub.key === "setting"
+                          ? isActive("/settings")
+                          : pathname.startsWith(`${basePath}/projects/${activeProject.id}`) && new URLSearchParams(pathname.split("?")[1] ?? "").get("tab") === "integrations";
+                      return (
+                        <li key={sub.key}>
+                          <Link
+                            href={sub.path}
                             aria-current={subActive ? "page" : undefined}
                             className={cn(
                               "flex h-9 w-full items-center gap-2.5 rounded-nav pl-10 pr-3 text-[14px] font-medium",

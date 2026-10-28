@@ -5,7 +5,6 @@ import { loadReportView, type ReportSearch } from "@/lib/report/view";
 import { cn } from "@/lib/utils";
 import { PerformanceView } from "@/components/report/performance-view";
 import { ReportActions } from "@/components/report/report-actions";
-import { AdminBottomNav } from "@/components/report/admin-bottom-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +32,6 @@ export default async function ReportAdminDashboard({ searchParams }: { searchPar
 
       <PerformanceView view={view} basePath="/report/admin" />
 
-      <AdminBottomNav accountIds={view.accountIds} webIds={view.webIds} active="report" />
     </div>
   );
 }
