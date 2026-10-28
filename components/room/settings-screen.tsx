@@ -10,7 +10,7 @@ import { useRoom } from "./room-provider";
 import { Btn, Card, Chip, EmptyState, PageHeader, Sheet, errorCls, inputCls, labelCls, motion, pageX, pillCls } from "./ui";
 import { BILLING_LABEL, GROUPS, PROVIDERS, isMetered, providerOf, type OwnKey, type ProviderId } from "./projects/brand-keys";
 import { KeyForm } from "./projects/key-form";
-import { removeRoomKey, saveRoomKey, updateRoomKeyMeta } from "@/lib/room/key-actions";
+import { removeRoomKey, saveRoomKey, updateRoomKeyMeta, saveWorkspaceCostProfile, type CostProfile } from "@/lib/room/key-actions";
 
 type User = { email: string; role: "admin" | "member"; lang: "id" | "en"; status: "active" | "invited" | "disabled" };
 
@@ -28,7 +28,7 @@ function Section({ id, title, hint, children }: { id: string; title: string; hin
 const list = "-mx-2 sm:-mx-4";
 const row = cn("flex min-h-16 flex-wrap items-center gap-x-4 gap-y-2 rounded-field px-4 py-3 hover:bg-paper-100", motion);
 
-export function SettingsScreen({ initialKeys = {} }: { initialKeys?: Partial<Record<ProviderId, OwnKey>> }) {
+export function SettingsScreen({ initialKeys = {}, initialCost }: { initialKeys?: Partial<Record<ProviderId, OwnKey>>; initialCost?: CostProfile }) {
   const { state, togglePin, toast } = useRoom();
   const [log, setLog] = useState<string[]>([]);
   const record = (text: string) => setLog((l) => [text, ...l].slice(0, 12));
@@ -36,7 +36,7 @@ export function SettingsScreen({ initialKeys = {} }: { initialKeys?: Partial<Rec
   // Workspace keys — loaded from app_settings by the server page, persisted via key-actions.
   const [keys, setKeys] = useState<Partial<Record<ProviderId, OwnKey>>>(initialKeys);
   const [addingKey, setAddingKey] = useState<ProviderId | null>(null);
-  const [cost, setCost] = useState({ budget: "3.00", alert: "80", chatCap: "40", markup: "30", hardStop: true });
+  const [cost, setCost] = useState<CostProfile>(initialCost ?? { budget: "3.00", alert: "80", chatCap: "40", markup: "30", hardStop: true });
   const [users, setUsers] = useState<User[]>([
     { email: "dewi@example.com", role: "admin", lang: "id", status: "active" },
     { email: "andre@example.com", role: "member", lang: "id", status: "active" },
@@ -162,10 +162,15 @@ export function SettingsScreen({ initialKeys = {} }: { initialKeys?: Partial<Rec
 
       <Section id="cost" title="Cost" hint="A batch copies its cost profile when it starts, so editing never changes a run in progress.">
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            record(`Saved the cost profile: $${cost.budget} run budget, alert at ${cost.alert}%`);
-            toast("Cost profile saved (prototype)");
+            try {
+              await saveWorkspaceCostProfile(cost);
+              record(`Saved the cost profile: $${cost.budget} run budget, alert at ${cost.alert}%`);
+              toast("Cost profile saved");
+            } catch {
+              toast("Failed to save cost profile");
+            }
           }}
           className="grid gap-6 sm:grid-cols-2"
         >

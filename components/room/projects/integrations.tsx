@@ -10,13 +10,13 @@
 // Keys are stored encrypted (AES-256-GCM) in report_client_settings. Only the last 4 characters are shown in the UI;
 // the full key is never returned to the client. Members cannot see keys or change them. Spend figures are sample data.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { KeyRound } from "lucide-react";
 import type { Project } from "@/lib/room/types";
-import { saveBrandKey, updateBrandKeyMeta, removeBrandKey } from "@/lib/room/brand-actions";
+import { saveBrandKey, updateBrandKeyMeta, removeBrandKey, loadBrandSpend } from "@/lib/room/brand-actions";
 import { useRoom } from "../room-provider";
 import { Alert, Bar, Btn, BudgetPanel, Card, Chip, Sheet } from "../ui";
-import { BILLING_LABEL, GROUPS, PROVIDERS, WORKSPACE_CAP, costSplit, isMetered, providerOf, spendOf, usd, type BrandKeys, type OwnKey, type Provider, type ProviderId } from "./brand-keys";
+import { BILLING_LABEL, GROUPS, PROVIDERS, WORKSPACE_CAP, isMetered, providerOf, usd, type BrandKeys, type OwnKey, type Provider, type ProviderId } from "./brand-keys";
 import { KeyForm } from "./key-form";
 
 const meterTone = (pct: number) => (pct >= 95 ? "bad" : pct >= 80 ? "warn" : "brand");
@@ -38,6 +38,13 @@ export function IntegrationsTab({
   const isAdmin = api.state.role === "admin";
   const [editing, setEditing] = useState<ProviderId | null>(null);
   const [removing, setRemoving] = useState<ProviderId | null>(null);
+  // Real spend from DB — falls back to zero while loading or if DB is not configured.
+  const [spend, setSpend] = useState<Partial<Record<string, number>>>({});
+  useEffect(() => {
+    if (project.dbId) {
+      loadBrandSpend(project.dbId).then(setSpend).catch(() => {/* ignore */});
+    }
+  }, [project.dbId]);
 
   /** Every key change lands in the brand's chronicle (without the key) and shows a toast. */
   const log = (text: string, toast = text) => {
@@ -45,7 +52,11 @@ export function IntegrationsTab({
     api.toast(toast);
   };
 
-  const { own, workspace } = costSplit(project.id, keys);
+  const spendOf = (pid: string) => spend[pid] ?? 0;
+  const totalOwn = PROVIDERS.filter((p) => keys[p.id]?.active).reduce((s, p) => s + spendOf(p.id), 0);
+  const totalWs = PROVIDERS.reduce((s, p) => s + spendOf(p.id), 0) - totalOwn;
+  const own = totalOwn;
+  const workspace = totalWs;
   const wsPct = (workspace / WORKSPACE_CAP) * 100;
   const onOwn = PROVIDERS.filter((p) => keys[p.id]?.active).length;
   const edit = editing ? providerOf(editing) : null;
@@ -100,6 +111,7 @@ export function IntegrationsTab({
                   project={project}
                   provider={p}
                   own={keys[p.id]}
+                  spend={spendOf(p.id)}
                   isAdmin={isAdmin}
                   onAdd={() => setEditing(p.id)}
                   onTest={() => api.toast(`${p.name}: test passed (prototype)`)}
@@ -177,6 +189,7 @@ function ProviderCard({
   project,
   provider: p,
   own: k,
+  spend,
   isAdmin,
   onAdd,
   onTest,
@@ -186,6 +199,7 @@ function ProviderCard({
   project: Project;
   provider: Provider;
   own?: OwnKey;
+  spend: number;
   isAdmin: boolean;
   onAdd: () => void;
   onTest: () => void;
@@ -194,7 +208,6 @@ function ProviderCard({
 }) {
   const grant = p.kind === "grant";
   const metered = isMetered(p);
-  const spend = spendOf(project.id, p.id);
 
   const status = !k
     ? { tone: "neutral" as const, text: grant ? "Not granted" : "Workspace key" }

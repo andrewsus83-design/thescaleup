@@ -168,6 +168,61 @@ export async function removeBrandKey(dbId: string, providerId: ProviderId): Prom
     .in("key", [String(providerId), `meta:${providerId}`]);
 }
 
+// ── Usage / cost tracking ─────────────────────────────────────────────────────
+
+/** Current 'YYYY-MM' string for the month key. */
+function thisMonth(): string {
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Load this month's cost per provider for a brand. Returns a map of providerId → cost_usd (0 if no row). */
+export async function loadBrandSpend(dbId: string): Promise<Partial<Record<string, number>>> {
+  if (!isSupabaseAdminConfigured()) return {};
+  const { data } = await db()
+    .from("brand_usage")
+    .select("provider_id, cost_usd")
+    .eq("client_id", dbId)
+    .eq("month", thisMonth());
+  const result: Partial<Record<string, number>> = {};
+  for (const row of data ?? []) {
+    result[row.provider_id as string] = Number(row.cost_usd ?? 0);
+  }
+  return result;
+}
+
+/** Increment usage for one provider this month (upsert). Call from server-side API routes after each AI/tool call. */
+export async function logBrandUsage(
+  dbId: string,
+  providerId: string,
+  costUsd: number,
+  calls = 1,
+  tokensIn = 0,
+  tokensOut = 0,
+): Promise<void> {
+  if (!isSupabaseAdminConfigured()) return;
+  const month = thisMonth();
+  // Try insert first, then increment on conflict
+  const { error } = await db().rpc("upsert_brand_usage" as never, {
+    p_client_id: dbId,
+    p_provider_id: providerId,
+    p_month: month,
+    p_cost_usd: costUsd,
+    p_calls: calls,
+    p_tokens_in: tokensIn,
+    p_tokens_out: tokensOut,
+  });
+  if (error) {
+    // Fallback: plain upsert (less accurate under concurrency but good enough for prototypes)
+    await db()
+      .from("brand_usage")
+      .upsert(
+        { client_id: dbId, provider_id: providerId, month, cost_usd: costUsd, calls, tokens_in: tokensIn, tokens_out: tokensOut, updated_at: new Date().toISOString() },
+        { onConflict: "client_id,provider_id,month" },
+      );
+  }
+}
+
 /** Read all decrypted API keys for a brand (used by the audit engine). */
 export async function getBrandApiKeys(dbId: string): Promise<Partial<Record<string, string>>> {
   if (!isSupabaseAdminConfigured()) return {};
