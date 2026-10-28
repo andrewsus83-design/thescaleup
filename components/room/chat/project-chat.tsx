@@ -73,7 +73,7 @@ export function ProjectChat({ project }: { project: Project }) {
     if (choice === "dismiss") return settle("dismissed");
     switch (a.type) {
       case "audit":
-        api.startAudit(project.id);
+        api.startAudit(project.id, a.budget);
         settle("done");
         api.toast("Audit started");
         break;

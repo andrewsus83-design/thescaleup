@@ -21,10 +21,11 @@ export async function callLLM(
   keys: ApiKeys,
   system: string,
   user: string,
+  modelOverride?: string,
 ): Promise<LlmResult> {
   // 1. Claude (preferred)
   if (keys.claude) {
-    const model = claudeModel();
+    const model = modelOverride ?? claudeModel();
     const client = new Anthropic({ apiKey: keys.claude });
     const resp = await client.messages.create({
       model,

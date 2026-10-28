@@ -4,6 +4,23 @@ import { fetchSiteText, type SiteData } from "./fetch-site";
 import { perplexityGeoCheck } from "./geo";
 import { callLLM } from "./llm";
 
+export type AuditTier = "lite" | "standard" | "deep" | "max";
+
+export function budgetToTier(budget?: number): AuditTier {
+  if (!budget || budget <= 1) return "lite";
+  if (budget <= 3) return "standard";
+  if (budget <= 5) return "deep";
+  return "max";
+}
+
+/** Model IDs per tier (Claude family). */
+const TIER_MODEL: Record<AuditTier, string> = {
+  lite:     "claude-haiku-5-5",
+  standard: "claude-sonnet-5-5",
+  deep:     "claude-opus-5-5",
+  max:      "claude-opus-5-5",
+};
+
 export type AuditResult = {
   ok: boolean;
   error?: string;
@@ -77,6 +94,17 @@ ScaleUp menjual 7 "builder" (produk/jasa) ke klien. Di "recommended_builders", p
 - crm: CRM Builder — database pelanggan/leads, pipeline follow-up, retensi/repeat order.
 - tasks: Task Management — board tugas tim, SOP, tracking progress.`;
 
+/** Max tier: same schema, richer instruction — go deeper, more specific evidence, longer output. */
+const SYSTEM_PROMPT_MAX = SYSTEM_PROMPT + `
+
+INSTRUKSI TAMBAHAN (TIER MAX):
+- Ini adalah analisis MENDALAM. Setiap temuan harus disertai BUKTI spesifik dari data yang diberikan (kutip teks nyata dari website/kompetitor/GEO).
+- whats_missing dan opportunities: minimal 6 item, sangat konkret, disertai estimasi dampak omzet per item.
+- executive.cmo/cbo/cto/creative: masing-masing minimal 3 action items yang sangat spesifik dan actionable dalam 30 hari.
+- roadmap: minimal 4 item per fase, dengan metrik sukses per item.
+- Berikan analisis kompetitif yang tajam: di mana kompetitor unggul, celah mana yang bisa direbut brand ini, dan KENAPA.
+- Output lebih panjang, lebih detail, tanpa mengorbankan kualitas JSON.`;
+
 function siteBlock(label: string, s: SiteData | null): string {
   if (!s) return `${label}: (tidak diberikan)`;
   if (!s.ok) return `${label}: (gagal diambil — ${s.error})`;
@@ -132,26 +160,26 @@ function extractJson(text: string): Record<string, unknown> | null {
   }
 }
 
-/** Run the real audit for a brand. Pass `brandDbId` (UUID from report_clients) to use the brand's own API keys with workspace as fallback. */
-export async function runAudit(m: Record<string, unknown>, brandDbId?: string): Promise<AuditResult> {
+/** Run the real audit for a brand. Pass `brandDbId` to use the brand's own API keys. `tier` controls depth and model. */
+export async function runAudit(m: Record<string, unknown>, brandDbId?: string, tier: AuditTier = "standard"): Promise<AuditResult> {
   const keys = await getApiKeys(brandDbId);
   if (!keys.claude && !keys.openai && !keys.gemini) {
     return { ok: false, error: "NO_LLM_KEY" };
   }
 
-  const business =
-    (m.business as string) || (m.name as string) || "Bisnis";
+  const business = (m.business as string) || (m.name as string) || "Bisnis";
+  const isLite = tier === "lite";
 
-  // 1. Gather real data (website + competitors) in parallel.
+  // 1. Gather data — lite skips competitors.
   const [site, comp1, comp2] = await Promise.all([
     m.website ? fetchSiteText(m.website as string) : Promise.resolve(null),
-    m.competitor1 ? fetchSiteText(m.competitor1 as string) : Promise.resolve(null),
-    m.competitor2 ? fetchSiteText(m.competitor2 as string) : Promise.resolve(null),
+    (!isLite && m.competitor1) ? fetchSiteText(m.competitor1 as string) : Promise.resolve(null),
+    (!isLite && m.competitor2) ? fetchSiteText(m.competitor2 as string) : Promise.resolve(null),
   ]);
 
-  // 2. Optional GEO check.
+  // 2. GEO check — lite skips it.
   let geo: string | null = null;
-  if (keys.perplexity) {
+  if (!isLite && keys.perplexity) {
     geo = await perplexityGeoCheck(
       keys.perplexity,
       business,
@@ -159,12 +187,13 @@ export async function runAudit(m: Record<string, unknown>, brandDbId?: string): 
     );
   }
 
-  // 3. LLM analysis.
-  const system = SYSTEM_PROMPT;
+  // 3. LLM analysis — model selected by tier.
+  const modelOverride = TIER_MODEL[tier];
+  const system = tier === "max" ? SYSTEM_PROMPT_MAX : SYSTEM_PROMPT;
   const user = buildUserPrompt(m, business, site, comp1, comp2, geo);
   let llm;
   try {
-    llm = await callLLM(keys, system, user);
+    llm = await callLLM(keys, system, user, modelOverride);
   } catch (e) {
     const err = e as { message?: string };
     if (err?.message === "NO_LLM_KEY") return { ok: false, error: "NO_LLM_KEY" };

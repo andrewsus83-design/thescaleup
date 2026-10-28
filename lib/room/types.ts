@@ -75,7 +75,7 @@ export type UsedChip = { kind: "profile" | "report" | "todo" | "chronicle" | "kn
 export type CardState = "pending" | "done" | "dismissed";
 /** Chat text never changes state: every change goes through one of these explicit action cards. */
 export type MessageAction =
-  | { type: "audit"; state: CardState }
+  | { type: "audit"; state: CardState; budget?: number }
   | { type: "todo"; title: string; state: CardState }
   | { type: "note"; text: string; state: CardState }
   | { type: "build"; options: { todoId: string; title: string }[]; state: CardState }
