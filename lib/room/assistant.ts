@@ -7,7 +7,7 @@
 import { REPORTS } from "./mock";
 import { FIVE_W, tr } from "./intake";
 import { isOpen } from "./todos";
-import type { Lang, MessageAction, Project, Role, Todo, UsedChip } from "./types";
+import type { Lang, MessageAction, Project, ReportData, Role, Todo, UsedChip } from "./types";
 
 export type Intent = "ask_report" | "change_todo" | "start_build" | "note_decision" | "command" | "off_topic" | "intake" | "unknown";
 
@@ -17,6 +17,8 @@ export type RouteInput = {
   project: Project;
   todos: Todo[];
   role: Role;
+  /** The brand's current report from state — used first, falls back to mock data. */
+  report?: ReportData;
 };
 export type RouteResult = { intent: Intent; text: string; used: UsedChip[]; action?: MessageAction };
 
@@ -35,7 +37,7 @@ const NOTE_Q = /\b(decide|decision|keputusan|catat|note)\b/i;
 
 const profileChip = (p: Project): UsedChip => ({ kind: "profile", label: p.locked ? `Profile v${p.profileVersion ?? 1}` : "Profile (draft)" });
 
-export function routeMessage({ text, lang, project, todos, role }: RouteInput): RouteResult {
+export function routeMessage({ text, lang, project, todos, role, report: stateReport }: RouteInput): RouteResult {
   const t = text.trim();
   const open = todos.filter(isOpen);
   const todoChip: UsedChip = { kind: "todo", label: `To do ${open.length}` };
@@ -91,15 +93,24 @@ export function routeMessage({ text, lang, project, todos, role }: RouteInput): 
     };
   }
 
-  const report = REPORTS[project.id];
+  const report = stateReport ?? REPORTS[project.id];
 
   // ---- grounded answers
-  if (REPORT_Q.test(t) && report) {
-    const top = report.insights.slice(0, 3).map((i, n) => `${n + 1}. ${i.title}`).join("\n");
+  if (REPORT_Q.test(t)) {
+    if (report) {
+      const top = report.insights.slice(0, 3).map((i, n) => `${n + 1}. ${i.title}`).join("\n");
+      return {
+        intent: "ask_report",
+        text: tr(lang, `From audit #${report.audit} (score ${report.score}), the top gaps are:\n${top}\nOnly the report and profile were used — I did not check the live site.`, `Dari audit #${report.audit} (skor ${report.score}), celah terbesarnya:\n${top}\nHanya laporan dan profil yang dipakai — saya tidak memeriksa situs langsung.`),
+        used: [{ kind: "report", label: `Report · audit #${report.audit}` }, profileChip(project)],
+      };
+    }
+    // no report yet — offer to run the first audit
     return {
-      intent: "ask_report",
-      text: tr(lang, `From audit #${report.audit} (score ${report.score}), the top gaps are:\n${top}\nOnly the report and profile were used — I did not check the live site.`, `Dari audit #${report.audit} (skor ${report.score}), celah terbesarnya:\n${top}\nHanya laporan dan profil yang dipakai — saya tidak memeriksa situs langsung.`),
-      used: [{ kind: "report", label: `Report · audit #${report.audit}` }, profileChip(project)],
+      intent: "command",
+      text: tr(lang, "No audit yet for this brand. Run one now to get a full analysis, score, and to do list?", "Belum ada audit untuk brand ini. Jalankan sekarang untuk analisis lengkap, skor, dan daftar to do?"),
+      used: [profileChip(project)],
+      action: { type: "audit", state: "pending" },
     };
   }
   if (TODO_Q.test(t)) {
