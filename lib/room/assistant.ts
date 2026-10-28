@@ -37,24 +37,49 @@ const NOTE_Q = /\b(decide|decision|keputusan|catat|note)\b/i;
 
 const profileChip = (p: Project): UsedChip => ({ kind: "profile", label: p.locked ? `Profile v${p.profileVersion ?? 1}` : "Profile (draft)" });
 
-function auditPreview(lang: Lang, project: Project): string {
+export type AuditBudget = 1 | 3 | 5 | 10;
+export const AUDIT_TIERS: Record<AuditBudget, { label: string; labelId: string; model: string; desc: string; descId: string }> = {
+  1:  { label: "Lite",     labelId: "Lite",     model: "Haiku",  desc: "website only, fast ~15s",            descId: "website saja, cepat ~15 dtk" },
+  3:  { label: "Standard", labelId: "Standar",  model: "Sonnet", desc: "website + 2 competitors + GEO ~45s", descId: "website + 2 kompetitor + GEO ~45 dtk" },
+  5:  { label: "Deep",     labelId: "Dalam",    model: "Opus",   desc: "full data + richer analysis ~60s",   descId: "data lengkap + analisis lebih detail ~60 dtk" },
+  10: { label: "Max",      labelId: "Maks",     model: "Opus",   desc: "two-pass director → builder ~90s",   descId: "dua langkah director → builder ~90 dtk" },
+};
+
+function parseBudget(arg: string): AuditBudget {
+  const n = parseInt(arg, 10);
+  if (n === 1) return 1;
+  if (n === 5) return 5;
+  if (n === 10) return 10;
+  return 3;
+}
+
+function auditPreview(lang: Lang, project: Project, budget: AuditBudget = 3): string {
   const p = project.profile;
+  const tier = AUDIT_TIERS[budget];
   const lines: string[] = [];
   if (p.brand && p.brand !== project.name) lines.push(`Brand: ${p.brand}`);
-  if (p.website) lines.push(`Website: ${p.website}`);
+  if (p.website) lines.push(tr(lang, `Website: ${p.website}`, `Website: ${p.website}`));
   if (p.handles?.length) lines.push(`Social: ${p.handles.join(", ")}`);
-  if (p.what) lines.push(`Kategori: ${p.what}`);
-  if (p.who) lines.push(`Target: ${p.who}`);
-  if (p.where) lines.push(`Lokasi: ${p.where}`);
-  if (p.why) lines.push(`Diferensiasi: ${p.why}`);
-  if (p.when) lines.push(`Operasional: ${p.when}`);
-  const summary = lines.length
-    ? `\n${lines.map((l) => `• ${l}`).join("\n")}\n`
-    : "\n(Profil sudah terkunci — data 5W akan dipakai.)\n";
+  if (p.what) lines.push(tr(lang, `Category: ${p.what}`, `Kategori: ${p.what}`));
+  if (p.who) lines.push(tr(lang, `Target: ${p.who}`, `Target: ${p.who}`));
+  if (p.where) lines.push(tr(lang, `Location: ${p.where}`, `Lokasi: ${p.where}`));
+  if (p.why) lines.push(tr(lang, `USP: ${p.why}`, `Diferensiasi: ${p.why}`));
+  if (p.when) lines.push(tr(lang, `Hours: ${p.when}`, `Operasional: ${p.when}`));
+  const dataLines = lines.length ? lines.map((l) => `• ${l}`).join("\n") : tr(lang, "(Profile locked — 5W data will be used.)", "(Profil terkunci — data 5W akan dipakai.)");
+  const tierLine = tr(
+    lang,
+    `Budget: **$${budget} ${tier.label}** — ${tier.model}, ${tier.desc}`,
+    `Budget: **$${budget} ${tier.labelId}** — ${tier.model}, ${tier.descId}`,
+  );
+  const hint = tr(
+    lang,
+    `Change: /audit 1 (lite) · /audit 3 (standard) · /audit 5 (deep) · /audit 10 (max)`,
+    `Ganti: /audit 1 (lite) · /audit 3 (standar) · /audit 5 (dalam) · /audit 10 (maks)`,
+  );
   return tr(
     lang,
-    `Run a new audit for **${project.name}**?\n${lines.map((l) => `• ${l.replace("Kategori:", "Category:").replace("Target:", "Target:").replace("Lokasi:", "Location:").replace("Diferensiasi:", "USP:").replace("Operasional:", "Hours:")}`).join("\n") || "(Profile locked — 5W data will be used.)"}\n\nEstimated cost: up to $3.00. Nothing runs until you confirm.`,
-    `Jalankan audit baru untuk **${project.name}**?${summary}\nEstimasi biaya: maks $3,00. Tidak ada yang berjalan sampai Anda konfirmasi.`,
+    `Run a new audit for **${project.name}**?\n${dataLines}\n\n${tierLine}\n${hint}\n\nNothing runs until you confirm.`,
+    `Jalankan audit baru untuk **${project.name}**?\n${dataLines}\n\n${tierLine}\n${hint}\n\nTidak ada yang berjalan sampai Anda konfirmasi.`,
   );
 }
 
@@ -74,7 +99,8 @@ export function routeMessage({ text, lang, project, todos, role, report: stateRe
         return { intent: "command", text: tr(lang, "Lock the profile as v1? Locking needs the positioning line approved first. Nothing changes until you confirm.", "Kunci profil sebagai v1? Penguncian butuh kalimat positioning yang disetujui. Tidak ada yang berubah sampai Anda konfirmasi."), used: [profileChip(project)], action: { type: "lock", state: "pending" } };
       case "/audit": {
         if (!project.locked) return { intent: "command", text: tr(lang, "An audit needs a locked profile. Lock it first with /lock (admin).", "Audit butuh profil yang terkunci. Kunci dulu dengan /lock (admin)."), used: [profileChip(project)] };
-        return { intent: "command", text: auditPreview(lang, project), used: [profileChip(project)], action: { type: "audit", state: "pending" } };
+        const budget = parseBudget(arg);
+        return { intent: "command", text: auditPreview(lang, project, budget), used: [profileChip(project)], action: { type: "audit", state: "pending", budget } };
       }
       case "/todo":
         if (!arg) return { intent: "command", text: tr(lang, "Write the to do after the command, e.g. /todo Update the opening hours.", "Tulis tugasnya setelah perintah, mis. /todo Perbarui jam buka."), used: [] };
@@ -130,9 +156,9 @@ export function routeMessage({ text, lang, project, todos, role, report: stateRe
     // no report yet — offer to run the first audit with profile preview
     return {
       intent: "command",
-      text: auditPreview(lang, project),
+      text: auditPreview(lang, project, 3),
       used: [profileChip(project)],
-      action: { type: "audit", state: "pending" },
+      action: { type: "audit", state: "pending", budget: 3 },
     };
   }
   if (TODO_Q.test(t)) {

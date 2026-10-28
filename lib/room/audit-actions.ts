@@ -1,5 +1,5 @@
 "use server";
-import { runAudit } from "@/lib/engine/audit";
+import { runAudit, type AuditTier, budgetToTier } from "@/lib/engine/audit";
 import type { Profile } from "./types";
 
 export type RoomAuditPayload = {
@@ -18,7 +18,9 @@ export async function runRoomAudit(
   brandDbId: string | undefined,
   projectName: string,
   profile: Profile,
+  budget?: number,
 ): Promise<RoomAuditResult> {
+  const tier = budgetToTier(budget);
   const business = profile.brand ?? projectName;
   const m: Record<string, unknown> = {
     business,
@@ -33,7 +35,7 @@ export async function runRoomAudit(
     competitor2: undefined,
   };
 
-  const result = await runAudit(m, brandDbId);
+  const result = await runAudit(m, brandDbId, tier);
 
   if (!result.ok) {
     return { ok: false, error: result.error ?? "Audit failed" };

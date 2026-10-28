@@ -265,7 +265,7 @@ export type RoomApi = {
   addMessage: (id: string, m: Omit<Message, "id"> & { id?: string }) => string;
   patchMessage: (id: string, msgId: string, patch: Partial<Message>) => void;
   approveReport: (id: string) => void;
-  startAudit: (id: string) => void;
+  startAudit: (id: string, budget?: number) => void;
   startBuild: (id: string, todo: Todo) => void;
   advanceBuild: (id: string, buildId: string) => void;
 };
@@ -419,12 +419,12 @@ export function RoomProvider({
       },
       patchMessage: (id, msgId, patch) => dispatch({ t: "msgPatch", id, msgId, patch }),
       approveReport: (id) => dispatch({ t: "approve", id, cid: uid() }),
-      startAudit: (id) => {
+      startAudit: (id, budget) => {
         if (ref.current.audit) return;
         dispatch({ t: "audit", audit: { projectId: id, pct: 0 } });
         const project = ref.current.projects.find((p) => p.id === id);
         if (!project) return;
-        runRoomAudit(project.dbId, project.name, project.profile)
+        runRoomAudit(project.dbId, project.name, project.profile, budget)
           .then((result) => finishAuditReal(id, result))
           .catch(() => {
             dispatch({ t: "audit", audit: null });
