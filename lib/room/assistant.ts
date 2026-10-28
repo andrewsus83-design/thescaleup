@@ -37,6 +37,27 @@ const NOTE_Q = /\b(decide|decision|keputusan|catat|note)\b/i;
 
 const profileChip = (p: Project): UsedChip => ({ kind: "profile", label: p.locked ? `Profile v${p.profileVersion ?? 1}` : "Profile (draft)" });
 
+function auditPreview(lang: Lang, project: Project): string {
+  const p = project.profile;
+  const lines: string[] = [];
+  if (p.brand && p.brand !== project.name) lines.push(`Brand: ${p.brand}`);
+  if (p.website) lines.push(`Website: ${p.website}`);
+  if (p.handles?.length) lines.push(`Social: ${p.handles.join(", ")}`);
+  if (p.what) lines.push(`Kategori: ${p.what}`);
+  if (p.who) lines.push(`Target: ${p.who}`);
+  if (p.where) lines.push(`Lokasi: ${p.where}`);
+  if (p.why) lines.push(`Diferensiasi: ${p.why}`);
+  if (p.when) lines.push(`Operasional: ${p.when}`);
+  const summary = lines.length
+    ? `\n${lines.map((l) => `• ${l}`).join("\n")}\n`
+    : "\n(Profil sudah terkunci — data 5W akan dipakai.)\n";
+  return tr(
+    lang,
+    `Run a new audit for **${project.name}**?\n${lines.map((l) => `• ${l.replace("Kategori:", "Category:").replace("Target:", "Target:").replace("Lokasi:", "Location:").replace("Diferensiasi:", "USP:").replace("Operasional:", "Hours:")}`).join("\n") || "(Profile locked — 5W data will be used.)"}\n\nEstimated cost: up to $3.00. Nothing runs until you confirm.`,
+    `Jalankan audit baru untuk **${project.name}**?${summary}\nEstimasi biaya: maks $3,00. Tidak ada yang berjalan sampai Anda konfirmasi.`,
+  );
+}
+
 export function routeMessage({ text, lang, project, todos, role, report: stateReport }: RouteInput): RouteResult {
   const t = text.trim();
   const open = todos.filter(isOpen);
@@ -51,9 +72,10 @@ export function routeMessage({ text, lang, project, todos, role, report: stateRe
         if (project.locked) return { intent: "command", text: tr(lang, `The profile is already locked (v${project.profileVersion}).`, `Profil sudah terkunci (v${project.profileVersion}).`), used: [profileChip(project)] };
         if (role !== "admin") return { intent: "command", text: tr(lang, "Only an admin can lock the profile — it needs the positioning line approved.", "Hanya admin yang bisa mengunci profil — kalimat positioning harus disetujui dulu."), used: [profileChip(project)] };
         return { intent: "command", text: tr(lang, "Lock the profile as v1? Locking needs the positioning line approved first. Nothing changes until you confirm.", "Kunci profil sebagai v1? Penguncian butuh kalimat positioning yang disetujui. Tidak ada yang berubah sampai Anda konfirmasi."), used: [profileChip(project)], action: { type: "lock", state: "pending" } };
-      case "/audit":
+      case "/audit": {
         if (!project.locked) return { intent: "command", text: tr(lang, "An audit needs a locked profile. Lock it first with /lock (admin).", "Audit butuh profil yang terkunci. Kunci dulu dengan /lock (admin)."), used: [profileChip(project)] };
-        return { intent: "command", text: tr(lang, "Run a new audit for this brand? It will use up to $3.00 (the default run budget). Nothing runs until you confirm.", "Jalankan audit baru untuk brand ini? Biayanya maksimal $3,00 (budget standar). Tidak ada yang berjalan sampai Anda konfirmasi."), used: [profileChip(project)], action: { type: "audit", state: "pending" } };
+        return { intent: "command", text: auditPreview(lang, project), used: [profileChip(project)], action: { type: "audit", state: "pending" } };
+      }
       case "/todo":
         if (!arg) return { intent: "command", text: tr(lang, "Write the to do after the command, e.g. /todo Update the opening hours.", "Tulis tugasnya setelah perintah, mis. /todo Perbarui jam buka."), used: [] };
         return { intent: "change_todo", text: tr(lang, `Add this to do to ${project.name}? It goes under “Manual”.`, `Tambahkan tugas ini ke ${project.name}? Masuk ke “Manual”.`), used: [todoChip], action: { type: "todo", title: arg, state: "pending" } };
@@ -105,10 +127,10 @@ export function routeMessage({ text, lang, project, todos, role, report: stateRe
         used: [{ kind: "report", label: `Report · audit #${report.audit}` }, profileChip(project)],
       };
     }
-    // no report yet — offer to run the first audit
+    // no report yet — offer to run the first audit with profile preview
     return {
       intent: "command",
-      text: tr(lang, "No audit yet for this brand. Run one now to get a full analysis, score, and to do list?", "Belum ada audit untuk brand ini. Jalankan sekarang untuk analisis lengkap, skor, dan daftar to do?"),
+      text: auditPreview(lang, project),
       used: [profileChip(project)],
       action: { type: "audit", state: "pending" },
     };
