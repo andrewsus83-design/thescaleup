@@ -17,6 +17,7 @@ import {
   todosFromReport,
 } from "@/lib/room/mock";
 import { loadBrands, loadBrandKeys } from "@/lib/room/brand-actions";
+import { runRoomAudit } from "@/lib/room/audit-actions";
 import { loadRoomKeys } from "@/lib/room/key-actions";
 import type { OwnKey, ProviderId } from "@/components/room/projects/brand-keys";
 import { statusChronicle } from "@/lib/room/todos";
@@ -315,41 +316,74 @@ export function RoomProvider({
   }, []);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
-  const finishAudit = useCallback(
-    (id: string) => {
+  // Finish with real engine data — called once the server action resolves.
+  const finishAuditReal = useCallback(
+    (id: string, result: Awaited<ReturnType<typeof runRoomAudit>>) => {
       const cur = ref.current;
       const project = cur.projects.find((p) => p.id === id);
       if (!project) return dispatch({ t: "audit", audit: null });
+      if (!result.ok) {
+        dispatch({ t: "audit", audit: null });
+        const err = result.error;
+        if (err === "NO_LLM_KEY") {
+          toast("Add an API key in Setting → API to run a live audit");
+        } else {
+          toast(`Audit failed: ${err}`);
+        }
+        return;
+      }
       const prev = cur.reports[id];
-      const report = nextReport(project.name, prev);
-      const todos = prev ? [] : todosFromReport(report, uid);
+      const auditNum = (prev?.audit ?? 0) + 1;
+      const score = result.score;
+      const report: ReportData = {
+        audit: auditNum,
+        date: new Date().toISOString().split("T")[0],
+        score,
+        scorecard: result.scorecard.map((s) => ({
+          name: s.name,
+          coverage: s.coverage,
+          must: Math.round(s.coverage / 10),
+          nice: 0,
+          try: 0,
+        })),
+        insights: [
+          ...result.missing.slice(0, 3).map((title) => ({
+            id: uid(), priority: 1 as 1 | 2 | 3, title, evidence: "",
+          })),
+          ...result.opportunities.slice(0, 2).map((title) => ({
+            id: uid(), priority: 2 as 1 | 2 | 3, title, evidence: "",
+          })),
+        ],
+      };
+      const todos: Todo[] = prev ? [] : result.missing.slice(0, 5).map((title) => ({
+        id: uid(), title, group: "week1" as const, status: "progress" as const, service: "website",
+      }));
+      const delta = prev ? ` (${score - prev.score >= 0 ? "+" : ""}${score - prev.score})` : "";
       const msg: Message = {
         id: uid(),
         role: "assistant",
-        text: `Audit #${report.audit} finished — score ${report.score}${prev ? ` (${report.score - prev.score >= 0 ? "+" : ""}${report.score - prev.score})` : ""}. The report is a draft until an admin approves it.${todos.length ? ` I added ${todos.length} to dos to Week 1.` : ""}`,
-        used: [{ kind: "report", label: `Report · audit #${report.audit}` }],
+        text: `Audit #${auditNum} selesai — skor ${score}${delta}. ${result.summary} Report masih draft sampai admin approve.${todos.length ? ` Saya tambahkan ${todos.length} to dos ke Week 1.` : ""}`,
+        used: [{ kind: "report", label: `Report · audit #${auditNum}` }],
       };
       dispatch({ t: "auditDone", id, report, todos, cid: uid(), msg });
-      toast(`Audit #${report.audit} finished — score ${report.score}`);
+      toast(`Audit #${auditNum} selesai — skor ${score}`);
     },
     [toast],
   );
 
-  // one audit at a time; progress ticks until it completes (live spend against the $3 budget)
+  // Fake progress bar: caps at 92% so it never self-completes — the real result fires finishAuditReal.
   const auditId = state.audit?.projectId ?? null;
   useEffect(() => {
     if (!auditId) return;
     const timer = setInterval(() => {
       const cur = ref.current.audit;
       if (!cur) return clearInterval(timer);
-      const pct = Math.min(100, cur.pct + 11 + Math.round(Math.random() * 9));
-      if (pct >= 100) {
-        clearInterval(timer);
-        finishAudit(cur.projectId);
-      } else dispatch({ t: "audit", audit: { projectId: cur.projectId, pct } });
-    }, 450);
+      const step = cur.pct < 60 ? 6 + Math.round(Math.random() * 4) : 1 + Math.round(Math.random() * 1);
+      const pct = Math.min(92, cur.pct + step);
+      dispatch({ t: "audit", audit: { projectId: cur.projectId, pct } });
+    }, 600);
     return () => clearInterval(timer);
-  }, [auditId, finishAudit]);
+  }, [auditId]);
 
   const api = useMemo<RoomApi>(() => {
     const act = state.activeId ? state.projects.find((p) => p.id === state.activeId) ?? null : null;
@@ -388,6 +422,14 @@ export function RoomProvider({
       startAudit: (id) => {
         if (ref.current.audit) return;
         dispatch({ t: "audit", audit: { projectId: id, pct: 0 } });
+        const project = ref.current.projects.find((p) => p.id === id);
+        if (!project) return;
+        runRoomAudit(project.dbId, project.name, project.profile)
+          .then((result) => finishAuditReal(id, result))
+          .catch(() => {
+            dispatch({ t: "audit", audit: null });
+            toast("Audit failed — check API keys in Setting → API");
+          });
       },
       startBuild: (id, todo) =>
         dispatch({
@@ -398,7 +440,7 @@ export function RoomProvider({
         }),
       advanceBuild: (id, buildId) => dispatch({ t: "buildAdvance", id, buildId, cid: uid(), aid: uid() }),
     };
-  }, [state, basePath, realRole, toastText, toast]);
+  }, [state, basePath, realRole, toastText, toast, finishAuditReal]);
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }

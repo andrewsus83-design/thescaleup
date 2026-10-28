@@ -132,9 +132,9 @@ function extractJson(text: string): Record<string, unknown> | null {
   }
 }
 
-/** Run the real audit for a member and return a saveable report. */
-export async function runAudit(m: Record<string, unknown>): Promise<AuditResult> {
-  const keys = await getApiKeys();
+/** Run the real audit for a brand. Pass `brandDbId` (UUID from report_clients) to use the brand's own API keys with workspace as fallback. */
+export async function runAudit(m: Record<string, unknown>, brandDbId?: string): Promise<AuditResult> {
+  const keys = await getApiKeys(brandDbId);
   if (!keys.claude && !keys.openai && !keys.gemini) {
     return { ok: false, error: "NO_LLM_KEY" };
   }

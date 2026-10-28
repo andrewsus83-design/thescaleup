@@ -110,6 +110,45 @@ export type Build = {
   version: number;
 };
 
+// ─── Web Builder types ────────────────────────────────────────────────────────
+export type FontSlot = "title" | "body" | "mono" | "accent";
+export type StyleTag =
+  | "minimal" | "bold" | "luxury" | "playful"
+  | "corporate" | "organic" | "tech" | "artisan"
+  | "editorial" | "energetic";
+export type PageSchema = "landing" | "service" | "product" | "custom";
+
+export type BrandDesign = {
+  fonts: Record<FontSlot, string>;
+  colors: { primary: string; secondary: string; accent: string };
+  style: StyleTag[];
+  schema: PageSchema;
+};
+
+export type FaqItem = { q: string; a: string };
+
+export type EeatSections = {
+  whatsapp: { enabled: boolean; number: string };
+  maps: { enabled: boolean; url: string };
+  faq: { enabled: boolean; autoGenerate: boolean; items: FaqItem[] };
+  blog: { enabled: boolean; label: string };
+};
+
+export type WebSetup = {
+  design: BrandDesign;
+  sections: EeatSections;
+  refUrls: [string, string, string];
+};
+
+export type WebBuild = {
+  id: string;
+  version: number;
+  html: string;
+  promptUsed?: string;
+  createdAt: string;
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type IntakeStep = "brand" | "website" | "handles" | "gaps" | "confirm";
 export type IntakeState = {
   step: IntakeStep;
