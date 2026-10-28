@@ -2,7 +2,7 @@
 
 // Shared state for the whole Chat Room: one provider in the layout, so the active project, to dos, chat
 // threads and an in-flight audit survive moving between Chat / Project / Builder / Assets / Setting.
-// Prototype: it lives in memory only — a reload resets it, and nothing is sent anywhere.
+// Brands and per-brand API keys are persisted to DB (report_clients / report_client_settings).
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
@@ -16,6 +16,8 @@ import {
   nextReport,
   todosFromReport,
 } from "@/lib/room/mock";
+import { loadBrands, loadBrandKeys } from "@/lib/room/brand-actions";
+import type { OwnKey, ProviderId } from "@/components/room/projects/brand-keys";
 import { statusChronicle } from "@/lib/room/todos";
 import type {
   Asset,
@@ -50,6 +52,8 @@ export type State = {
   intake: IntakeState | null;
   intakeLog: Message[];
   audit: AuditRun;
+  /** Per-brand API key metadata keyed by project.id (slug). Secret values never reach the client. */
+  brandKeys: Record<string, Partial<Record<ProviderId, OwnKey>>>;
 };
 
 // Reducers stay pure: every id is minted by the caller and travels inside the action.
@@ -59,6 +63,10 @@ type Action =
   | { t: "intake"; state: IntakeState | null; log?: Message[] }
   | { t: "intakeLog"; msg: Message }
   | { t: "projectSave"; project: Project }
+  | { t: "projectsLoaded"; projects: Project[] }
+  | { t: "brandKeysLoaded"; projectId: string; keys: Partial<Record<ProviderId, OwnKey>> }
+  | { t: "brandKeySet"; projectId: string; providerId: ProviderId; key: OwnKey }
+  | { t: "brandKeyRemoved"; projectId: string; providerId: ProviderId }
   | { t: "projectCreate"; project: Project; welcome: Message; cid: string }
   | { t: "lock"; id: string; cid: string; msg: Message }
   | { t: "todoStatus"; id: string; todoId: string; status: TodoStatus; cid: string }
@@ -93,6 +101,19 @@ function reducer(s: State, a: Action): State {
     case "projectSave": {
       const exists = s.projects.some((p) => p.id === a.project.id);
       return { ...s, projects: exists ? s.projects.map((p) => (p.id === a.project.id ? a.project : p)) : [...s.projects, a.project] };
+    }
+    case "projectsLoaded":
+      return { ...s, projects: [...a.projects, ...s.projects.filter((p) => !a.projects.some((l) => l.id === p.id))] };
+    case "brandKeysLoaded":
+      return { ...s, brandKeys: { ...s.brandKeys, [a.projectId]: a.keys } };
+    case "brandKeySet": {
+      const existing = s.brandKeys[a.projectId] ?? {};
+      return { ...s, brandKeys: { ...s.brandKeys, [a.projectId]: { ...existing, [a.providerId]: a.key } } };
+    }
+    case "brandKeyRemoved": {
+      const next = { ...(s.brandKeys[a.projectId] ?? {}) };
+      delete next[a.providerId];
+      return { ...s, brandKeys: { ...s.brandKeys, [a.projectId]: next } };
     }
     case "projectCreate": {
       const exists = s.projects.some((p) => p.id === a.project.id);
@@ -203,6 +224,7 @@ function initialState(role: Role): State {
     intake: null,
     intakeLog: [],
     audit: null,
+    brandKeys: {},
   };
 }
 
@@ -223,6 +245,8 @@ export type RoomApi = {
   saveProject: (p: Project) => void;
   createProject: (p: Project, welcome: Message) => void;
   lockProfile: (id: string, msg: Message) => void;
+  setBrandKey: (projectId: string, providerId: ProviderId, key: OwnKey) => void;
+  deleteBrandKey: (projectId: string, providerId: ProviderId) => void;
   setTodoStatus: (id: string, todoId: string, status: TodoStatus) => void;
   addTodo: (id: string, title: string) => void;
   assignTodo: (id: string, todoId: string, assignee: string) => void;
@@ -260,6 +284,19 @@ export function RoomProvider({
   useEffect(() => {
     ref.current = state;
   }, [state]);
+
+  // Load brands from DB on mount; load each brand's key metadata once brands are known.
+  useEffect(() => {
+    loadBrands().then((brands) => {
+      if (brands.length) dispatch({ t: "projectsLoaded", projects: brands });
+      for (const brand of brands) {
+        if (!brand.dbId) continue;
+        loadBrandKeys(brand.dbId).then((keys) => {
+          dispatch({ t: "brandKeysLoaded", projectId: brand.id, keys });
+        });
+      }
+    });
+  }, []);
 
   const [toastText, setToastText] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -324,6 +361,8 @@ export function RoomProvider({
       saveProject: (project) => dispatch({ t: "projectSave", project }),
       createProject: (project, welcome) => dispatch({ t: "projectCreate", project, welcome, cid: uid() }),
       lockProfile: (id, msg) => dispatch({ t: "lock", id, cid: uid(), msg }),
+      setBrandKey: (projectId, providerId, key) => dispatch({ t: "brandKeySet", projectId, providerId, key }),
+      deleteBrandKey: (projectId, providerId) => dispatch({ t: "brandKeyRemoved", projectId, providerId }),
       setTodoStatus: (id, todoId, status) => dispatch({ t: "todoStatus", id, todoId, status, cid: uid() }),
       addTodo: (id, title) => dispatch({ t: "todoAdd", id, todo: { id: uid(), title, group: "manual", status: "progress" }, cid: uid() }),
       assignTodo: (id, todoId, assignee) => dispatch({ t: "todoAssign", id, todoId, assignee }),

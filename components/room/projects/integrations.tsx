@@ -7,13 +7,13 @@
 // Every provider the product calls is listed (see the catalog in brand-keys.ts): AI models, search and AI-answer data,
 // website tools, Zernio and Search Console, email and tracing. Search Console is a grant by the brand's owner, not a key.
 //
-// Prototype: keys live in this page's memory only. The full key is discarded the moment the form closes, only the last 4
-// characters are kept, nothing is sent anywhere, and members never see a key (not even those 4 characters) or change one.
-// The spend figures are sample data (see brand-keys.ts).
+// Keys are stored encrypted (AES-256-GCM) in report_client_settings. Only the last 4 characters are shown in the UI;
+// the full key is never returned to the client. Members cannot see keys or change them. Spend figures are sample data.
 
 import { useState } from "react";
 import { KeyRound } from "lucide-react";
 import type { Project } from "@/lib/room/types";
+import { saveBrandKey, updateBrandKeyMeta, removeBrandKey } from "@/lib/room/brand-actions";
 import { useRoom } from "../room-provider";
 import { Alert, Bar, Btn, BudgetPanel, Card, Chip, Sheet } from "../ui";
 import { BILLING_LABEL, GROUPS, PROVIDERS, WORKSPACE_CAP, costSplit, isMetered, providerOf, spendOf, usd, type BrandKeys, type OwnKey, type Provider, type ProviderId } from "./brand-keys";
@@ -23,18 +23,22 @@ const meterTone = (pct: number) => (pct >= 95 ? "bad" : pct >= 80 ? "warn" : "br
 const noun = (p: Provider) => (p.kind === "grant" ? "access" : "key");
 const caps = "font-mono text-code uppercase text-ink-500";
 
-export function IntegrationsTab({ project, keys, onChange }: { project: Project; keys: BrandKeys; onChange: (next: BrandKeys) => void }) {
+export function IntegrationsTab({
+  project,
+  keys,
+  onSet,
+  onDelete,
+}: {
+  project: Project;
+  keys: BrandKeys;
+  onSet: (providerId: ProviderId, key: OwnKey) => void;
+  onDelete: (providerId: ProviderId) => void;
+}) {
   const api = useRoom();
   const isAdmin = api.state.role === "admin";
   const [editing, setEditing] = useState<ProviderId | null>(null);
   const [removing, setRemoving] = useState<ProviderId | null>(null);
 
-  const set = (id: ProviderId, key: OwnKey | undefined) => {
-    const next = { ...keys };
-    if (key) next[id] = key;
-    else delete next[id];
-    onChange(next);
-  };
   /** Every key change lands in the brand's chronicle (without the key) and shows a toast. */
   const log = (text: string, toast = text) => {
     api.addChronicle(project.id, "settings", text);
@@ -100,7 +104,9 @@ export function IntegrationsTab({ project, keys, onChange }: { project: Project;
                   onAdd={() => setEditing(p.id)}
                   onTest={() => api.toast(`${p.name}: test passed (prototype)`)}
                   onToggle={(k) => {
-                    set(p.id, { ...k, active: !k.active });
+                    const next = { ...k, active: !k.active };
+                    onSet(p.id, next);
+                    if (project.dbId) updateBrandKeyMeta(project.dbId, p.id, { active: next.active });
                     log(k.active ? `Own ${p.name} ${noun(p)} switched off — ${p.kind === "grant" ? "its checks are skipped" : "using the workspace key"}` : `Own ${p.name} ${noun(p)} switched on`);
                   }}
                   onRemove={() => setRemoving(p.id)}
@@ -115,7 +121,7 @@ export function IntegrationsTab({ project, keys, onChange }: { project: Project;
         Not listed because they take no brand key: the database and sign-in (Supabase), hosting (Vercel) and file storage (Cloudflare R2) run on the workspace. Similarweb and Mention or Brand24 are held back until after the pilot.
       </p>
       <p className="text-[13px] leading-[1.5] text-ink-500">
-        Prototype: keys stay in this page&apos;s memory only — the full key is dropped when the form closes, only the last 4 characters are kept, and nothing is sent anywhere. Spend figures are sample data.
+        Keys are stored encrypted (AES-256-GCM) in the database. Only the last 4 characters are shown here; the full key is never returned to the client. Spend figures are sample data.
       </p>
 
       <Sheet open={edit !== null} onClose={() => setEditing(null)} title={edit ? `${edit.name} ${noun(edit)}` : "API key"}>
@@ -125,11 +131,14 @@ export function IntegrationsTab({ project, keys, onChange }: { project: Project;
             intro={edit.kind === "grant" ? `${project.name} gives you read access to its own Search Console data. Nothing is billed.` : `${project.name}'s ${edit.name} usage is billed to the account that owns this key.`}
             current={keys[edit.id]}
             onCancel={() => setEditing(null)}
-            onSave={(key) => {
+            onSave={(key, fullKey) => {
               const replacing = !!keys[edit.id];
-              set(edit.id, key);
+              onSet(edit.id, key);
               setEditing(null);
-              log(replacing ? `Own ${edit.name} ${noun(edit)} replaced` : `Own ${edit.name} ${noun(edit)} added`, `${edit.name} ${noun(edit)} saved for ${project.name} (prototype: nothing was stored)`);
+              if (project.dbId && fullKey) {
+                saveBrandKey(project.dbId, edit.id, fullKey, key).catch(() => {/* toast already showed */});
+              }
+              log(replacing ? `Own ${edit.name} ${noun(edit)} replaced` : `Own ${edit.name} ${noun(edit)} added`, `${edit.name} ${noun(edit)} saved for ${project.name}`);
             }}
           />
         )}
@@ -148,8 +157,9 @@ export function IntegrationsTab({ project, keys, onChange }: { project: Project;
               <Btn
                 variant="danger"
                 onClick={() => {
-                  set(rem.id, undefined);
+                  onDelete(rem.id);
                   setRemoving(null);
+                  if (project.dbId) removeBrandKey(project.dbId, rem.id).catch(() => {/* silent */});
                   log(`Own ${rem.name} ${noun(rem)} removed${rem.kind === "grant" ? "" : " — back to the workspace key"}`);
                 }}
               >
