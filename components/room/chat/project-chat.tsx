@@ -32,11 +32,11 @@ export function ProjectChat({ project }: { project: Project }) {
   const [sheet, setSheet] = useState(false);
   const [highlight, setHighlight] = useState<UsedChip["kind"] | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const latest = useRef({ project, todos, role: state.role });
+  const latest = useRef({ project, todos, role: state.role, report: state.reports[project.id] as import("@/lib/room/types").ReportData | undefined });
   const timers = useRef<number[]>([]);
 
   useEffect(() => {
-    latest.current = { project, todos, role: state.role };
+    latest.current = { project, todos, role: state.role, report: state.reports[project.id] as import("@/lib/room/types").ReportData | undefined };
   }, [project, todos, state.role]);
   useEffect(() => {
     const t = timers.current;
@@ -59,7 +59,7 @@ export function ProjectChat({ project }: { project: Project }) {
     // stand-in for the intent router + grounded answer (see lib/room/assistant.ts)
     const id = window.setTimeout(() => {
       const cur = latest.current;
-      const r = routeMessage({ text, lang, project: cur.project, todos: cur.todos, role: cur.role });
+      const r = routeMessage({ text, lang, project: cur.project, todos: cur.todos, role: cur.role, report: cur.report });
       api.addMessage(project.id, { role: "assistant", text: r.text, used: r.used, action: r.action });
       setThinking(false);
     }, 650);
