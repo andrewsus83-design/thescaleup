@@ -5,7 +5,7 @@
 // chronicle and saves the output back as an asset. The preview is a sandboxed iframe (no scripts).
 
 import { useState } from "react";
-import { Eye, Hammer } from "lucide-react";
+import { Eye, Hammer, KeyRound } from "lucide-react";
 import { isOpen } from "@/lib/room/todos";
 import type { Build, Project } from "@/lib/room/types";
 import { cn } from "@/lib/utils";
@@ -34,6 +34,17 @@ export function BuilderScreen({ kind }: { kind?: "web" | "content" }) {
   return <BuilderFor key={activeProject.id} project={activeProject} kind={kind} />;
 }
 
+/** True when a usable AI key exists — brand own key (active) OR workspace key (active). */
+function hasAiKey(projectId: string, brandKeys: Record<string, Record<string, { active?: boolean }>>, wsKeys: Record<string, { active?: boolean }>) {
+  const own = brandKeys[projectId] ?? {};
+  return (
+    (own["claude"]?.active ?? false) ||
+    (own["openai"]?.active ?? false) ||
+    (wsKeys["claude"]?.active ?? false) ||
+    (wsKeys["openai"]?.active ?? false)
+  );
+}
+
 function BuilderFor({ project, kind }: { project: Project; kind?: "web" | "content" }) {
   const api = useRoom();
   const todos = api.state.todos[project.id] ?? [];
@@ -43,13 +54,34 @@ function BuilderFor({ project, kind }: { project: Project; kind?: "web" | "conte
   const servicePattern = kind === "web" ? /web/i : kind === "content" ? /content/i : /builder/i;
   const ready = todos.filter((t) => servicePattern.test(t.service ?? "") && isOpen(t) && !allBuilds.some((b) => b.todoId === t.id));
 
+  const title = kind === "web" ? "Web Builder" : kind === "content" ? "Content Builder" : "Builder";
+
   if (!project.locked) {
     return (
       <div className={cn("mx-auto max-w-3xl py-10 sm:py-12", pageX)}>
-        <PageHeader title={kind === "web" ? "Web Builder" : kind === "content" ? "Content Builder" : "Builder"} description={`Builds for ${project.name}`} action={<ProjectSwitcher />} />
+        <PageHeader title={title} description={`Builds for ${project.name}`} action={<ProjectSwitcher />} />
         <Alert tone="warn">
           Builds read the locked profile, and {project.name} is still in intake mode. Lock the profile first (an admin approves the positioning line, then <span className="font-mono">/lock</span> in the chat).
         </Alert>
+      </div>
+    );
+  }
+
+  if (!hasAiKey(project.id, api.state.brandKeys as Record<string, Record<string, { active?: boolean }>>, api.state.wsKeys as Record<string, { active?: boolean }>)) {
+    return (
+      <div className={cn("mx-auto max-w-3xl py-10 sm:py-12", pageX)}>
+        <PageHeader title={title} description={`Builds for ${project.name}`} action={<ProjectSwitcher />} />
+        <div className="rounded-card border-[1.5px] border-ink-200 px-8 py-10 text-center">
+          <span className="inline-flex size-12 items-center justify-center rounded-full bg-paper-100">
+            <KeyRound className="size-6 text-ink-500" aria-hidden />
+          </span>
+          <h2 className="mt-4 font-title text-h3 text-ink-800">AI key required</h2>
+          <p className="mt-2 max-w-sm mx-auto text-[15px] leading-[1.6] text-ink-500">
+            {title} uses an AI model to draft and refine content. Add a Claude or OpenAI key under{" "}
+            <strong>Project → Integrations</strong> (brand key) or{" "}
+            <strong>Project → Setting → API keys</strong> (workspace key).
+          </p>
+        </div>
       </div>
     );
   }

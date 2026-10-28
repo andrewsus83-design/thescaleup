@@ -17,6 +17,7 @@ import {
   todosFromReport,
 } from "@/lib/room/mock";
 import { loadBrands, loadBrandKeys } from "@/lib/room/brand-actions";
+import { loadRoomKeys } from "@/lib/room/key-actions";
 import type { OwnKey, ProviderId } from "@/components/room/projects/brand-keys";
 import { statusChronicle } from "@/lib/room/todos";
 import type {
@@ -54,6 +55,8 @@ export type State = {
   audit: AuditRun;
   /** Per-brand API key metadata keyed by project.id (slug). Secret values never reach the client. */
   brandKeys: Record<string, Partial<Record<ProviderId, OwnKey>>>;
+  /** Workspace-level API key metadata from Setting → API keys. Used as fallback when a brand has no own key. */
+  wsKeys: Partial<Record<ProviderId, OwnKey>>;
 };
 
 // Reducers stay pure: every id is minted by the caller and travels inside the action.
@@ -64,6 +67,7 @@ type Action =
   | { t: "intakeLog"; msg: Message }
   | { t: "projectSave"; project: Project }
   | { t: "projectsLoaded"; projects: Project[] }
+  | { t: "wsKeysLoaded"; keys: Partial<Record<ProviderId, OwnKey>> }
   | { t: "brandKeysLoaded"; projectId: string; keys: Partial<Record<ProviderId, OwnKey>> }
   | { t: "brandKeySet"; projectId: string; providerId: ProviderId; key: OwnKey }
   | { t: "brandKeyRemoved"; projectId: string; providerId: ProviderId }
@@ -104,6 +108,8 @@ function reducer(s: State, a: Action): State {
     }
     case "projectsLoaded":
       return { ...s, projects: [...a.projects, ...s.projects.filter((p) => !a.projects.some((l) => l.id === p.id))] };
+    case "wsKeysLoaded":
+      return { ...s, wsKeys: a.keys };
     case "brandKeysLoaded":
       return { ...s, brandKeys: { ...s.brandKeys, [a.projectId]: a.keys } };
     case "brandKeySet": {
@@ -225,6 +231,7 @@ function initialState(role: Role): State {
     intakeLog: [],
     audit: null,
     brandKeys: {},
+    wsKeys: {},
   };
 }
 
@@ -285,8 +292,9 @@ export function RoomProvider({
     ref.current = state;
   }, [state]);
 
-  // Load brands from DB on mount; load each brand's key metadata once brands are known.
+  // Load brands + workspace keys on mount.
   useEffect(() => {
+    loadRoomKeys().then((keys) => dispatch({ t: "wsKeysLoaded", keys }));
     loadBrands().then((brands) => {
       if (brands.length) dispatch({ t: "projectsLoaded", projects: brands });
       for (const brand of brands) {
