@@ -28,23 +28,25 @@ const STAGES: { key: Build["stage"]; label: string }[] = [
 
 const caps = "font-mono text-code uppercase text-ink-500";
 
-export function BuilderScreen() {
+export function BuilderScreen({ kind }: { kind?: "web" | "content" }) {
   const { activeProject } = useRoom();
   if (!activeProject) return <NeedProject what="Builder" />;
-  return <BuilderFor key={activeProject.id} project={activeProject} />;
+  return <BuilderFor key={activeProject.id} project={activeProject} kind={kind} />;
 }
 
-function BuilderFor({ project }: { project: Project }) {
+function BuilderFor({ project, kind }: { project: Project; kind?: "web" | "content" }) {
   const api = useRoom();
   const todos = api.state.todos[project.id] ?? [];
-  const builds = api.state.builds[project.id] ?? [];
+  const allBuilds = api.state.builds[project.id] ?? [];
+  const builds = kind ? allBuilds.filter((b) => b.kind === kind) : allBuilds;
   const [preview, setPreview] = useState<Build | null>(null);
-  const ready = todos.filter((t) => /builder/i.test(t.service ?? "") && isOpen(t) && !builds.some((b) => b.todoId === t.id));
+  const servicePattern = kind === "web" ? /web/i : kind === "content" ? /content/i : /builder/i;
+  const ready = todos.filter((t) => servicePattern.test(t.service ?? "") && isOpen(t) && !allBuilds.some((b) => b.todoId === t.id));
 
   if (!project.locked) {
     return (
       <div className={cn("mx-auto max-w-3xl py-10 sm:py-12", pageX)}>
-        <PageHeader title="Builder" description={`Builds for ${project.name}`} action={<ProjectSwitcher />} />
+        <PageHeader title={kind === "web" ? "Web Builder" : kind === "content" ? "Content Builder" : "Builder"} description={`Builds for ${project.name}`} action={<ProjectSwitcher />} />
         <Alert tone="warn">
           Builds read the locked profile, and {project.name} is still in intake mode. Lock the profile first (an admin approves the positioning line, then <span className="font-mono">/lock</span> in the chat).
         </Alert>
@@ -54,7 +56,11 @@ function BuilderFor({ project }: { project: Project }) {
 
   return (
     <div className={cn("mx-auto max-w-5xl py-10 sm:py-12", pageX)}>
-      <PageHeader title="Builder" description={`Web and content builds for ${project.name}. Every build starts from a to do and is versioned.`} action={<ProjectSwitcher />} />
+      <PageHeader
+        title={kind === "web" ? "Web Builder" : kind === "content" ? "Content Builder" : "Builder"}
+        description={`${kind ? (kind === "web" ? "Web" : "Content") + " builds" : "Web and content builds"} for ${project.name}. Every build starts from a to do and is versioned.`}
+        action={<ProjectSwitcher />}
+      />
 
       <Alert tone="warn" title="Scope for version 1:" className="mb-8">
         single pages that fix failed checks (FAQ, About with the 5W, schema, titles) and content drafts from topics. Whole-site generation comes after the pilot shows demand.
@@ -62,9 +68,9 @@ function BuilderFor({ project }: { project: Project }) {
 
       <div className="grid gap-6 md:grid-cols-2">
         {[
-          { name: "Web builder", from: "A failed check or to do, such as a missing FAQ page or schema", out: "Page blocks rendered to HTML, with a preview", formats: "Page · FAQ · About · Landing page", publish: "The client's own domain through a hosting project, or export" },
-          { name: "Content builder", from: "A topic from the topic bank, with channel and format", out: "Brief, copy and a visual spec per channel", formats: "Post · Short video script · FAQ · Blog", publish: "Export, or hand off to scheduling" },
-        ].map((c) => (
+          { key: "web" as const, name: "Web builder", from: "A failed check or to do, such as a missing FAQ page or schema", out: "Page blocks rendered to HTML, with a preview", formats: "Page · FAQ · About · Landing page", publish: "The client's own domain through a hosting project, or export" },
+          { key: "content" as const, name: "Content builder", from: "A topic from the topic bank, with channel and format", out: "Brief, copy and a visual spec per channel", formats: "Post · Short video script · FAQ · Blog", publish: "Export, or hand off to scheduling" },
+        ].filter((c) => !kind || c.key === kind).map((c) => (
           <section key={c.name} aria-label={c.name}>
             <Card className="h-full">
               <h2 className="font-title text-h3 text-ink-800">{c.name}</h2>

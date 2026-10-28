@@ -21,7 +21,10 @@ export type Profile = {
 };
 
 export type Project = {
+  /** Slug — used as the URL segment and in-memory key. */
   id: string;
+  /** UUID primary key from report_clients — used for DB operations on report_client_settings. */
+  dbId?: string;
   name: string;
   website: string;
   /** "draft" = an unfinished intake: it shows on the chat start screen, never in the Project tab. */

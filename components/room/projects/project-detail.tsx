@@ -13,7 +13,7 @@ import type { ChronicleKind, Project } from "@/lib/room/types";
 import { cn } from "@/lib/utils";
 import { useRoom } from "../room-provider";
 import { Btn, Chip, EmptyState, PageHeader, btnCls, inputCls, pageX, pillCls, segItem, segWrap } from "../ui";
-import { initialKeys, type BrandKeys } from "./brand-keys";
+import type { BrandKeys } from "./brand-keys";
 import { IntegrationsTab } from "./integrations";
 import { TodoBoard } from "./todo-board";
 
@@ -26,12 +26,11 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 export function ProjectDetail({ id, report }: { id: string; report: React.ReactNode }) {
-  const { state, href, open } = useRoom();
+  const { state, href, open, setBrandKey, deleteBrandKey } = useRoom();
   const router = useRouter();
   const project = state.projects.find((p) => p.id === id && p.status === "active");
   const [tab, setTab] = useState<Tab>("report");
-  // the brand's own API keys live here, not in the tab, so switching tabs doesn't forget them (prototype: in memory only)
-  const [brandKeys, setBrandKeys] = useState<BrandKeys>(() => initialKeys(id));
+  const brandKeys: BrandKeys = (state.brandKeys[id] ?? {}) as BrandKeys;
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ report: null, todo: null, chronicle: null, integrations: null });
 
   if (!project) {
@@ -116,7 +115,14 @@ export function ProjectDetail({ id, report }: { id: string; report: React.ReactN
         {tab === "report" && <ReportPanel projectId={project.id} report={report} />}
         {tab === "todo" && <TodoBoard project={project} />}
         {tab === "chronicle" && <ChronicleTab project={project} />}
-        {tab === "integrations" && <IntegrationsTab project={project} keys={brandKeys} onChange={setBrandKeys} />}
+        {tab === "integrations" && (
+          <IntegrationsTab
+            project={project}
+            keys={brandKeys}
+            onSet={(pid, key) => setBrandKey(id, pid, key)}
+            onDelete={(pid) => deleteBrandKey(id, pid)}
+          />
+        )}
       </div>
     </div>
   );

@@ -18,24 +18,44 @@ export type ApiKeys = {
 };
 
 /**
- * Resolve API keys from the admin Settings table (app_settings), falling back
- * to environment variables. Reads settings once per call.
+ * Resolve API keys, preferring brand-level keys over workspace keys over env vars.
+ * Pass `brandDbId` (the UUID from report_clients) to enable per-brand key resolution.
+ * Brand key → workspace key → environment variable.
  */
-export async function getApiKeys(): Promise<ApiKeys> {
-  const settings: Record<string, string> = {};
+export async function getApiKeys(brandDbId?: string): Promise<ApiKeys> {
+  const workspace: Record<string, string> = {};
+  const brand: Record<string, string> = {};
+
   if (isSupabaseAdminConfigured()) {
+    const db = createSupabaseAdminClient();
     try {
-      const db = createSupabaseAdminClient();
       const { data } = await db.from("app_settings").select("key, value");
       for (const r of data ?? []) {
-        if (r.key && r.value) settings[r.key as string] = decryptValue(r.value as string);
+        if (r.key && r.value) workspace[r.key as string] = decryptValue(r.value as string);
       }
     } catch {
       // app_settings table may not exist yet — fall back to env.
     }
+
+    if (brandDbId) {
+      try {
+        const { data } = await db
+          .from("report_client_settings")
+          .select("key, value")
+          .eq("client_id", brandDbId)
+          .not("key", "like", "meta:%");
+        for (const r of data ?? []) {
+          if (r.key && r.value) brand[r.key as string] = decryptValue(r.value as string);
+        }
+      } catch {
+        // report_client_settings may not exist yet — continue with workspace keys.
+      }
+    }
   }
+
+  // brand key → workspace key → env var
   const pick = (k: string, env?: string) =>
-    settings[k]?.trim() || env?.trim() || undefined;
+    brand[k]?.trim() || workspace[k]?.trim() || env?.trim() || undefined;
 
   return {
     claude: pick("claude", process.env.ANTHROPIC_API_KEY),

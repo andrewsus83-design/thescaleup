@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Save } from "lucide-react";
 import { answer, detectLang, editField, MAX_QUESTIONS, canCreate, question, readingNote, toProject, tr } from "@/lib/room/intake";
+import { createBrand } from "@/lib/room/brand-actions";
 import type { FieldKey, Lang, MessageAction } from "@/lib/room/types";
 import { cn } from "@/lib/utils";
 import { useRoom } from "../room-provider";
@@ -69,19 +70,24 @@ export function IntakeChat() {
     return undefined;
   };
 
-  const create = () => {
+  const create = async () => {
     const p = toProject(s, state.projects, "active");
+    // Persist to DB (fire-and-forget on the client; the server action handles errors gracefully).
+    // We patch dbId into the project once the DB returns the UUID.
+    createBrand(p).then((dbId) => {
+      if (dbId) api.saveProject({ ...p, dbId });
+    });
     api.createProject(p, {
       id: uid(),
       role: "assistant",
       text: tr(
         lang,
-        `“${p.name}” is created and this chat continues inside it. Next: an admin approves the positioning line, the profile is locked, and then the first audit can run. Until then I can only help complete and lock the profile.`,
-        `“${p.name}” sudah dibuat dan chat ini berlanjut di dalamnya. Berikutnya: admin menyetujui kalimat positioning, profil dikunci, lalu audit pertama bisa dijalankan. Sampai saat itu saya hanya membantu melengkapi dan mengunci profil.`,
+        `"${p.name}" is created and this chat continues inside it. Next: an admin approves the positioning line, the profile is locked, and then the first audit can run. Until then I can only help complete and lock the profile.`,
+        `"${p.name}" sudah dibuat dan chat ini berlanjut di dalamnya. Berikutnya: admin menyetujui kalimat positioning, profil dikunci, lalu audit pertama bisa dijalankan. Sampai saat itu saya hanya membantu melengkapi dan mengunci profil.`,
       ),
       used: [{ kind: "profile", label: "Profile (draft)" }],
     });
-    api.toast(`“${p.name}” created`);
+    api.toast(`"${p.name}" created`);
   };
 
   const leave = () => {
