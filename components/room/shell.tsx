@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FolderKanban, Hammer, Images, LogOut, MessageSquarePlus, MessagesSquare, Settings } from "lucide-react";
+import { FileText, FolderKanban, Globe, Hammer, Images, LogOut, MessageSquarePlus, MessagesSquare, Settings } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { RECENT_THREADS } from "@/lib/room/mock";
 import type { Role } from "@/lib/room/types";
@@ -20,6 +20,11 @@ export const NAV = [
   { key: "builder", label: "Builder", path: "/builder", icon: Hammer },
   { key: "assets", label: "Assets", path: "/assets", icon: Images },
   { key: "settings", label: "Setting", path: "/settings", icon: Settings, adminOnly: true },
+] as const;
+
+const BUILDER_SUB = [
+  { key: "web", label: "Web Builder", path: "/builder/web", icon: Globe },
+  { key: "content", label: "Content Builder", path: "/builder/content", icon: FileText },
 ] as const;
 
 export function RoomShell({
@@ -94,12 +99,38 @@ function Frame({ email, role, children }: { email: string; role: string; childre
           {items.map((n) => {
             const Icon = n.icon;
             const active = isActive(n.path);
+            const isBuilder = n.key === "builder";
             return (
-              <Link key={n.key} href={href(n.path)} aria-current={active ? "page" : undefined} className={menuItem(active)}>
-                <Icon className={cn("size-5 shrink-0 lg:hidden", active && "text-brand-700")} aria-hidden />
-                <Dot className={cn("hidden lg:block", active ? "bg-brand-500" : "bg-ink-200")} />
-                {n.label}
-              </Link>
+              <div key={n.key}>
+                <Link href={href(n.path)} aria-current={active ? "page" : undefined} className={menuItem(active)}>
+                  <Icon className={cn("size-5 shrink-0 lg:hidden", active && "text-brand-700")} aria-hidden />
+                  <Dot className={cn("hidden lg:block", active ? "bg-brand-500" : "bg-ink-200")} />
+                  {n.label}
+                </Link>
+                {isBuilder && active && activeProject && (
+                  <ul className="mt-0.5 hidden flex-col gap-0.5 lg:flex" aria-label="Builder options">
+                    {BUILDER_SUB.map((sub) => {
+                      const subActive = pathname === `${basePath}${sub.path}`;
+                      return (
+                        <li key={sub.key}>
+                          <Link
+                            href={href(sub.path)}
+                            aria-current={subActive ? "page" : undefined}
+                            className={cn(
+                              "flex h-9 w-full items-center gap-2.5 rounded-nav pl-10 pr-3 text-[14px] font-medium",
+                              motion,
+                              subActive ? "bg-paper-100 text-ink-800" : "text-ink-500 hover:bg-paper-100 hover:text-ink-700",
+                            )}
+                          >
+                            <sub.icon className={cn("size-4 shrink-0", subActive && "text-brand-700")} aria-hidden />
+                            {sub.label}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
             );
           })}
         </nav>
