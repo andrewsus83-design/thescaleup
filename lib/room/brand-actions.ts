@@ -1,12 +1,14 @@
 "use server";
 // Brand (report_clients) and per-brand API key (report_client_settings) persistence for Room.
+// Also: runWebBuild / runWebEdit server actions that call lib/engine/build-web.
 // Each brand created via the guided intake is saved here and loaded on startup.
 // Per-brand keys override workspace keys when the audit engine resolves providers.
 
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { encryptValue, decryptValue } from "@/lib/room/crypto";
 import type { OwnKey, ProviderId } from "@/components/room/projects/brand-keys";
-import type { Project } from "@/lib/room/types";
+import type { Project, WebSetup, WebBuild } from "@/lib/room/types";
+import { runWebBuildEngine, runWebEditEngine, type WebBuildInput } from "@/lib/engine/build-web";
 
 function db() {
   return createSupabaseAdminClient();
@@ -237,4 +239,72 @@ export async function getBrandApiKeys(dbId: string): Promise<Partial<Record<stri
     if (row.key && row.value) result[row.key as string] = decryptValue(row.value as string);
   }
   return result;
+}
+
+// ── Web Builder ───────────────────────────────────────────────────────────────
+
+export type RunWebBuildResult =
+  | { ok: true; build: WebBuild }
+  | { ok: false; error: string };
+
+/** Build a website for a project: Opus director pass → Sonnet builder pass. */
+export async function runWebBuild(
+  project: Project,
+  setup: WebSetup,
+  existingVersion = 0,
+): Promise<RunWebBuildResult> {
+  const input: WebBuildInput = {
+    businessName: project.profile.brand ?? project.name,
+    category: project.profile.what ?? undefined,
+    goal: project.profile.why ?? undefined,
+    website: project.profile.website ?? (project.website || undefined),
+    instagram: project.profile.handles?.[0] ?? undefined,
+    fonts: setup.design.fonts,
+    colors: setup.design.colors,
+    style: setup.design.style,
+    schema: setup.design.schema,
+    whatsapp: setup.sections.whatsapp.enabled ? setup.sections.whatsapp.number : undefined,
+    mapsUrl: setup.sections.maps.enabled ? setup.sections.maps.url : undefined,
+    faqAuto: setup.sections.faq.enabled ? setup.sections.faq.autoGenerate : undefined,
+    faqItems: setup.sections.faq.enabled && !setup.sections.faq.autoGenerate
+      ? setup.sections.faq.items
+      : undefined,
+    blogLabel: setup.sections.blog.enabled ? setup.sections.blog.label : undefined,
+    refUrls: setup.refUrls.filter(Boolean),
+  };
+
+  const result = await runWebBuildEngine(input, project.dbId);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const build: WebBuild = {
+    id: `build-${Date.now()}`,
+    version: existingVersion + 1,
+    html: result.html,
+    promptUsed: undefined,
+    createdAt: new Date().toISOString(),
+  };
+  return { ok: true, build };
+}
+
+export type RunWebEditResult =
+  | { ok: true; build: WebBuild }
+  | { ok: false; error: string };
+
+/** Revise an existing web build with a plain-language edit prompt. */
+export async function runWebEdit(
+  project: Project,
+  editPrompt: string,
+  currentBuild: WebBuild,
+): Promise<RunWebEditResult> {
+  const result = await runWebEditEngine(currentBuild.html, editPrompt, project.dbId);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const build: WebBuild = {
+    id: `build-${Date.now()}`,
+    version: currentBuild.version + 1,
+    html: result.html,
+    promptUsed: editPrompt,
+    createdAt: new Date().toISOString(),
+  };
+  return { ok: true, build };
 }
