@@ -21,6 +21,7 @@ import {
 } from "./ui";
 import { inputCls, textareaCls, labelCls, cardCls, motion, capsCls } from "@/components/brand/styles";
 import { ProjectSwitcher, NeedProject } from "./project-switcher";
+import { runWebBuild, runWebEdit } from "@/lib/room/brand-actions";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -571,6 +572,8 @@ function WebSetupForm({
   onBuild,
   building,
   lastBuild,
+  onEdit,
+  editing,
 }: {
   project: Project;
   setup: WebSetup;
@@ -578,6 +581,8 @@ function WebSetupForm({
   onBuild: () => void;
   building: boolean;
   lastBuild: WebBuild | null;
+  onEdit: (prompt: string) => void;
+  editing: boolean;
 }) {
   const [open, setOpen] = useState({ design: true, sections: true, refs: false });
   const toggleSection = (k: keyof typeof open) => setOpen((o) => ({ ...o, [k]: !o[k] }));
@@ -870,11 +875,8 @@ function WebSetupForm({
       {lastBuild && (
         <EditBar
           version={lastBuild.version}
-          onEdit={(prompt) => {
-            // TODO: wire to server action runWebEdit(projectId, prompt, lastBuild.id)
-            console.log("edit prompt:", prompt);
-          }}
-          editing={false}
+          onEdit={onEdit}
+          editing={editing}
         />
       )}
     </div>
@@ -889,6 +891,7 @@ function WebBuilderFor({ project }: { project: Project }) {
   const api = useRoom();
   const [setup, setSetup] = useState<WebSetup>(DEFAULT_SETUP);
   const [building, setBuilding] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [lastBuild, setLastBuild] = useState<WebBuild | null>(null);
 
   if (!project.locked) {
@@ -909,18 +912,31 @@ function WebBuilderFor({ project }: { project: Project }) {
   const handleBuild = async () => {
     setBuilding(true);
     try {
-      // TODO: wire to server action runWebBuild(project.dbId, setup)
-      await new Promise((r) => setTimeout(r, 2000));
-      const version = (lastBuild?.version ?? 0) + 1;
-      setLastBuild({
-        id: `build-${Date.now()}`,
-        version,
-        html: `<!-- Build v${version} — ${project.name} -->`,
-        createdAt: new Date().toISOString(),
-      });
-      api.toast(`Website v${version} built for ${project.name}`);
+      const result = await runWebBuild(project, setup, lastBuild?.version ?? 0);
+      if (!result.ok) {
+        api.toast(`Build failed: ${result.error}`);
+        return;
+      }
+      setLastBuild(result.build);
+      api.toast(`Website v${result.build.version} built for ${project.name}`);
     } finally {
       setBuilding(false);
+    }
+  };
+
+  const handleEdit = async (prompt: string) => {
+    if (!lastBuild) return;
+    setEditing(true);
+    try {
+      const result = await runWebEdit(project, prompt, lastBuild);
+      if (!result.ok) {
+        api.toast(`Edit failed: ${result.error}`);
+        return;
+      }
+      setLastBuild(result.build);
+      api.toast(`Website updated to v${result.build.version}`);
+    } finally {
+      setEditing(false);
     }
   };
 
@@ -938,6 +954,8 @@ function WebBuilderFor({ project }: { project: Project }) {
         onBuild={handleBuild}
         building={building}
         lastBuild={lastBuild}
+        onEdit={handleEdit}
+        editing={editing}
       />
     </div>
   );
