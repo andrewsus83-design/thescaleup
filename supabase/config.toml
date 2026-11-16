@@ -1,0 +1,5 @@
+# Supabase CLI project config for thescaleup.
+# Minimal on purpose: lets the Supabase GitHub integration and the CLI
+# recognise this repo's supabase/ directory. Remote project ref is kept out
+# of the file; link it locally with `supabase link --project-ref <ref>`.
+project_id = "thescaleup"
