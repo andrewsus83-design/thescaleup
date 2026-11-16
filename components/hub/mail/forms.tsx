@@ -1,12 +1,12 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
-import { Check, Copy, Loader2, Trash2 } from "lucide-react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
+import { Check, Copy, CornerUpLeft, Loader2, Trash2 } from "lucide-react";
 import { Alert, Btn } from "@/components/brand/primitives";
-import { labelCls, textareaCls } from "@/components/brand/styles";
+import { labelCls } from "@/components/brand/styles";
 import { compactField } from "@/components/hub/tasks/parts";
 import type { FormState } from "@/lib/hub/actions";
-import { addAddress, addDomain, checkDomain, removeAddress, removeDomain, sendMail, setThreadStatus } from "@/lib/hub/mail-actions";
+import { addAddress, addDomain, checkDomain, removeAddress, removeDomain, sendMail } from "@/lib/hub/mail-actions";
 import { cn } from "@/lib/utils";
 
 function Notice({ state }: { state: FormState }) {
@@ -175,76 +175,121 @@ export function RemoveAddressButton({ brandId, addressId, email }: { brandId: st
 // ---------------------------------------------------------------------------------------------- Mail
 type FromOption = { id: string; email: string; name: string | null };
 
-/** New message (threadId empty) or a reply (threadId set: the server picks the recipients and the subject). */
-export function Composer({ brandId, from, threadId, replyTo }: { brandId: string; from?: FromOption[]; threadId?: string; replyTo?: string }) {
+const rowCls = "flex items-center gap-3 border-b border-hairline focus-within:border-ink-800";
+const rowLabel = "w-16 shrink-0 text-small text-ink-500";
+const rowInput = "h-12 min-w-0 flex-1 bg-transparent text-body text-ink-800 outline-none placeholder:text-ink-500";
+
+/**
+ * Gmail's writing window: a dark "New message" bar, From / To / Subject on lines with only an underline, a large message area and
+ * Send underneath. As a reply (threadId set) the server picks the recipients and the subject, so only the message shows.
+ */
+export function Composer({ brandId, from, threadId, replyTo, onCancel }: { brandId: string; from?: FromOption[]; threadId?: string; replyTo?: string; onCancel?: () => void }) {
   const [state, action, pending] = useActionState<FormState, FormData>(sendMail, {});
   const [showCc, setShowCc] = useState(false);
+  const id = useId();
   const reply = Boolean(threadId);
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="overflow-hidden rounded-bubble border border-hairline bg-paper-0">
       <input type="hidden" name="brandId" value={brandId} />
       {threadId && <input type="hidden" name="threadId" value={threadId} />}
-      <Notice state={state} />
-      {!reply && (
-        <>
-          <label className="block">
-            <span className={labelCls}>From</span>
-            <select name="addressId" required defaultValue={from?.[0]?.id} className={cn(compactField, "h-12 w-full")}>
-              {from?.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name ? `${a.name} <${a.email}>` : a.email}
-                </option>
-              ))}
-            </select>
+      {!reply && <div className="bg-ink-800 px-5 py-3 text-small font-semibold text-paper-100">New message</div>}
+      <div className="px-5">
+        {!reply && from && (
+          <div className={rowCls}>
+            <label htmlFor={`${id}-from`} className={rowLabel}>
+              From
+            </label>
+            {from.length === 1 ? (
+              <>
+                <input type="hidden" name="addressId" value={from[0].id} />
+                <p id={`${id}-from`} className="flex h-12 min-w-0 flex-1 items-center truncate text-body text-ink-800">
+                  {from[0].name ? `${from[0].name} <${from[0].email}>` : from[0].email}
+                </p>
+              </>
+            ) : (
+              <select id={`${id}-from`} name="addressId" required defaultValue={from[0]?.id} className={cn(rowInput, "cursor-pointer")}>
+                {from.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name ? `${a.name} <${a.email}>` : a.email}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+        <div className={rowCls}>
+          <label htmlFor={`${id}-to`} className={rowLabel}>
+            To
           </label>
-          <label className="block">
-            <span className={labelCls}>To</span>
-            <input name="to" required autoCapitalize="none" spellCheck={false} placeholder="name@company.com, another@company.com" className={cn(compactField, "h-12 w-full")} />
-          </label>
-        </>
+          {reply ? (
+            <p id={`${id}-to`} className="flex h-12 min-w-0 flex-1 items-center truncate text-body text-ink-800">
+              {replyTo}
+            </p>
+          ) : (
+            <input id={`${id}-to`} name="to" required autoCapitalize="none" spellCheck={false} placeholder="name@company.com, another@company.com" className={rowInput} />
+          )}
+          {!showCc && (
+            <button type="button" onClick={() => setShowCc(true)} className="hit-44 min-h-11 shrink-0 rounded-full px-3 text-small font-semibold text-ink-500 hover:text-ink-800">
+              Cc
+            </button>
+          )}
+        </div>
+        {showCc && (
+          <div className={rowCls}>
+            <label htmlFor={`${id}-cc`} className={rowLabel}>
+              Cc
+            </label>
+            <input id={`${id}-cc`} name="cc" autoCapitalize="none" spellCheck={false} placeholder="name@company.com" autoFocus className={rowInput} />
+          </div>
+        )}
+        {!reply && (
+          <div className={rowCls}>
+            <label htmlFor={`${id}-subject`} className={rowLabel}>
+              Subject
+            </label>
+            <input id={`${id}-subject`} name="subject" required maxLength={200} className={rowInput} />
+          </div>
+        )}
+      </div>
+      {(state.error || state.message) && (
+        <div className="px-5 pt-4">
+          <Notice state={state} />
+        </div>
       )}
-      {reply && replyTo && <p className="text-small text-ink-500">Replying to {replyTo}</p>}
-      {showCc ? (
-        <label className="block">
-          <span className={labelCls}>Cc</span>
-          <input name="cc" autoCapitalize="none" spellCheck={false} placeholder="name@company.com" className={cn(compactField, "h-12 w-full")} />
-        </label>
-      ) : (
-        <button type="button" onClick={() => setShowCc(true)} className="hit-44 min-h-11 text-small font-semibold text-ink-500 hover:text-ink-800">
-          Add Cc
-        </button>
-      )}
-      {!reply && (
-        <label className="block">
-          <span className={labelCls}>Subject</span>
-          <input name="subject" required maxLength={200} className={cn(compactField, "h-12 w-full")} />
-        </label>
-      )}
-      <label className="block">
-        <span className={labelCls}>{reply ? "Your reply" : "Message"}</span>
-        <textarea name="body" required rows={reply ? 5 : 10} maxLength={50000} className={textareaCls} />
-      </label>
-      <Btn type="submit" variant="primary" disabled={pending}>
-        {pending ? <Spin label="Sending" /> : reply ? "Send reply" : "Send"}
-      </Btn>
+      <textarea
+        name="body"
+        required
+        rows={reply ? 6 : 14}
+        maxLength={50000}
+        autoFocus={reply}
+        aria-label={reply ? "Your reply" : "Message"}
+        className="block w-full resize-y bg-transparent px-5 py-4 text-body text-ink-800 outline-none placeholder:text-ink-500 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-inset"
+      />
+      <div className="flex flex-wrap items-center gap-3 border-t border-hairline px-5 py-3">
+        <Btn type="submit" variant="primary" disabled={pending}>
+          {pending ? <Spin label="Sending" /> : "Send"}
+        </Btn>
+        {onCancel && (
+          <Btn variant="secondary" onClick={onCancel}>
+            Discard
+          </Btn>
+        )}
+      </div>
     </form>
   );
 }
 
-export function ThreadStatusButton({ brandId, threadId, status }: { brandId: string; threadId: string; status: "open" | "done" }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(setThreadStatus, {});
-  const next = status === "open" ? "done" : "open";
-  return (
-    <form action={action} className="flex flex-col items-end gap-1">
-      <input type="hidden" name="brandId" value={brandId} />
-      <input type="hidden" name="threadId" value={threadId} />
-      <input type="hidden" name="status" value={next} />
-      <Btn type="submit" variant="secondary" size="sm" disabled={pending}>
-        {pending ? <Spin label="Saving" /> : next === "done" ? "Mark done" : "Reopen"}
+/** Under the last message: a Reply button that opens the writing area in place, like Gmail. */
+export function ReplyBox({ brandId, threadId, replyTo }: { brandId: string; threadId: string; replyTo?: string }) {
+  const [open, setOpen] = useState(false);
+  if (!open)
+    return (
+      <Btn variant="secondary" onClick={() => setOpen(true)}>
+        <CornerUpLeft className="size-4" aria-hidden />
+        Reply
       </Btn>
-      {state.error && <span className="text-caption text-danger">{state.error}</span>}
-    </form>
-  );
+    );
+  return <Composer brandId={brandId} threadId={threadId} replyTo={replyTo} onCancel={() => setOpen(false)} />;
 }
 
 /** The sender's own formatting, in a sandbox: no scripts, no forms, no access to this page, and no remote images or fonts (they would tell the sender the mail was opened). */
