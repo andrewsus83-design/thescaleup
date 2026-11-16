@@ -1,0 +1,42 @@
+name: Supabase migrate (manual)
+
+# Manual only: never runs on push or pull_request.
+# Run it from Actions -> "Supabase migrate (manual)" -> Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: list pending migrations, apply nothing"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  db-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Apply migrations
+        env:
+          # Postgres connection string of the Supabase project (use the pooler
+          # string: GitHub runners are IPv4-only). Add it under
+          # Settings -> Secrets and variables -> Actions.
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Repository secret SUPABASE_DB_URL is not set."
+            exit 1
+          fi
+          if [ "$DRY_RUN" = "true" ]; then
+            supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
+          else
+            supabase db push --db-url "$SUPABASE_DB_URL"
+          fi
