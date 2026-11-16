@@ -1,5 +1,5 @@
 import { applyDeliveryEvent, ingestReceived } from "@/lib/hub/mail/inbound";
-import { verifySvix } from "@/lib/hub/mail/svix";
+import { cleanSecret, svixFailure, verifySvix } from "@/lib/hub/mail/svix";
 
 // Resend calls this when mail arrives at a brand's address and when an email we sent is delivered or bounces.
 // Set it up in Resend → Webhooks: URL https://<this site>/api/mail/resend, events email.received, email.sent,
@@ -9,18 +9,21 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export async function POST(request: Request) {
-  const secret = process.env.RESEND_WEBHOOK_SECRET;
+  const secret = cleanSecret(process.env.RESEND_WEBHOOK_SECRET ?? "");
   if (!secret) return new Response("RESEND_WEBHOOK_SECRET is not set", { status: 503 });
 
   const body = await request.text(); // the signature covers the raw body, so it is read as text before anything parses it
-  const ok = verifySvix({
+  const headers = {
     id: request.headers.get("svix-id"),
     timestamp: request.headers.get("svix-timestamp"),
     signature: request.headers.get("svix-signature"),
-    body,
-    secret,
-  });
-  if (!ok) return new Response("Invalid signature", { status: 401 });
+  };
+  const ok = verifySvix({ ...headers, body, secret });
+  if (!ok) {
+    // Never the secret itself: just why the check failed, so a wrong or stale secret can be told apart from a bad request.
+    console.warn("[mail webhook] rejected", JSON.stringify(svixFailure({ ...headers, secret })));
+    return new Response("Invalid signature", { status: 401 });
+  }
 
   let event: { type?: string; data?: Record<string, unknown> };
   try {
