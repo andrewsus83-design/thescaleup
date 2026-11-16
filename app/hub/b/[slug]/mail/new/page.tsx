@@ -8,7 +8,7 @@ import { MailShell } from "@/components/hub/mail/shell";
 import { requireFunction } from "@/lib/hub/access";
 import { countUnread, listAddresses, listDomains, sendable } from "@/lib/hub/mail/data";
 import { canManageTeam } from "@/lib/hub/rules";
-import { isR2Ready } from "@/lib/hub/storage/r2";
+import { isR2Ready, r2Problem } from "@/lib/hub/storage/r2";
 
 export const metadata: Metadata = { title: "Compose" };
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ export default async function NewMailPage({ params }: { params: Promise<{ slug: 
           )}
         </EmptyState>
       ) : (
-        <Composer brandId={brand.id} canAttach={isR2Ready()} from={from.map((a) => ({ id: a.id, email: a.email, name: a.display_name }))} />
+        <Composer brandId={brand.id} canAttach={isR2Ready()} attachHint={canManageTeam(actor) ? (r2Problem() ?? undefined) : undefined} from={from.map((a) => ({ id: a.id, email: a.email, name: a.display_name }))} />
       )}
     </MailShell>
   );

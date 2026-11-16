@@ -7,17 +7,40 @@ import { presignUrl } from "./sigv4";
 
 type Cfg = { host: string; bucket: string; accessKeyId: string; secretAccessKey: string };
 
+/** A value as it was probably meant: trimmed, without the quotes people paste around it. */
+const clean = (v: string | undefined) => (v ?? "").trim().replace(/^["']+|["']+$/g, "").trim();
+
+/**
+ * Reads the four settings. When something is wrong the answer names the variable (never its value), so whoever manages the
+ * workspace can fix it without guessing. A pasted endpoint such as https://<id>.r2.cloudflarestorage.com still yields the account id.
+ */
+function read(): { cfg: Cfg } | { problem: string } {
+  const accountRaw = clean(process.env.R2_ACCOUNT_ID);
+  if (!accountRaw) return { problem: "R2_ACCOUNT_ID is not set on the server." };
+  const account = /[a-f0-9]{32}/i.exec(accountRaw)?.[0]?.toLowerCase();
+  if (!account) return { problem: "R2_ACCOUNT_ID should be the 32-character account ID from Cloudflare." };
+  const accessKeyId = clean(process.env.R2_ACCESS_KEY_ID);
+  if (!accessKeyId) return { problem: "R2_ACCESS_KEY_ID is not set on the server." };
+  const secretAccessKey = clean(process.env.R2_SECRET_ACCESS_KEY);
+  if (!secretAccessKey) return { problem: "R2_SECRET_ACCESS_KEY is not set on the server." };
+  const bucket = clean(process.env.R2_BUCKET);
+  if (!bucket) return { problem: "R2_BUCKET is not set on the server." };
+  if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket)) return { problem: "R2_BUCKET should be the bucket name only, such as thescaleup-assets." };
+  return { cfg: { host: `${account}.r2.cloudflarestorage.com`, bucket, accessKeyId, secretAccessKey } };
+}
+
 function config(): Cfg | null {
-  const account = process.env.R2_ACCOUNT_ID?.trim();
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim();
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
-  const bucket = process.env.R2_BUCKET?.trim();
-  if (!account || !accessKeyId || !secretAccessKey || !bucket) return null;
-  if (!/^[a-f0-9]{32}$/i.test(account) || !/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket)) return null;
-  return { host: `${account}.r2.cloudflarestorage.com`, bucket, accessKeyId, secretAccessKey };
+  const r = read();
+  return "cfg" in r ? r.cfg : null;
 }
 
 export const isR2Ready = () => config() !== null;
+
+/** Why storage is not usable, in words that name the setting, or null when it is. */
+export const r2Problem = (): string | null => {
+  const r = read();
+  return "problem" in r ? r.problem : null;
+};
 
 type Method = "GET" | "PUT" | "HEAD" | "DELETE";
 
