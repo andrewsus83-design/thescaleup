@@ -124,7 +124,7 @@ export function Alert({
   return (
     <div role={role} className={cn("flex items-start gap-3 rounded-field px-5 py-4 text-small font-normal text-ink-800", ALERT[tone].box, className)}>
       <Dot className={cn("mt-1.5", ALERT[tone].dot)} />
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         {title && <strong className="font-semibold">{title} </strong>}
         {children}
       </div>
