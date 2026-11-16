@@ -15,4 +15,5 @@ CREATE INDEX IF NOT EXISTS admin_sessions_expires_at_idx ON admin_sessions(expir
 
 -- RLS: service-role only (no anon/authenticated reads).
 ALTER TABLE admin_sessions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "service role only" ON admin_sessions;
 CREATE POLICY "service role only" ON admin_sessions USING (false);
