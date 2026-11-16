@@ -1,11 +1,11 @@
 import { CalendarDays, HardDrive } from "lucide-react";
 import { Alert, Chip } from "@/components/brand/primitives";
 import { KeyRow } from "@/components/hub/keys-panel";
-import { GROUPS, fallsBack, providersFor } from "@/lib/hub/providers";
+import { GROUPS, fallsBack, providersFor, type GroupId } from "@/lib/hub/providers";
 import { isEncryptionReady, secretStatus } from "@/lib/hub/secrets";
 
 /** Keys for the workspace (brandId = null) or one brand, grouped by what they are for. Server component: reads only the last 4 characters. */
-export async function KeysSection({ brandId }: { brandId: string | null }) {
+export async function KeysSection({ brandId, only }: { brandId: string | null; only?: GroupId[] }) {
   const scope = brandId ?? "workspace";
   const [own, workspace] = await Promise.all([secretStatus(brandId), brandId ? secretStatus(null) : Promise.resolve({})]);
   const ready = isEncryptionReady();
@@ -17,7 +17,7 @@ export async function KeysSection({ brandId }: { brandId: string | null }) {
           Encryption is not set up on the server yet, so keys cannot be saved. Add <code className="font-mono">SECRETS_KEY_1</code> (see the PR notes).
         </Alert>
       )}
-      {GROUPS.map((g) => {
+      {GROUPS.filter((g) => !only || only.includes(g.id)).map((g) => {
         const rows = list.filter((p) => p.group === g.id);
         const showGoogleSoon = Boolean(brandId) && g.id === "google";
         if (rows.length === 0 && !showGoogleSoon) return null;
