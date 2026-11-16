@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
-import { Alert, Card } from "@/components/brand/primitives";
-import { BackLink } from "@/components/hub/back-link";
-import { Composer, ThreadStatusButton } from "@/components/hub/mail/forms";
+import { Alert } from "@/components/brand/primitives";
+import { tagCls } from "@/components/brand/styles";
+import { ReplyBox } from "@/components/hub/mail/forms";
 import { Message } from "@/components/hub/mail/message";
+import { MailShell } from "@/components/hub/mail/shell";
+import { ThreadToolbar } from "@/components/hub/mail/thread-toolbar";
 import { requireFunction } from "@/lib/hub/access";
-import { getThread, listAddresses, listDomains, sendable } from "@/lib/hub/mail/data";
+import { countUnread, getThread, listAddresses, listDomains, sendable } from "@/lib/hub/mail/data";
+import { mailHref } from "@/lib/hub/mail/model";
 import { atLeast } from "@/lib/hub/permissions";
 import { hubTz, todayIn } from "@/lib/hub/tasks/dates";
 import { UUID } from "@/lib/hub/tasks/context";
@@ -29,41 +32,43 @@ export default async function ThreadPage({ params }: { params: Promise<{ slug: s
       await createSupabaseAdminClient().from("mail_threads").update({ unread: false }).eq("brand_id", brand.id).eq("id", threadId);
     });
   }
-  const [domains] = await Promise.all([listDomains(brand.id)]);
+  const [domains, unread] = await Promise.all([listDomains(brand.id), countUnread(brand.id)]);
   const addresses = await listAddresses(brand.id, domains);
   const mine = addresses.find((a) => a.id === thread.address_id);
   const canReply = canWrite && !!mine && sendable([mine], domains).length > 0;
+  const canCompose = canWrite && sendable(addresses, domains).length > 0;
   const lastIn = [...messages].reverse().find((m) => m.direction === "in");
   const replyTo = lastIn ? lastIn.from_email : messages[messages.length - 1]?.to_emails.join(", ");
   const tz = hubTz();
   const today = todayIn(tz);
+  const base = `/hub/b/${slug}/mail`;
+  const folder = thread.status === "done" ? "done" : "inbox";
+  const back = mailHref(base, folder);
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
-      <BackLink href={`/hub/b/${slug}/mail${thread.status === "done" ? "?f=done" : ""}`}>Mail</BackLink>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="break-words font-title text-h2 text-ink-800">{thread.subject || "(no subject)"}</h1>
-          <p className="mt-1 truncate font-mono text-micro text-ink-500">{thread.mailbox}</p>
-        </div>
-        {canWrite && <ThreadStatusButton brandId={brand.id} threadId={thread.id} status={thread.status} />}
+    <MailShell slug={slug} active={folder} unread={Math.max(0, unread - (thread.unread && canWrite && thread.status === "open" ? 1 : 0))} addresses={addresses} canCompose={canCompose}>
+      <ThreadToolbar brandId={brand.id} threadId={thread.id} status={thread.status} back={back} canEdit={canWrite} />
+      <div className="mb-5">
+        <h1 className="break-words font-title text-h2 text-ink-800">{thread.subject || "(no subject)"}</h1>
+        <p className="mt-2 flex flex-wrap items-center gap-2">
+          <span className={tagCls}>{thread.status === "done" ? "Done" : "Inbox"}</span>
+          <span className="min-w-0 truncate font-mono text-micro text-ink-500">{thread.mailbox}</span>
+        </p>
       </div>
-      <div className="space-y-4">
-        {messages.map((m) => (
-          <Message key={m.id} m={m} slug={slug} tz={tz} today={today} />
+      <div className="space-y-3">
+        {messages.map((m, i) => (
+          <Message key={m.id} m={m} slug={slug} tz={tz} today={today} open={i === messages.length - 1} />
         ))}
       </div>
-      <div className="mt-8">
+      <div className="mt-6">
         {canReply ? (
-          <Card small>
-            <Composer brandId={brand.id} threadId={thread.id} replyTo={replyTo} />
-          </Card>
+          <ReplyBox brandId={brand.id} threadId={thread.id} replyTo={replyTo} />
         ) : canWrite ? (
           <Alert tone="info">{mine ? `${mine.domain} is not verified, so this conversation cannot be answered yet.` : "The address of this conversation was removed, so it cannot be answered from here."}</Alert>
         ) : (
           <Alert tone="info">You can read this conversation but not reply to it.</Alert>
         )}
       </div>
-    </div>
+    </MailShell>
   );
 }

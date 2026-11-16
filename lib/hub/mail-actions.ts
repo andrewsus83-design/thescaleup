@@ -9,7 +9,7 @@ import { MAIL_LIMITS, domainError, fromHeader, localPartError, messageIds, parse
 import { createDomain, deleteDomain, enableReceiving, findDomain, getDomain, isResendReady, sendEmail, verifyDomain, type ResendDomain } from "./mail/resend";
 import { atLeast } from "./permissions";
 import { allow } from "./ratelimit";
-import { canManageTeam } from "./rules";
+import { canManageTeam, safeNext } from "./rules";
 import { audit } from "./session";
 import { UUID, str, taskContext, type Ctx } from "./tasks/context";
 
@@ -274,15 +274,26 @@ export async function sendMail(_prev: FormState, fd: FormData): Promise<FormStat
 }
 
 // ---------------------------------------------------------------------------------------------- conversation state
-export async function setThreadStatus(_prev: FormState, fd: FormData): Promise<FormState> {
+const OPS = { done: { status: "done" }, open: { status: "open" }, read: { unread: false }, unread: { unread: true } } as const;
+
+/**
+ * Done, reopen, mark read or unread, for the conversations ticked in the list ("act" is the action) or for one row ("act" is
+ * "action:threadId"). From the conversation page "back" is where to go afterwards. Read state is shared by the whole team.
+ */
+export async function setThreadsState(_prev: FormState, fd: FormData): Promise<FormState> {
   const c = await mailContext(fd, "edit");
   if (!c.ok) return { error: c.error };
   const { ctx } = c;
-  const id = str(fd, "threadId");
-  const status = str(fd, "status");
-  if (!UUID.test(id) || (status !== "open" && status !== "done")) return { error: "Unknown conversation." };
-  const { error } = await ctx.admin.from("mail_threads").update({ status }).eq("brand_id", ctx.brandId).eq("id", id);
-  if (error) return { error: "Could not update the conversation. Try again." };
+  const [op, one] = str(fd, "act").split(":");
+  const patch = Object.hasOwn(OPS, op) ? OPS[op as keyof typeof OPS] : undefined;
+  if (!patch) return { error: "Unknown action." };
+  const ids = one ? [one] : fd.getAll("id").filter((v): v is string => typeof v === "string");
+  if (ids.length === 0) return { error: "Tick a conversation first." };
+  if (ids.length > 100 || !ids.every((id) => UUID.test(id))) return { error: "Unknown conversation." };
+  const { error } = await ctx.admin.from("mail_threads").update(patch).eq("brand_id", ctx.brandId).in("id", ids);
+  if (error) return { error: "Could not update the conversations. Try again." };
   refresh(ctx.slug);
-  return { message: status === "done" ? "Marked done." : "Reopened." };
+  const back = safeNext(str(fd, "back"), "");
+  if (back.startsWith(`/hub/b/${ctx.slug}/mail`)) redirect(back);
+  return { message: "Updated." };
 }

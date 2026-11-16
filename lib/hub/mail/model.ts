@@ -114,3 +114,54 @@ export const normalizeSubject = (s: string) =>
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
+
+// ---------------------------------------------------------------------------------------------- list, search and avatars
+
+export type Folder = "inbox" | "sent" | "done";
+
+/** The folder named in the address bar. Anything unknown (or the old "open") is the inbox. */
+export const folderOf = (raw: unknown): Folder => (raw === "done" || raw === "sent" ? raw : "inbox");
+
+/** The address of a Mail list: the folder, one address and a page are all optional. The inbox with nothing else is just the base. */
+export function mailHref(base: string, folder: Folder, opts: { addressId?: string; before?: string; q?: string } = {}): string {
+  const p = new URLSearchParams();
+  if (folder !== "inbox") p.set("f", folder);
+  if (opts.addressId) p.set("a", opts.addressId);
+  if (opts.q) p.set("q", opts.q);
+  if (opts.before) p.set("before", opts.before);
+  const s = p.toString();
+  return s ? `${base}?${s}` : base;
+}
+
+/** What was typed in the search box, made safe to put into a database filter: no wildcards, commas, quotes or brackets. Empty when nothing is left. */
+export function searchTerm(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  return raw.replace(/[%_*\\,()"]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+/** A page cursor from the address bar: an ISO time, or nothing. */
+export function cursorOf(raw: unknown): string | undefined {
+  if (typeof raw !== "string" || raw.length > 40) return undefined;
+  const t = Date.parse(raw);
+  return Number.isFinite(t) ? new Date(t).toISOString() : undefined;
+}
+
+/** The letter in an avatar: the first letter or digit of the name, else of the address. */
+export function initialOf(name: string | null | undefined, email: string): string {
+  const pick = (s: string) => (/[\p{L}\p{N}]/u.exec(s)?.[0] ?? "").toUpperCase();
+  return pick(name ?? "") || pick(email) || "?";
+}
+
+/** A stable pick from `count` options for an address, so the same person always keeps the same avatar colour. */
+export function toneOf(email: string, count: number): number {
+  let h = 0;
+  for (const c of email.toLowerCase()) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return h % Math.max(1, count);
+}
+
+/** One line of a message for a collapsed row: line breaks and runs of spaces become single spaces, quoted lines are skipped. */
+export function previewOf(text: string, max = 110): string {
+  const lines = text.split(/\r?\n/).filter((l) => !/^\s*>/.test(l));
+  const flat = lines.join(" ").replace(/\s+/g, " ").trim();
+  return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
+}
