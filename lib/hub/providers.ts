@@ -4,13 +4,14 @@
 //  - scope "brand":     a connection that belongs to one brand and never falls back (the brand's own accounts).
 // "wired" is false while nothing in the app reads that key yet: the page says so instead of implying it is in use.
 
-export type GroupId = "ai" | "research" | "pages" | "social" | "ads" | "cost" | "google";
+export type GroupId = "ai" | "research" | "media" | "pages" | "social" | "ads" | "cost" | "google";
 export type Scope = "both" | "workspace" | "brand";
 export type ProviderDef = { key: string; label: string; use: string; hint: string; group: GroupId; scope: Scope; wired: boolean };
 
 export const GROUPS: { id: GroupId; label: string; hint: string }[] = [
   { id: "ai", label: "AI models", hint: "Chat, analysis, writing and the agents" },
   { id: "research", label: "Search and research", hint: "Rankings, AI answers with citations, competitor data" },
+  { id: "media", label: "Image and video generation", hint: "Images and video made from a prompt or a photo" },
   { id: "pages", label: "Pages and scraping", hint: "Reading websites and pulling data where no API exists" },
   { id: "social", label: "Social and messaging", hint: "Connected social accounts and WhatsApp" },
   { id: "ads", label: "Ads", hint: "Campaigns and ad spend across Google, Meta, LinkedIn and TikTok" },
@@ -27,6 +28,9 @@ export const PROVIDERS: ProviderDef[] = [
   { key: "dataforseo_login", label: "DataForSEO login", use: "Search positions, AI mentions, competitor keywords", hint: "account email", group: "research", scope: "both", wired: true },
   { key: "dataforseo", label: "DataForSEO password", use: "Pairs with the login above", hint: "password or API key", group: "research", scope: "both", wired: true },
   { key: "serp", label: "SerpApi", use: "Second source for search results", hint: "API key", group: "research", scope: "both", wired: true },
+
+  { key: "higgsfield_key", label: "Higgsfield key ID", use: "Makes images and video for the brand: ads, social posts, newsletter pictures", hint: "Key ID from the Higgsfield Console", group: "media", scope: "both", wired: false },
+  { key: "higgsfield_secret", label: "Higgsfield key secret", use: "Pairs with the key ID above", hint: "Key secret from the Higgsfield Console", group: "media", scope: "both", wired: false },
 
   { key: "firecrawl", label: "Firecrawl", use: "Clean page text for checks and brand extraction", hint: "fc-...", group: "pages", scope: "both", wired: true },
   { key: "apify", label: "Apify", use: "Scrapers where no API exists (fallback only)", hint: "apify_api_...", group: "pages", scope: "both", wired: true },
