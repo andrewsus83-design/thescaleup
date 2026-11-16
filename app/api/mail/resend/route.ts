@@ -36,9 +36,11 @@ export async function POST(request: Request) {
   if (event.type === "email.received") {
     if (!data.email_id) return new Response("Missing email_id", { status: 400 });
     const result = await ingestReceived(data.email_id);
+    console.info("[mail webhook] accepted", event.type, result); // event type and outcome only, no addresses or content
     // "retry" answers 500 so Resend tries again; everything else is final.
     return result === "retry" ? new Response("Try again", { status: 500 }) : Response.json({ ok: true, result });
   }
   if (event.type) await applyDeliveryEvent(event.type, data);
+  console.info("[mail webhook] accepted", event.type ?? "(no type)");
   return Response.json({ ok: true });
 }
