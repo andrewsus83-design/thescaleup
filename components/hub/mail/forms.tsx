@@ -184,7 +184,7 @@ const rowInput = "h-12 min-w-0 flex-1 bg-transparent text-body text-ink-800 outl
  * Gmail's writing window: a dark "New message" bar, From / To / Subject on lines with only an underline, a large message area and
  * Send underneath. As a reply (threadId set) the server picks the recipients and the subject, so only the message shows.
  */
-export function Composer({ brandId, from, threadId, replyTo, onCancel, canAttach }: { brandId: string; from?: FromOption[]; threadId?: string; replyTo?: string; onCancel?: () => void; canAttach?: boolean }) {
+export function Composer({ brandId, from, threadId, replyTo, onCancel, canAttach, attachHint }: { brandId: string; from?: FromOption[]; threadId?: string; replyTo?: string; onCancel?: () => void; canAttach?: boolean; attachHint?: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(sendMail, {});
   const [showCc, setShowCc] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -267,7 +267,7 @@ export function Composer({ brandId, from, threadId, replyTo, onCancel, canAttach
         aria-label={reply ? "Your reply" : "Message"}
         className="block w-full resize-y bg-transparent px-5 py-4 text-body text-ink-800 outline-none placeholder:text-ink-500 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-inset"
       />
-      {canAttach ? <AttachPicker brandId={brandId} onBusy={setUploading} /> : <p className="px-5 pb-4 text-caption text-ink-500">Attachments are not turned on yet. The founder or the agency can set up file storage.</p>}
+      {canAttach ? <AttachPicker brandId={brandId} onBusy={setUploading} /> : <p className="px-5 pb-4 text-caption text-ink-500">Attachments are not turned on yet. {attachHint ?? "The founder or the agency can set up file storage."}</p>}
       <div className="flex flex-wrap items-center gap-3 border-t border-hairline px-5 py-3">
         <Btn type="submit" variant="primary" disabled={pending || uploading}>
           {pending ? <Spin label="Sending" /> : "Send"}
@@ -284,7 +284,7 @@ export function Composer({ brandId, from, threadId, replyTo, onCancel, canAttach
 }
 
 /** Under the last message: a Reply button that opens the writing area in place, like Gmail. */
-export function ReplyBox({ brandId, threadId, replyTo, canAttach }: { brandId: string; threadId: string; replyTo?: string; canAttach?: boolean }) {
+export function ReplyBox({ brandId, threadId, replyTo, canAttach, attachHint }: { brandId: string; threadId: string; replyTo?: string; canAttach?: boolean; attachHint?: string }) {
   const [open, setOpen] = useState(false);
   if (!open)
     return (
@@ -293,7 +293,7 @@ export function ReplyBox({ brandId, threadId, replyTo, canAttach }: { brandId: s
         Reply
       </Btn>
     );
-  return <Composer brandId={brandId} threadId={threadId} replyTo={replyTo} canAttach={canAttach} onCancel={() => setOpen(false)} />;
+  return <Composer brandId={brandId} threadId={threadId} replyTo={replyTo} canAttach={canAttach} attachHint={attachHint} onCancel={() => setOpen(false)} />;
 }
 
 /** The sender's own formatting, in a sandbox: no scripts, no forms, no access to this page, and no remote images or fonts (they would tell the sender the mail was opened). */

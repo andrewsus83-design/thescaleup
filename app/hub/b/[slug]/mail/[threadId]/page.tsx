@@ -11,7 +11,8 @@ import { requireFunction } from "@/lib/hub/access";
 import { countUnread, getThread, listAddresses, listDomains, sendable } from "@/lib/hub/mail/data";
 import { mailHref } from "@/lib/hub/mail/model";
 import { atLeast } from "@/lib/hub/permissions";
-import { isR2Ready } from "@/lib/hub/storage/r2";
+import { canManageTeam } from "@/lib/hub/rules";
+import { isR2Ready, r2Problem } from "@/lib/hub/storage/r2";
 import { hubTz, todayIn } from "@/lib/hub/tasks/dates";
 import { UUID } from "@/lib/hub/tasks/context";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -21,7 +22,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ThreadPage({ params }: { params: Promise<{ slug: string; threadId: string }> }) {
   const { slug, threadId } = await params;
-  const { brand, access } = await requireFunction(slug, "mail");
+  const { brand, access, actor } = await requireFunction(slug, "mail");
   if (!UUID.test(threadId)) notFound();
   const found = await getThread(brand.id, threadId);
   if (!found) notFound();
@@ -63,7 +64,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ slug: s
       </div>
       <div className="mt-6">
         {canReply ? (
-          <ReplyBox brandId={brand.id} threadId={thread.id} replyTo={replyTo} canAttach={isR2Ready()} />
+          <ReplyBox brandId={brand.id} threadId={thread.id} replyTo={replyTo} canAttach={isR2Ready()} attachHint={canManageTeam(actor) ? (r2Problem() ?? undefined) : undefined} />
         ) : canWrite ? (
           <Alert tone="info">{mine ? `${mine.domain} is not verified, so this conversation cannot be answered yet.` : "The address of this conversation was removed, so it cannot be answered from here."}</Alert>
         ) : (
