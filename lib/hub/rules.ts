@@ -69,3 +69,10 @@ export function passwordError(pw: string, email: string): string | null {
   if (COMMON_PASSWORDS.has(lower) || lower === email.toLowerCase() || lower === email.split("@")[0]?.toLowerCase()) return "That password is too easy to guess.";
   return null;
 }
+
+/** The six digits from a box where people paste "123 456" or "123-456". Null when it is not six digits. */
+export function cleanCode(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const digits = raw.replace(/[\s-]/g, "");
+  return /^\d{6}$/.test(digits) ? digits : null;
+}
