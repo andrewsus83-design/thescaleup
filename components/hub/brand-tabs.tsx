@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Building2, CheckSquare, Ellipsis, Images, Inbox, Mail, Package, Pencil, Settings, Share2, Users, Wallet, type LucideIcon } from "lucide-react";
+import { Building2, CheckSquare, Ellipsis, Images, Inbox, Mail, Package, Pencil, PenLine, Settings, Share2, Users, Wallet, type LucideIcon } from "lucide-react";
 import type { TabKey } from "@/lib/hub/tabs";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +13,7 @@ const DEFS: Record<TabKey, { label: string; short: string; icon: LucideIcon }> =
   inbox: { label: "Inbox", short: "Inbox", icon: Inbox },
   mail: { label: "Mail", short: "Mail", icon: Mail },
   social: { label: "Social Media", short: "Social", icon: Share2 },
+  content: { label: "Content", short: "Content", icon: PenLine },
   assets: { label: "Assets", short: "Assets", icon: Images },
   team: { label: "Team", short: "Team", icon: Users },
   finance: { label: "Finance", short: "Finance", icon: Wallet },
