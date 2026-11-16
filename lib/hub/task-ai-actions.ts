@@ -1,8 +1,8 @@
 "use server";
 
-import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import type { FormState } from "./actions";
+import { aiModel as model, askClaude as ask } from "./ai";
 import { allow } from "./ratelimit";
 import { getBrandKey } from "./secrets";
 import { audit } from "./session";
@@ -17,19 +17,8 @@ import { canComment, canCreate, canSeeStage, startStatus } from "./tasks/rules";
 // *proposal* a person approves (drafted tasks) or a comment (a summary). Cost control: size caps on input and output, an hourly
 // limit per person, and the token counts go to the audit log until the usage ledger exists.
 
-const model = () => process.env.HUB_AI_MODEL?.trim() || "claude-sonnet-5-5";
 const NO_KEY = "Add an Anthropic key in Settings → Integrations to use AI.";
 const BUSY = "That is a lot of AI requests in an hour. Try again later.";
-
-async function ask(apiKey: string, system: string, user: string, maxTokens: number) {
-  const client = new Anthropic({ apiKey });
-  const resp = await client.messages.create({ model: model(), max_tokens: maxTokens, system, messages: [{ role: "user", content: user }] }, { timeout: 60_000 });
-  const text = resp.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
-  return { text, tokens: { in: resp.usage?.input_tokens ?? 0, out: resp.usage?.output_tokens ?? 0 } };
-}
 
 /** A goal (plan) or pasted notes in, proposed tasks out. */
 export async function draftTasks(_prev: FormState, fd: FormData): Promise<FormState> {

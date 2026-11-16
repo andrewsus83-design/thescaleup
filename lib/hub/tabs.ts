@@ -1,7 +1,7 @@
 import type { Access, Fn } from "./permissions";
 
 // The sections of a brand, in the order of the bottom bar on a wide screen (Brand is the home, on the far left).
-export const TAB_KEYS = ["brand", "tasks", "inbox", "mail", "social", "assets", "team", "finance", "products", "settings"] as const;
+export const TAB_KEYS = ["brand", "tasks", "inbox", "mail", "social", "content", "assets", "team", "finance", "products", "settings"] as const;
 export type TabKey = (typeof TAB_KEYS)[number];
 export const isTabKey = (v: unknown): v is TabKey => typeof v === "string" && (TAB_KEYS as readonly string[]).includes(v);
 
@@ -12,6 +12,7 @@ const TAB_FN: Record<TabKey, Fn | null> = {
   inbox: "inbox",
   mail: "mail",
   social: "social",
+  content: "content",
   assets: "assets",
   team: "team",
   finance: "finance",
@@ -30,7 +31,7 @@ export function visibleTabs(access: Access): TabKey[] {
 export const PHONE_BAR_SLOTS = 4;
 
 /** What the bar starts with, and what fills a free slot when a chosen menu is not available in this brand. */
-export const DEFAULT_PHONE_ORDER: readonly TabKey[] = ["brand", "tasks", "inbox", "team", "settings", "mail", "social", "assets", "finance", "products"];
+export const DEFAULT_PHONE_ORDER: readonly TabKey[] = ["brand", "tasks", "inbox", "team", "settings", "mail", "social", "content", "assets", "finance", "products"];
 
 /** The phone bar for this person in this brand: their choices that they may open, then the defaults; everything else goes under More. */
 export function phoneLayout(allowed: readonly TabKey[], chosen: readonly string[] | null): { bar: TabKey[]; more: TabKey[] } {
