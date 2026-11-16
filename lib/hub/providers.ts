@@ -4,7 +4,7 @@
 //  - scope "brand":     a connection that belongs to one brand and never falls back (the brand's own accounts).
 // "wired" is false while nothing in the app reads that key yet: the page says so instead of implying it is in use.
 
-export type GroupId = "ai" | "research" | "pages" | "social" | "cost" | "google";
+export type GroupId = "ai" | "research" | "pages" | "social" | "ads" | "cost" | "google";
 export type Scope = "both" | "workspace" | "brand";
 export type ProviderDef = { key: string; label: string; use: string; hint: string; group: GroupId; scope: Scope; wired: boolean };
 
@@ -13,6 +13,7 @@ export const GROUPS: { id: GroupId; label: string; hint: string }[] = [
   { id: "research", label: "Search and research", hint: "Rankings, AI answers with citations, competitor data" },
   { id: "pages", label: "Pages and scraping", hint: "Reading websites and pulling data where no API exists" },
   { id: "social", label: "Social and messaging", hint: "Connected social accounts and WhatsApp" },
+  { id: "ads", label: "Ads", hint: "Campaigns and ad spend across Google, Meta, LinkedIn and TikTok" },
   { id: "cost", label: "Cost control", hint: "See what every AI call costs, per brand" },
   { id: "google", label: "Google", hint: "Drive files and Calendar events" },
 ];
@@ -31,6 +32,12 @@ export const PROVIDERS: ProviderDef[] = [
   { key: "apify", label: "Apify", use: "Scrapers where no API exists (fallback only)", hint: "apify_api_...", group: "pages", scope: "both", wired: true },
 
   { key: "zernio", label: "Zernio", use: "Connects the brand's social accounts and WhatsApp (one key for both)", hint: "Zernio API key", group: "social", scope: "brand", wired: false },
+
+  { key: "metricool", label: "Metricool API token", use: "Posts, scheduling and analytics from the brand's Metricool account", hint: "Account settings, API, copy the token", group: "social", scope: "both", wired: false },
+  { key: "metricool_user_id", label: "Metricool user ID", use: "Pairs with the token: your Metricool account number", hint: "The number after userId= in the Metricool address bar", group: "social", scope: "both", wired: false },
+  { key: "metricool_blog_id", label: "Metricool brand ID", use: "Which Metricool brand belongs to this brand", hint: "The number after blogId= when the brand is open in Metricool", group: "social", scope: "brand", wired: false },
+
+  { key: "adspirer", label: "Adspirer", use: "Reads and manages campaigns on the ad accounts connected in Adspirer", hint: "sk_live_...", group: "ads", scope: "both", wired: false },
 
   { key: "langfuse_public", label: "Langfuse public key", use: "Traces tokens and cost of AI calls, tagged by brand", hint: "pk-lf-...", group: "cost", scope: "both", wired: false },
   { key: "langfuse_secret", label: "Langfuse secret key", use: "Pairs with the public key above", hint: "sk-lf-...", group: "cost", scope: "both", wired: false },
