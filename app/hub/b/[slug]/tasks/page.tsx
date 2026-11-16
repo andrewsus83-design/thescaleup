@@ -6,6 +6,7 @@ import { CalendarView } from "@/components/hub/tasks/calendar-view";
 import { ListView } from "@/components/hub/tasks/list-view";
 import { Toolbar, type Query, type View } from "@/components/hub/tasks/toolbar";
 import { requireFunction } from "@/lib/hub/access";
+import { canManageTeam } from "@/lib/hub/rules";
 import { getWorkflow, hasAiKey, listMembers, listTasks } from "@/lib/hub/tasks/data";
 import { monthGrid, parseMonth } from "@/lib/hub/tasks/calendar";
 import { addDays, dayIn, hubTz, isIsoDate, todayIn } from "@/lib/hub/tasks/dates";
@@ -82,7 +83,7 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
   return (
     <div>
       <PageHeader title="Tasks" description={access.tasks === "view" ? "You can see tasks here. Ask the founder if you need to change them." : "Add work, move it along, and approve what the team proposes."} />
-      {canAdd && <AddPanel brandId={brand.id} members={members} withAi={await hasAiKey(brand.id)} />}
+      {canAdd && <AddPanel slug={slug} brandId={brand.id} members={members} withAi={await hasAiKey(brand.id)} canSetKey={canManageTeam(actor)} />}
       {!canAdd && actor === "ops" && (
         <div className="mb-6">
           <Alert tone="info">You see the tasks assigned to you and the rest of the team&apos;s approved work. You can move your own tasks and comment.</Alert>
