@@ -2,25 +2,37 @@ import type { Metadata } from "next";
 import { CalendarDays, CheckSquare, Clock, Landmark, Target } from "lucide-react";
 import { PageHeader } from "@/components/brand/primitives";
 import { SectionList, type SectionItem } from "@/components/hub/section-list";
+import { ClockCard } from "@/components/hub/tasks/clock-card";
 import { requireFunction } from "@/lib/hub/access";
+import { getOpenEntry } from "@/lib/hub/tasks/data";
+import { fmtStamp, hubTz, todayIn } from "@/lib/hub/tasks/dates";
 
 export const metadata: Metadata = { title: "Team" };
 export const dynamic = "force-dynamic";
 
 export default async function TeamPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { access } = await requireFunction(slug, "team");
-  const items: SectionItem[] = [
-    { key: "tasks", title: "Team tasks", hint: "Who is working on what, and what is waiting", icon: CheckSquare, soon: true },
-    { key: "clock", title: "Clock in and out", hint: "Start and end the working day from your phone", icon: Clock, soon: true },
-    { key: "kpi", title: "KPI and deliverables", hint: "Tasks done on time and late, per person", icon: Target, soon: true },
-    { key: "calendar", title: "Calendar", hint: "Deadlines, days off and shifts", icon: CalendarDays, soon: true },
-  ];
+  const { user, brand, access } = await requireFunction(slug, "team");
+  const open = await getOpenEntry(brand.id, user.id);
+  const tz = hubTz();
+  const base = `/hub/b/${slug}`;
+  // Tasks, the calendar and the KPI index all come from the tasks, so they follow the Tasks access, not Team access.
+  const seesTasks = access.tasks !== "none";
+  const items: SectionItem[] = [];
+  if (seesTasks) items.push({ key: "tasks", title: "Team tasks", hint: "Who is working on what, and what is overdue", icon: CheckSquare, href: `${base}/team/tasks` });
+  items.push({ key: "clock", title: "Hours", hint: "Your clock-ins, and the team's if you manage it", icon: Clock, href: `${base}/team/clock` });
+  if (seesTasks) {
+    items.push({ key: "kpi", title: "KPI and deliverables", hint: "Tasks done on time, late and missed", icon: Target, href: `${base}/team/kpi` });
+    items.push({ key: "calendar", title: "Calendar", hint: "Task deadlines by day", icon: CalendarDays, href: `${base}/tasks?v=calendar` });
+  }
   // Pay is sensitive: the row only shows to roles that were given access to it.
   if (access.payroll !== "none") items.push({ key: "payroll", title: "Salary and payroll", hint: "Pay, payslips and payroll runs", icon: Landmark, soon: true });
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <PageHeader title="Team" description="Keep it simple: tasks, hours, results and the calendar." />
+      <PageHeader title="Team" description="Tasks, hours and results in one place." />
+      <div className="mb-8">
+        <ClockCard brandId={brand.id} sinceLabel={open ? fmtStamp(open.clock_in, tz, todayIn(tz)) : null} />
+      </div>
       <SectionList items={items} />
     </div>
   );
