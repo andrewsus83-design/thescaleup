@@ -5,5 +5,5 @@ import { Coming } from "@/components/hub/coming";
 export const metadata: Metadata = { title: "Assets" };
 
 export default function AssetsPage() {
-  return <Coming title="Assets" icon={<Images className="size-6" aria-hidden />} hint="This brand's files and media." />;
+  return <Coming title="Assets" icon={<Images className="size-6" aria-hidden />} hint="Graphics, logos, the brand&apos;s design system and other files." />;
 }

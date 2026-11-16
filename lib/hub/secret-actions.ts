@@ -25,7 +25,8 @@ async function authorize(scope: string): Promise<{ ok: true; brandId: string | n
   return { ok: true, brandId: scope, slug: data.slug, user };
 }
 
-const refresh = (slug: string | null) => revalidatePath(slug ? `/hub/b/${slug}/settings` : "/hub/settings");
+// "layout" also refreshes the sub-pages (Integrations, Social connections) that show these keys.
+const refresh = (slug: string | null) => (slug ? revalidatePath(`/hub/b/${slug}/settings`, "layout") : revalidatePath("/hub/settings"));
 
 export async function saveSecretAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const scope = str(fd, "scope");

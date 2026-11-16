@@ -6,33 +6,37 @@ import { CheckSquare, Images, Inbox, Settings, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { path: "tasks", label: "Tasks", icon: CheckSquare },
-  { path: "inbox", label: "Inbox", icon: Inbox },
-  { path: "social", label: "Social Media", icon: Share2 },
-  { path: "assets", label: "Assets", icon: Images },
-  { path: "settings", label: "Settings", icon: Settings },
+  { path: "tasks", label: "Tasks", short: "Tasks", icon: CheckSquare },
+  { path: "inbox", label: "Inbox", short: "Inbox", icon: Inbox },
+  { path: "social", label: "Social Media", short: "Social", icon: Share2 },
+  { path: "assets", label: "Assets", short: "Assets", icon: Images },
+  { path: "settings", label: "Settings", short: "Settings", icon: Settings },
 ] as const;
 
+/** The brand's five sections, pinned to the bottom of the screen like a phone app. */
 export function BrandTabs({ slug }: { slug: string }) {
   const pathname = usePathname();
   return (
-    <nav aria-label="Brand sections" className="border-b border-ink-100 bg-paper-0">
-      <ul className="mx-auto flex w-full max-w-5xl gap-1 overflow-x-auto px-3 sm:px-6">
-        {TABS.map(({ path, label, icon: Icon }) => {
+    <nav aria-label="Brand sections" className="fixed inset-x-0 bottom-0 z-20 border-t border-ink-100 bg-paper-0 pb-[env(safe-area-inset-bottom)]">
+      <ul className="mx-auto grid max-w-xl grid-cols-5">
+        {TABS.map(({ path, label, short, icon: Icon }) => {
           const href = `/hub/b/${slug}/${path}`;
           const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <li key={path}>
               <Link
                 href={href}
+                aria-label={label}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex h-12 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-small font-semibold",
-                  active ? "border-brand-500 text-ink-800" : "border-transparent text-ink-500 hover:text-ink-800",
+                  "relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 text-caption font-semibold",
+                  active ? "text-ink-800" : "text-ink-500 hover:text-ink-800",
                 )}
               >
-                <Icon className="size-4" aria-hidden />
-                {label}
+                {active && <span aria-hidden className="absolute inset-x-5 top-0 h-0.5 rounded-b-full bg-brand-500" />}
+                <Icon className={cn("size-6", active && "text-brand-500")} aria-hidden />
+                <span className="sm:hidden">{short}</span>
+                <span className="hidden sm:inline">{label}</span>
               </Link>
             </li>
           );
