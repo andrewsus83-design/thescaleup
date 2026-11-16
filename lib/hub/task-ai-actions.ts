@@ -9,7 +9,7 @@ import { audit } from "./session";
 import { str, taskContext, UUID } from "./tasks/context";
 import { dayIn, hubTz, fmtDay } from "./tasks/dates";
 import { getWorkflow, listComments, listMembers } from "./tasks/data";
-import { MAX_DRAFTS, MAX_INPUT_CHARS, SUMMARY_SYSTEM, extractPrompt, extractUser, parseDrafts } from "./tasks/ai-parse";
+import { MAX_DRAFTS, MAX_GOAL_CHARS, MAX_INPUT_CHARS, SUMMARY_SYSTEM, extractPrompt, extractUser, parseDrafts, planPrompt, planUser, type DraftMode } from "./tasks/ai-parse";
 import { TASK_COLUMNS, type Task } from "./tasks/model";
 import { canComment, canCreate, canSeeStage, startStatus } from "./tasks/rules";
 
@@ -31,16 +31,18 @@ async function ask(apiKey: string, system: string, user: string, maxTokens: numb
   return { text, tokens: { in: resp.usage?.input_tokens ?? 0, out: resp.usage?.output_tokens ?? 0 } };
 }
 
-/** Pasted notes in, proposed tasks out. */
+/** A goal (plan) or pasted notes in, proposed tasks out. */
 export async function draftTasks(_prev: FormState, fd: FormData): Promise<FormState> {
   const c = await taskContext(str(fd, "brandId"));
   if (!c.ok) return { error: c.error };
   const { ctx } = c;
   if (!canCreate(ctx.who)) return { error: "You cannot add tasks in this brand." };
 
+  const mode: DraftMode = str(fd, "mode") === "notes" ? "notes" : "plan";
   const text = str(fd, "text").trim();
-  if (text.length < 20) return { error: "Paste a few sentences of notes first." };
-  if (text.length > MAX_INPUT_CHARS) return { error: `That is too long. Keep it under ${MAX_INPUT_CHARS.toLocaleString("en-US")} characters.` };
+  const max = mode === "plan" ? MAX_GOAL_CHARS : MAX_INPUT_CHARS;
+  if (text.length < (mode === "plan" ? 10 : 20)) return { error: mode === "plan" ? "Describe the goal in a sentence or two first." : "Paste a few sentences of notes first." };
+  if (text.length > max) return { error: `That is too long. Keep it under ${max.toLocaleString("en-US")} characters.` };
   if (!allow(`ai:${ctx.user.id}`, 12)) return { error: BUSY };
 
   const key = await getBrandKey(ctx.brandId, "claude", true);
@@ -52,14 +54,15 @@ export async function draftTasks(_prev: FormState, fd: FormData): Promise<FormSt
 
   let reply: Awaited<ReturnType<typeof ask>>;
   try {
-    reply = await ask(key, extractPrompt(dayIn(hubTz())), extractUser(text), 2500);
+    const today = dayIn(hubTz());
+    reply = await ask(key, mode === "plan" ? planPrompt(today) : extractPrompt(today), mode === "plan" ? planUser(text) : extractUser(text), 2500);
   } catch (e) {
     console.error("[hub] draftTasks failed:", e instanceof Error ? e.message : e);
     return { error: "The AI request failed. Check the Anthropic key in Settings and try again." };
   }
 
   const drafts = parseDrafts(reply.text, members);
-  if (!drafts.length) return { error: "No tasks found in that text. Try adding what needs to be done and by when." };
+  if (!drafts.length) return { error: mode === "plan" ? "No tasks came back. Say what the goal is and when it should be done." : "No tasks found in that text. Try adding what needs to be done and by when." };
 
   const { error } = await ctx.admin.from("tasks").insert(
     drafts.slice(0, MAX_DRAFTS).map((d) => ({
@@ -79,8 +82,8 @@ export async function draftTasks(_prev: FormState, fd: FormData): Promise<FormSt
     console.error("[hub] draftTasks insert failed:", error.message);
     return { error: "Could not save the drafted tasks. Try again." };
   }
-  // The notes themselves are not logged, only how much was used.
-  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "task.ai_draft", meta: { count: drafts.length, chars: text.length, model: model(), tokens: reply.tokens } });
+  // The text itself is not logged, only how much was used.
+  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "task.ai_draft", meta: { mode, count: drafts.length, chars: text.length, model: model(), tokens: reply.tokens } });
   revalidatePath(`/hub/b/${ctx.slug}`, "layout");
   const n = drafts.length;
   return { message: `${n} ${n === 1 ? "task" : "tasks"} drafted.${start.stage === "proposed" ? " They are waiting for approval in the list." : ""}` };
