@@ -1,16 +1,19 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Alert, Btn, Card } from "@/components/brand/primitives";
-import { inputCls, labelCls } from "@/components/brand/styles";
+import { inputCls, labelCls, pillCls } from "@/components/brand/styles";
 import { cn } from "@/lib/utils";
-import { requestLoginCode, verifyLoginCode, type FormState } from "@/lib/hub/actions";
+import { requestLoginCode, signInWithPassword, verifyLoginCode, type FormState } from "@/lib/hub/actions";
 
 export function HubLoginForm({ next, presetEmail }: { next: string; presetEmail?: string }) {
   const [sent, sendAction, sending] = useActionState<FormState, FormData>(requestLoginCode, { email: presetEmail });
   const [checked, verifyAction, verifying] = useActionState<FormState, FormData>(verifyLoginCode, {});
+
+  const [pwState, pwAction, pwPending] = useActionState<FormState, FormData>(signInWithPassword, {});
+  const [mode, setMode] = useState<"password" | "code">("password");
 
   const step = sent.step === "code" ? "code" : "email";
   const email = sent.email ?? presetEmail ?? "";
@@ -20,11 +23,44 @@ export function HubLoginForm({ next, presetEmail }: { next: string; presetEmail?
       <div className="mb-10 flex flex-col items-center text-center">
         <Logo variant="lockup" size={32} />
         <h1 className="mt-10 font-title text-balance text-h2 text-ink-800">Sign in</h1>
-        <p className="mt-3 text-pretty text-body text-ink-500">We email you a sign-in code. No password.</p>
+        <p className="mt-3 text-pretty text-body text-ink-500">Use your password, or get a sign-in code by email.</p>
       </div>
 
       <Card>
-        {step === "email" ? (
+        {step === "email" && (
+          <div className="mb-6 flex gap-2" role="tablist" aria-label="Sign-in method">
+            {(["password", "code"] as const).map((m) => (
+              <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={pillCls(mode === m)}>
+                {m === "password" ? "Password" : "Email code"}
+              </button>
+            ))}
+          </div>
+        )}
+        {step === "email" && mode === "password" ? (
+          <form action={pwAction} className="space-y-6">
+            <input type="hidden" name="next" value={next} />
+            {pwState.error && (
+              <Alert tone="bad" role="alert">
+                {pwState.error}
+              </Alert>
+            )}
+            <div>
+              <label htmlFor="hub-pw-email" className={labelCls}>
+                Email
+              </label>
+              <input id="hub-pw-email" name="email" type="email" required autoComplete="username" defaultValue={email} placeholder="you@company.com" className={inputCls} />
+            </div>
+            <div>
+              <label htmlFor="hub-pw" className={labelCls}>
+                Password
+              </label>
+              <input id="hub-pw" name="password" type="password" required autoComplete="current-password" aria-invalid={Boolean(pwState.error)} className={inputCls} />
+            </div>
+            <Btn type="submit" variant="primary" size="lg" className="w-full" disabled={pwPending}>
+              {pwPending ? <Loader2 className="size-5 animate-spin" aria-label="Signing in" /> : "Sign in"}
+            </Btn>
+          </form>
+        ) : step === "email" ? (
           <form action={sendAction} className="space-y-6">
             {sent.error && (
               <Alert tone="bad" role="alert">

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { LogOut, UserRound } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Chip } from "@/components/brand/primitives";
 import { btnCls } from "@/components/brand/styles";
@@ -18,7 +18,11 @@ export function HubBar({ email, isOwner, brandName }: { email: string; isOwner: 
         </div>
         <div className="flex shrink-0 items-center gap-3">
           {isOwner && <Chip tone="brand">Agency</Chip>}
-          <span className="hidden max-w-[16rem] truncate text-small text-ink-500 sm:inline">{email}</span>
+          <Link href="/hub/account" className={btnCls("ghost", "sm")} title={email}>
+            <UserRound className="size-4" aria-hidden />
+            <span className="hidden max-w-[12rem] truncate sm:inline">{email}</span>
+            <span className="sm:hidden">Account</span>
+          </Link>
           <form action={signOut}>
             <button type="submit" className={btnCls("ghost", "sm")}>
               <LogOut className="size-4" aria-hidden />
