@@ -15,7 +15,7 @@ export default async function MailboxPage({ params }: { params: Promise<{ slug: 
   if (!canManageTeam(actor)) notFound();
   return (
     <SettingsShell slug={slug} title="Mailbox" description="Manage the brand's email addresses in one place, like a cPanel: addresses, forwarding and the DNS records the domain needs.">
-      <EmptyState icon={<Mail className="size-6" aria-hidden />} title="Coming next" hint="Mail received here lands in this brand's Inbox. The mail provider and the DNS steps are still to be chosen." />
+      <EmptyState icon={<Mail className="size-6" aria-hidden />} title="Coming next" hint="Planned on Resend: mail sent to this brand's addresses lands in its Inbox, and replies go out from the same address. The DNS records, addresses and forwarding will be managed here." />
     </SettingsShell>
   );
 }
