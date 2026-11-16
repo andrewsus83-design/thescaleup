@@ -3,6 +3,7 @@ import {
   createSupabaseAdminClient,
   isSupabaseAdminConfigured,
 } from "@/lib/supabase/admin";
+import { getWorkspaceSecrets } from "@/lib/hub/secrets";
 
 export type ApiKeys = {
   claude?: string;
@@ -31,6 +32,14 @@ export async function getApiKeys(): Promise<ApiKeys> {
       }
     } catch {
       // app_settings table may not exist yet — fall back to env.
+    }
+  }
+  // Encrypted workspace keys (Hub → Workspace keys) win over the old plain-text settings and over env.
+  if (isSupabaseAdminConfigured()) {
+    try {
+      Object.assign(settings, await getWorkspaceSecrets());
+    } catch {
+      // workspace_secrets may not exist yet — keep what we have.
     }
   }
   const pick = (k: string, env?: string) =>

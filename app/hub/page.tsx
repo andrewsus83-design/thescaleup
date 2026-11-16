@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Plus, Store } from "lucide-react";
+import { ArrowRight, KeyRound, Plus, Store } from "lucide-react";
 import { Card, Chip, EmptyState, PageHeader } from "@/components/brand/primitives";
 import { btnCls } from "@/components/brand/styles";
 import { HubBar } from "@/components/hub/frame";
@@ -21,10 +21,16 @@ export default async function HubHome() {
           description={user.isOwner ? "Every brand has its own team, tasks, keys and connections." : "Pick the brand you want to work on."}
           action={
             user.isOwner ? (
-              <Link href="/hub/new" className={btnCls("primary", "md")}>
-                <Plus className="size-4" aria-hidden />
-                Add brand
-              </Link>
+              <div className="flex gap-2">
+                <Link href="/hub/settings" className={btnCls("secondary", "md")}>
+                  <KeyRound className="size-4" aria-hidden />
+                  Workspace keys
+                </Link>
+                <Link href="/hub/new" className={btnCls("primary", "md")}>
+                  <Plus className="size-4" aria-hidden />
+                  Add brand
+                </Link>
+              </div>
             ) : undefined
           }
         />

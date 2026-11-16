@@ -3,6 +3,7 @@ import { Trash2 } from "lucide-react";
 import { Card, Chip } from "@/components/brand/primitives";
 import { btnCls } from "@/components/brand/styles";
 import { InviteForm } from "@/components/hub/forms";
+import { KeysSection } from "@/components/hub/keys-section";
 import { removeMember, revokeInvite } from "@/lib/hub/actions";
 import { canInvite, canManageTeam, canRemove, invitableRoles, isBrandRole, ROLE_LABEL, type BrandRole } from "@/lib/hub/rules";
 import { requireBrand } from "@/lib/hub/session";
@@ -54,6 +55,16 @@ export default async function SettingsPage({ params }: { params: Promise<{ slug:
           </dd>
         </dl>
       </Card>
+
+      {manage && (
+        <Card>
+          <h2 className="font-title text-h3 text-ink-800">Keys and connections</h2>
+          <p className="mt-2 text-body text-ink-500">This brand&apos;s own keys. AI keys you leave empty use the agency&apos;s default. Connections such as Zernio belong to this brand only. Keys are encrypted and cannot be read back.</p>
+          <div className="mt-4">
+            <KeysSection brandId={brand.id} />
+          </div>
+        </Card>
+      )}
 
       {manage ? (
         <Card>
