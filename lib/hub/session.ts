@@ -35,8 +35,9 @@ export async function listMyBrands(): Promise<BrandRow[]> {
   return (data ?? []) as BrandRow[];
 }
 
-/** The brand plus what this person is in it. 404 when they have no access (never reveals that the brand exists). */
-export async function requireBrand(slug: string): Promise<{ user: HubUser; brand: BrandRow; actor: Actor }> {
+/** The brand plus what this person is in it. 404 when they have no access (never reveals that the brand exists).
+ *  Cached per request: the layout and the page both ask, and the second ask must not hit the database again. */
+export const requireBrand = cache(async (slug: string): Promise<{ user: HubUser; brand: BrandRow; actor: Actor }> => {
   const user = await requireHubUser(`/hub/b/${slug}`);
   const supabase = await createSupabaseServerClient();
   const { data: brand } = await supabase.from("brands").select("id, slug, name, website, status").eq("slug", slug).maybeSingle();
@@ -44,7 +45,7 @@ export async function requireBrand(slug: string): Promise<{ user: HubUser; brand
   const actor = await actorFor(user, brand.id);
   if (!actor) notFound();
   return { user, brand: brand as BrandRow, actor };
-}
+});
 
 /** Server-side role lookup used by every mutation (the service role skips RLS, so each action re-checks here). */
 export async function actorFor(user: HubUser, brandId: string): Promise<Actor | null> {

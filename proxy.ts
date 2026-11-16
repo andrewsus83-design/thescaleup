@@ -60,8 +60,9 @@ async function refreshSupabaseSession(request: NextRequest) {
       },
     },
   });
-  // getUser() validates the token with Supabase and refreshes it when needed; the result is not used here.
-  await supabase.auth.getUser();
+  // getClaims() refreshes an expired session and checks a valid token locally, so most requests make no call to Supabase Auth
+  // here (getUser() made one on every request). The result is not used: pages and actions still call getUser() themselves.
+  await supabase.auth.getClaims();
   return response;
 }
 
