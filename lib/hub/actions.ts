@@ -3,13 +3,14 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import type { User } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isAdminEmail } from "@/lib/admin/config";
 import { site } from "@/lib/site";
 import { audit, actorFor, getHubUser } from "./session";
 import { inviteMail, isMailConfigured, loginCodeMail, sendMail } from "./mail";
-import { canInvite, canManageTeam, canRemove, isBrandRole, isEmail, normalizeEmail, safeNext, ROLE_LABEL } from "./rules";
+import { canInvite, canManageTeam, canRemove, isBrandRole, isEmail, normalizeEmail, passwordError, safeNext, ROLE_LABEL } from "./rules";
 import { slugError } from "./slug";
 import { hashToken, looksLikeToken, newInviteToken } from "./tokens";
 
@@ -115,15 +116,64 @@ export async function verifyLoginCode(_prev: FormState, fd: FormData): Promise<F
   }
   if (!user) return { step: "code", email, error: "That code is wrong or expired. Request a new one." };
 
-  // Agency owners (ADMIN_EMAILS) become platform owners once their email is verified.
-  if (user.email && isAdminEmail(user.email) && user.email_confirmed_at) {
-    try {
-      await createSupabaseAdminClient().from("platform_admins").upsert({ user_id: user.id, email: user.email.toLowerCase() }, { onConflict: "user_id" });
-    } catch (e) {
-      console.error("[hub] platform_admins upsert failed:", e instanceof Error ? e.message : e);
-    }
-  }
+  await seedPlatformOwner(user);
   redirect(next);
+}
+
+/** Agency owners (ADMIN_EMAILS) become platform owners once their email is verified. */
+async function seedPlatformOwner(user: User): Promise<void> {
+  if (!user.email || !isAdminEmail(user.email) || !user.email_confirmed_at) return;
+  try {
+    await createSupabaseAdminClient().from("platform_admins").upsert({ user_id: user.id, email: user.email.toLowerCase() }, { onConflict: "user_id" });
+  } catch (e) {
+    console.error("[hub] platform_admins upsert failed:", e instanceof Error ? e.message : e);
+  }
+}
+
+/**
+ * Email + password. Only passwords that were set through this app count (app_metadata.hub_password, writable by the
+ * server only). That way a password planted on an account before its owner ever signed in is useless.
+ */
+export async function signInWithPassword(_prev: FormState, fd: FormData): Promise<FormState> {
+  const email = normalizeEmail(str(fd, "email"));
+  const password = str(fd, "password");
+  const next = safeNext(str(fd, "next"));
+  if (!isEmail(email) || !password) return { error: "Enter your email and password." };
+  if (!allow(`pw:email:${email}`, 8) || !allow(`pw:ip:${await clientIp()}`, 30)) {
+    return { error: "Too many attempts. Try again in 15 minutes." };
+  }
+  const wrong = { error: "Wrong email or password. No password yet? Use an email code, then set one under Account." };
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error || !data.user) return wrong;
+  if (!data.user.email_confirmed_at || data.user.app_metadata?.hub_password !== true) {
+    await supabase.auth.signOut();
+    return wrong;
+  }
+  await seedPlatformOwner(data.user);
+  redirect(next);
+}
+
+/** Sets or changes the signed-in person's password. */
+export async function setPassword(_prev: FormState, fd: FormData): Promise<FormState> {
+  const user = await getHubUser();
+  if (!user) return { error: "Your session ended. Sign in again." };
+  const pw = str(fd, "password");
+  if (pw !== str(fd, "confirm")) return { error: "The two passwords do not match." };
+  const bad = passwordError(pw, user.email);
+  if (bad) return { error: bad };
+  if (!allow(`setpw:${user.id}`, 10)) return { error: "Too many attempts. Try again in 15 minutes." };
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.updateUser({ password: pw });
+  if (error) return { error: error.message };
+  const { error: metaError } = await createSupabaseAdminClient().auth.admin.updateUserById(user.id, { app_metadata: { hub_password: true } });
+  if (metaError) {
+    console.error("[hub] could not flag password:", metaError.message);
+    return { error: "The password was saved but could not be activated. Try again." };
+  }
+  await audit({ actor: user, action: "password.set" });
+  return { message: "Password saved. You can now sign in with your email and password." };
 }
 
 export async function signOut(): Promise<void> {

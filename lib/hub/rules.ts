@@ -57,3 +57,15 @@ export function safeNext(v: unknown, fallback = "/hub"): string {
   if (v !== "/hub" && !v.startsWith("/hub/") && !v.startsWith("/hub?")) return fallback;
   return v;
 }
+
+const COMMON_PASSWORDS = new Set(["password12", "password123", "1234567890", "12345678910", "qwertyuiop", "1q2w3e4r5t", "iloveyou12", "welcome123", "admin12345", "letmein1234"]);
+
+/** Returns an error message, or null when the password is acceptable. bcrypt only reads the first 72 bytes, so longer is refused. */
+export function passwordError(pw: string, email: string): string | null {
+  if (pw.length < 10) return "Use at least 10 characters.";
+  if (new TextEncoder().encode(pw).length > 72) return "Use at most 72 characters.";
+  if (/^(.)\1+$/.test(pw)) return "Choose something less repetitive.";
+  const lower = pw.toLowerCase();
+  if (COMMON_PASSWORDS.has(lower) || lower === email.toLowerCase() || lower === email.split("@")[0]?.toLowerCase()) return "That password is too easy to guess.";
+  return null;
+}
