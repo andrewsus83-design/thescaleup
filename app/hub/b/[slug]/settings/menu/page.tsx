@@ -10,7 +10,7 @@ import { phoneLayout, visibleTabs, type TabKey } from "@/lib/hub/tabs";
 export const metadata: Metadata = { title: "Phone menu" };
 export const dynamic = "force-dynamic";
 
-const LABEL: Record<TabKey, string> = { brand: "Brand", tasks: "Tasks", inbox: "Inbox", mail: "Mail", social: "Social Media", content: "Content", assets: "Assets", team: "Team", finance: "Finance", products: "Products", settings: "Settings" };
+const LABEL: Record<TabKey, string> = { brand: "Brand", tasks: "Tasks", inbox: "Inbox", mail: "Mail", social: "Social Media", content: "Content", wiki: "Wiki", assets: "Assets", team: "Team", finance: "Finance", products: "Products", settings: "Settings" };
 
 export default async function PhoneMenuPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
