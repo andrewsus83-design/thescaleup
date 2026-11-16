@@ -7,6 +7,7 @@ import { AddAddressForm, AddDomainForm, CopyButton, RemoveAddressButton } from "
 import { SettingsShell } from "@/components/hub/settings-shell";
 import { listAddresses, listDomains } from "@/lib/hub/mail/data";
 import { isResendReady } from "@/lib/hub/mail/resend";
+import { requireMfa } from "@/lib/hub/mfa";
 import { canManageTeam } from "@/lib/hub/rules";
 import { requireBrand } from "@/lib/hub/session";
 import { Mail } from "lucide-react";
@@ -18,6 +19,7 @@ export default async function MailboxPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const { actor, brand } = await requireBrand(slug);
   if (!canManageTeam(actor)) notFound();
+  await requireMfa(`/hub/b/${slug}/settings/mailbox`);
   const [domains, host] = await Promise.all([listDomains(brand.id), headers().then((h) => h.get("host") ?? "")]);
   const addresses = await listAddresses(brand.id, domains);
   const hook = `https://${host}/api/mail/resend`;

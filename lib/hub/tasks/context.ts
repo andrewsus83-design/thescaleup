@@ -1,6 +1,7 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { accessFor } from "../access";
+import { MFA_REQUIRED, mfaPassed } from "../mfa";
 import type { Fn, Level } from "../permissions";
 import type { Actor } from "../rules";
 import { actorFor, getHubUser, type HubUser } from "../session";
@@ -35,5 +36,6 @@ export async function taskContext(brandId: unknown, fn: Fn = "tasks"): Promise<{
   if (brand.status === "archived") return { ok: false, error: "This brand is archived." };
   const access = await accessFor(brandId, actor);
   const level = access[fn];
+  if (fn === "mail" && !(await mfaPassed())) return { ok: false, error: MFA_REQUIRED };
   return { ok: true, ctx: { user, brandId, slug: brand.slug as string, actor, level, admin, who: { actor, level, userId: user.id } } };
 }
