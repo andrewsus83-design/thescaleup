@@ -5,10 +5,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { FormState } from "./actions";
 import { getThread, listAddresses, listDomains } from "./mail/data";
+import { ATTACH_LIMITS, attachError, safeFilename, storageKey } from "./mail/files";
 import { MAIL_LIMITS, domainError, fromHeader, localPartError, messageIds, parseRecipients, replySubject, snippet, textToHtml } from "./mail/model";
 import { createDomain, deleteDomain, enableReceiving, findDomain, getDomain, isResendReady, sendEmail, verifyDomain, type ResendDomain } from "./mail/resend";
 import { atLeast } from "./permissions";
 import { allow } from "./ratelimit";
+import { deleteObject, isR2Ready, objectSize, signedUrl } from "./storage/r2";
 import { canManageTeam, safeNext } from "./rules";
 import { audit } from "./session";
 import { UUID, str, taskContext, type Ctx } from "./tasks/context";
@@ -17,7 +19,11 @@ const refresh = (slug: string) => revalidatePath(`/hub/b/${slug}`, "layout");
 
 /** Who is asking, what they are in this brand, and what the access matrix gives them on Mail. */
 async function mailContext(fd: FormData, need: "view" | "edit" | "manage"): Promise<{ ok: true; ctx: Ctx } | { ok: false; error: string }> {
-  const c = await taskContext(str(fd, "brandId"), "mail");
+  return mailAccess(str(fd, "brandId"), need);
+}
+
+async function mailAccess(brandId: string, need: "view" | "edit" | "manage"): Promise<{ ok: true; ctx: Ctx } | { ok: false; error: string }> {
+  const c = await taskContext(brandId, "mail");
   if (!c.ok) return c;
   if (need === "manage" ? !canManageTeam(c.ctx.actor) : !atLeast(c.ctx.level, need)) {
     return { ok: false, error: need === "manage" ? "Only the founder or the agency can change the mailbox." : "You can read mail here but not change it." };
@@ -221,15 +227,37 @@ export async function sendMail(_prev: FormState, fd: FormData): Promise<FormStat
   if (!from || !dom) return { error: "Pick an address to send from." };
   if (dom.status !== "verified") return { error: `${dom.name} is not verified yet. Finish its DNS records in Settings, Mailbox.` };
 
+  // Files: the browser already uploaded them to storage. Here each one is checked to be this person's, unsent and really there.
+  const wanted = [...new Set(fd.getAll("attachmentId").filter((v): v is string => typeof v === "string" && v !== ""))];
+  if (wanted.length > ATTACH_LIMITS.files) return { error: `Up to ${ATTACH_LIMITS.files} files per message.` };
+  if (!wanted.every((id) => UUID.test(id))) return { error: "An attachment is no longer available. Attach it again." };
+  let files: { id: string; filename: string; content_type: string; size: number; storage_key: string }[] = [];
+  const outFiles: { filename: string; path: string; contentType: string }[] = [];
+  if (wanted.length > 0) {
+    if (!isR2Ready()) return { error: "Attachments are not turned on yet: file storage is not set up on the server." };
+    const { data: rows } = await ctx.admin.from("mail_attachments").select("id, filename, content_type, size, storage_key").eq("brand_id", ctx.brandId).eq("uploaded_by", ctx.user.id).is("message_id", null).in("id", wanted);
+    files = (rows ?? []) as typeof files;
+    if (files.length !== wanted.length) return { error: "An attachment is no longer available. Attach it again." };
+    if (files.reduce((n, f) => n + Number(f.size), 0) > ATTACH_LIMITS.bytes) return { error: `A message can carry up to ${ATTACH_LIMITS.bytes / 1024 / 1024} MB of files in total.` };
+    for (const f of files) {
+      const there = await objectSize(f.storage_key);
+      if (there === null) return { error: `${f.filename} did not finish uploading. Remove it and attach it again.` };
+      if (there > ATTACH_LIMITS.bytes || there !== Number(f.size)) return { error: `${f.filename} is not the file that was selected. Remove it and attach it again.` };
+      const link = signedUrl("GET", f.storage_key, 1800);
+      if (!link) return { error: "Attachments are not turned on yet: file storage is not set up on the server." };
+      outFiles.push({ filename: f.filename, path: link, contentType: f.content_type });
+    }
+  }
+
   const messageId = `<${randomUUID()}@${dom.name}>`;
   const html = textToHtml(body);
   const headers: Record<string, string> = { "Message-ID": messageId };
   if (inReplyTo) headers["In-Reply-To"] = inReplyTo;
   if (refs.length) headers.References = [...new Set([...refs, ...(inReplyTo ? [inReplyTo] : [])])].join(" ");
   // The same message sent twice within a minute (a double click, a retry) is one email at Resend.
-  const key = createHash("sha256").update(JSON.stringify([ctx.brandId, from.email, to, cc.list, subject, body, Math.floor(Date.now() / 60_000)])).digest("hex");
+  const key = createHash("sha256").update(JSON.stringify([ctx.brandId, from.email, to, cc.list, subject, body, wanted.slice().sort(), Math.floor(Date.now() / 60_000)])).digest("hex");
 
-  const sent = await sendEmail({ from: fromHeader(from.display_name, from.email), to, cc: cc.list, subject, text: body, html, headers }, key);
+  const sent = await sendEmail({ from: fromHeader(from.display_name, from.email), to, cc: cc.list, subject, text: body, html, headers, attachments: outFiles }, key);
   if (!sent.ok) return { error: `The message was not sent. Resend said: ${sent.error}` };
 
   let tid = existingThread;
@@ -242,33 +270,42 @@ export async function sendMail(_prev: FormState, fd: FormData): Promise<FormStat
     tid = t.id as string;
   }
   const now = new Date().toISOString();
-  const { error: insErr } = await ctx.admin.from("mail_messages").insert({
-    brand_id: ctx.brandId,
-    thread_id: tid,
-    direction: "out",
-    rfc_message_id: messageId,
-    in_reply_to: inReplyTo,
-    refs,
-    resend_id: sent.data.id,
-    from_email: from.email,
-    from_name: from.display_name,
-    to_emails: to,
-    cc_emails: cc.list,
-    subject,
-    text_body: body,
-    html_body: html,
-    snippet: snippet(body),
-    status: "sent",
-    sent_by: ctx.user.id,
-    occurred_at: now,
-  });
+  const { data: saved, error: insErr } = await ctx.admin
+    .from("mail_messages")
+    .insert({
+      brand_id: ctx.brandId,
+      thread_id: tid,
+      direction: "out",
+      rfc_message_id: messageId,
+      in_reply_to: inReplyTo,
+      refs,
+      resend_id: sent.data.id,
+      from_email: from.email,
+      from_name: from.display_name,
+      to_emails: to,
+      cc_emails: cc.list,
+      subject,
+      text_body: body,
+      html_body: html,
+      snippet: snippet(body),
+      status: "sent",
+      sent_by: ctx.user.id,
+      occurred_at: now,
+      attachments: files.map((f) => ({ id: f.id, filename: f.filename, content_type: f.content_type, size: Number(f.size) })),
+    })
+    .select("id")
+    .single();
   if (insErr && insErr.code !== "23505") {
     console.error("[mail] sent but could not save the message:", insErr.message);
     return { error: "The message was sent, but a copy could not be saved here. Do not send it again." };
   }
+  if (saved && files.length > 0) {
+    const { error: linkErr } = await ctx.admin.from("mail_attachments").update({ message_id: saved.id }).in("id", files.map((f) => f.id));
+    if (linkErr) console.error("[mail] sent but could not link the attachments:", linkErr.message);
+  }
   const { count } = await ctx.admin.from("mail_messages").select("id", { count: "exact", head: true }).eq("thread_id", tid);
   await ctx.admin.from("mail_threads").update({ status: "open", unread: false, message_count: count ?? 1, last_message_at: now, last_snippet: snippet(body), last_from: from.display_name || from.email }).eq("id", tid);
-  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "mail.send", target: tid, meta: { recipients: to.length + cc.list.length, reply: Boolean(existingThread) } });
+  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "mail.send", target: tid, meta: { recipients: to.length + cc.list.length, reply: Boolean(existingThread), files: files.length } });
   refresh(ctx.slug);
   redirect(`/hub/b/${ctx.slug}/mail/${tid}`);
 }
@@ -296,4 +333,46 @@ export async function setThreadsState(_prev: FormState, fd: FormData): Promise<F
   const back = safeNext(str(fd, "back"), "");
   if (back.startsWith(`/hub/b/${ctx.slug}/mail`)) redirect(back);
   return { message: "Updated." };
+}
+
+// ---------------------------------------------------------------------------------------------- attachments
+export type UploadTicket = { ok: true; id: string; url: string; contentType: string } | { ok: false; error: string };
+
+/**
+ * Step one of attaching a file: the browser says what it is about to upload, the server checks it and hands back a link that allows
+ * exactly one upload to exactly one place for ten minutes. Step two (the upload itself) goes straight to storage.
+ */
+export async function prepareUpload(input: { brandId: string; name: string; type: string; size: number; count: number; total: number }): Promise<UploadTicket> {
+  const c = await mailAccess(typeof input?.brandId === "string" ? input.brandId : "", "edit");
+  if (!c.ok) return c;
+  const { ctx } = c;
+  if (!isR2Ready()) return { ok: false, error: "Attachments are not turned on yet: file storage is not set up on the server." };
+  const name = typeof input.name === "string" ? safeFilename(input.name) : "";
+  const size = Number(input.size);
+  const bad = attachError(name || "file", size, Number(input.count) || 0, Number(input.total) || 0);
+  if (!name || bad) return { ok: false, error: bad ?? "That file cannot be attached." };
+  if (!allow(`mail-upload:${ctx.user.id}`, 80)) return { ok: false, error: "You have attached a lot of files in the last hour. Try again a bit later." };
+  const contentType = typeof input.type === "string" && /^[\w.+-]+\/[\w.+-]+$/.test(input.type) && input.type.length <= 100 ? input.type.toLowerCase() : "application/octet-stream";
+
+  const id = randomUUID();
+  const key = storageKey(ctx.brandId, id, name);
+  const { error } = await ctx.admin.from("mail_attachments").insert({ id, brand_id: ctx.brandId, uploaded_by: ctx.user.id, filename: name, content_type: contentType, size, storage_key: key });
+  if (error) {
+    console.error("[mail] could not record an upload:", error.message);
+    return { ok: false, error: "Could not start the upload. Try again." };
+  }
+  const url = signedUrl("PUT", key, 600);
+  if (!url) return { ok: false, error: "Attachments are not turned on yet: file storage is not set up on the server." };
+  return { ok: true, id, url, contentType };
+}
+
+/** The person removed a file before sending: forget it and delete it from storage. Only your own unsent uploads can be removed this way. */
+export async function discardUpload(brandId: string, id: string): Promise<{ ok: boolean }> {
+  const c = await mailAccess(brandId, "edit");
+  if (!c.ok || typeof id !== "string" || !UUID.test(id)) return { ok: false };
+  const { data: row } = await c.ctx.admin.from("mail_attachments").select("id, storage_key").eq("brand_id", c.ctx.brandId).eq("uploaded_by", c.ctx.user.id).is("message_id", null).eq("id", id).maybeSingle();
+  if (!row) return { ok: true };
+  await deleteObject(row.storage_key as string);
+  await c.ctx.admin.from("mail_attachments").delete().eq("id", id);
+  return { ok: true };
 }

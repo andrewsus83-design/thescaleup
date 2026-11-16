@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Paperclip } from "lucide-react";
 import { Chip } from "@/components/brand/primitives";
 import type { MessageRow } from "@/lib/hub/mail/data";
+import { sizeLabel } from "@/lib/hub/mail/files";
 import { personLabel, previewOf } from "@/lib/hub/mail/model";
 import { fmtStamp } from "@/lib/hub/tasks/dates";
 import { Avatar } from "./avatar";
@@ -14,8 +15,6 @@ const STATUS: Record<string, { tone: "ok" | "bad" | "neutral"; label: string } |
   complained: { tone: "bad", label: "Marked as spam" },
   failed: { tone: "bad", label: "Failed" },
 };
-
-const kb = (n?: number | null) => (n ? (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`) : "");
 
 /**
  * One message of a conversation, like Gmail's: a row with the sender's circle, name and time that opens to the full message.
@@ -63,7 +62,7 @@ export function Message({ m, slug, tz, today, open }: { m: MessageRow; slug: str
                 <Link href={`/hub/b/${slug}/mail/file/${m.id}/${a.id}`} prefetch={false} className="hit-44 inline-flex min-h-11 max-w-full items-center gap-2 rounded-full bg-paper-100 px-4 text-small text-ink-800 hover:bg-paper-200">
                   <Paperclip className="size-4 shrink-0" aria-hidden />
                   <span className="min-w-0 truncate">{a.filename || "Attachment"}</span>
-                  <span className="shrink-0 whitespace-nowrap text-caption text-ink-500">{kb(a.size)}</span>
+                  <span className="shrink-0 whitespace-nowrap text-caption text-ink-500">{sizeLabel(a.size)}</span>
                 </Link>
               </li>
             ))}

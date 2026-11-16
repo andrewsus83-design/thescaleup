@@ -68,9 +68,26 @@ export async function findDomain(name: string): Promise<Result<ResendDomain | nu
 export const verifyDomain = (id: string) => call<{ id: string }>("POST", `/domains/${encodeURIComponent(id)}/verify`);
 export const deleteDomain = (id: string) => call<{ id: string }>("DELETE", `/domains/${encodeURIComponent(id)}`);
 
-export type SendInput = { from: string; to: string[]; cc?: string[]; subject: string; text: string; html: string; headers?: Record<string, string>; replyTo?: string };
+/** A file for Resend to fetch itself from a link, so it never passes through this server. */
+export type SendAttachment = { filename: string; path: string; contentType: string };
+export type SendInput = { from: string; to: string[]; cc?: string[]; subject: string; text: string; html: string; headers?: Record<string, string>; replyTo?: string; attachments?: SendAttachment[] };
 export const sendEmail = (m: SendInput, idempotencyKey: string) =>
-  call<{ id: string }>("POST", "/emails", { from: m.from, to: m.to, cc: m.cc?.length ? m.cc : undefined, subject: m.subject, text: m.text, html: m.html, headers: m.headers, reply_to: m.replyTo }, idempotencyKey);
+  call<{ id: string }>(
+    "POST",
+    "/emails",
+    {
+      from: m.from,
+      to: m.to,
+      cc: m.cc?.length ? m.cc : undefined,
+      subject: m.subject,
+      text: m.text,
+      html: m.html,
+      headers: m.headers,
+      reply_to: m.replyTo,
+      attachments: m.attachments?.length ? m.attachments.map((a) => ({ filename: a.filename, path: a.path, content_type: a.contentType })) : undefined,
+    },
+    idempotencyKey,
+  );
 
 export type ReceivedAttachment = { id: string; filename?: string | null; content_type?: string | null; content_disposition?: string | null; content_id?: string | null; size?: number | null };
 export type ReceivedEmail = {
