@@ -47,8 +47,10 @@ export const enableReceiving = (id: string) => call<{ id: string }>("PATCH", `/d
 /**
  * Finds a domain by name in the Resend account, or null when the account does not have it. Reads up to 10 pages of 100,
  * which is far more domains than one agency has; a failed read comes back as an error so the caller can fall back.
+ * Two entries can share a name (a leftover from a second attempt): the verified one wins, because it is the one that works.
  */
 export async function findDomain(name: string): Promise<Result<ResendDomain | null>> {
+  const hits: ResendDomain[] = [];
   let after: string | undefined;
   for (let page = 0; page < 10; page++) {
     const q = new URLSearchParams({ limit: "100" });
@@ -56,12 +58,11 @@ export async function findDomain(name: string): Promise<Result<ResendDomain | nu
     const got = await call<{ data?: ResendDomain[]; has_more?: boolean }>("GET", `/domains?${q}`);
     if (!got.ok) return got;
     const rows = got.data.data ?? [];
-    const hit = rows.find((d) => d.name?.toLowerCase() === name);
-    if (hit) return { ok: true, data: hit };
+    hits.push(...rows.filter((d) => d.name?.toLowerCase() === name));
     if (!got.data.has_more || rows.length === 0) break;
     after = rows[rows.length - 1].id;
   }
-  return { ok: true, data: null };
+  return { ok: true, data: hits.find((d) => d.status === "verified") ?? hits[0] ?? null };
 }
 
 export const verifyDomain = (id: string) => call<{ id: string }>("POST", `/domains/${encodeURIComponent(id)}/verify`);
