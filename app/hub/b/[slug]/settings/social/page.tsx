@@ -18,7 +18,7 @@ export default async function SocialConnectionsPage({ params }: { params: Promis
     <SettingsShell
       slug={slug}
       title="Social media connections"
-      description="One Zernio key connects this brand's social accounts and WhatsApp. It belongs to this brand only and never falls back to the agency's."
+      description="One Zernio key connects this brand's social accounts and WhatsApp. It belongs to this brand only and never falls back to the agency's. The Metricool token and user ID fall back to the agency's when left empty; the Metricool brand ID is always this brand's own."
     >
       <Card>
         <KeysSection brandId={brand.id} only={["social"]} />
