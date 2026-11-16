@@ -7,7 +7,9 @@ import { createSupabaseAdminClient, isSupabaseAdminConfigured } from "@/lib/supa
  * Shared access-code gate for the admin backend (stand-in for email OTP).
  * Two codes with different privilege:
  *   - ADMIN_ACCESS_CODE (owner)  → full access.
- *   - MEMBER_ACCESS_CODE (member)→ limited access for newly-added users.
+ *   - MEMBER_ACCESS_CODE (member)→ limited access for users registered in admin_users.
+ *     There is NO default: if the variable is unset, member login is disabled.
+ *     A member session never becomes an owner session, whatever the email.
  *
  * Cookie format (v2): role_prefix:email:sessionId:hmac(role:email:sessionId)
  * Each login creates a row in admin_sessions; deleting the row revokes the session.
@@ -17,7 +19,7 @@ const COOKIE = "sc_admin_access";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 const OWNER_CODE = () => process.env.ADMIN_ACCESS_CODE || null;
-const MEMBER_CODE = () => process.env.MEMBER_ACCESS_CODE || "111111";
+const MEMBER_CODE = () => process.env.MEMBER_ACCESS_CODE || null;
 
 export type AccessRole = "owner" | "member";
 
@@ -46,13 +48,16 @@ export function verifyCodeRole(code: string): AccessRole | null {
 
 /* ─── HMAC signing ───────────────────────────────────────────────────────── */
 
-function sigSecret(): string {
-  return process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.ADMIN_ACCESS_CODE || "scaleup-secret";
+/** Signing secret. No hard-coded fallback: with no secret configured, cookies cannot be signed or verified (fail closed). */
+function sigSecret(): string | null {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.ADMIN_ACCESS_CODE || null;
 }
 
 function emailSig(role: AccessRole, email: string, sid: string): string {
+  const secret = sigSecret();
+  if (!secret) return "";
   return crypto
-    .createHmac("sha256", sigSecret())
+    .createHmac("sha256", secret)
     .update(`${role}:${email.toLowerCase()}:${sid}`)
     .digest("hex")
     .slice(0, 32);
@@ -148,6 +153,7 @@ function readSessionCookie(v: string): { role: AccessRole; email: string; sessio
   const lastColon = rest.lastIndexOf(":");
   if (lastColon < 0) return null;
   const sig = rest.slice(lastColon + 1);
+  if (!sig || !sigSecret()) return null; // an empty signature must never match an unsigned (empty) one
   const body = rest.slice(0, lastColon);
   const sidColon = body.lastIndexOf(":");
   if (sidColon < 0) return null;

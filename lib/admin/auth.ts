@@ -39,10 +39,10 @@ export async function getAdminUser(): Promise<AdminUser | null> {
   }
   if (access?.role === "member" && access.email) {
     const e = access.email;
-    // an env owner using the member code still gets owner
-    if (isAdminEmail(e)) return { id: `m:${e}`, email: e, role: "owner", perms: OWNER_PERMS };
-    // otherwise resolve this user's role/perms from admin_users
-    if (isSupabaseAdminConfigured()) {
+    // A member session NEVER becomes owner. Owner emails must sign in with the owner code (or Supabase login), so a
+    // member-role session carrying an owner email is ignored and falls through to the Supabase login check below.
+    // Otherwise resolve this user's role/perms from admin_users; an unregistered email gets no access.
+    if (!isAdminEmail(e) && isSupabaseAdminConfigured()) {
       try {
         const admin = createSupabaseAdminClient();
         const { data: row } = await admin
@@ -64,11 +64,9 @@ export async function getAdminUser(): Promise<AdminUser | null> {
           };
         }
       } catch {
-        /* fall through */
+        /* fail closed: fall through to the Supabase login check */
       }
     }
-    // registered but not resolvable → sensible member perms (no delete)
-    return { id: `m:${e}`, email: e, role: "admin", perms: { create: true, read: true, update: true, delete: false } };
   }
 
   const supabase = await createSupabaseServerClient();

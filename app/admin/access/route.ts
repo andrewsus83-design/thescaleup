@@ -38,8 +38,9 @@ export async function POST(request: Request) {
   const fail = (e: number) => NextResponse.redirect(new URL(`/admin/login?e=${e}`, request.url));
   if (!role || !email) return fail(1); // missing email or wrong code
 
-  // owner code → email must be an env owner; member code → email must be registered
-  const allowed = role === "owner" ? isAdminEmail(email) : await isRegisteredAdmin(email);
+  // owner code → email must be an env owner; member code → email must be registered in admin_users and must NOT be an
+  // owner email (owners sign in with the owner code only, so the member code can never lead to owner access).
+  const allowed = role === "owner" ? isAdminEmail(email) : !isAdminEmail(email) && (await isRegisteredAdmin(email));
   if (!allowed) return fail(2); // email not registered for this code
 
   const sessionId = await createAdminSession(role, email);
