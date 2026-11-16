@@ -5,7 +5,7 @@ import type { DnsRecord } from "./resend";
 // Reads for the Mail pages. They use the service role, so every function takes the brand id and filters on it: the caller
 // has already checked that this person may open Mail in this brand.
 
-export type MailDomain = { id: string; name: string; status: string; receiving: boolean; records: DnsRecord[]; verified_at: string | null; created_at: string };
+export type MailDomain = { id: string; name: string; status: string; receiving: boolean; records: DnsRecord[]; verified_at: string | null; created_at: string; linked: boolean };
 export type MailAddress = { id: string; domain_id: string; local_part: string; display_name: string | null; email: string; domain: string };
 export type ThreadRow = { id: string; address_id: string | null; mailbox: string; subject: string; status: "open" | "done"; unread: boolean; message_count: number; last_message_at: string; last_snippet: string; last_from: string };
 export type Attachment = { id: string; filename?: string | null; content_type?: string | null; size?: number | null };
@@ -31,7 +31,7 @@ export type MessageRow = {
 const db = () => createSupabaseAdminClient();
 
 export async function listDomains(brandId: string): Promise<MailDomain[]> {
-  const { data } = await db().from("mail_domains").select("id, name, status, receiving, records, verified_at, created_at").eq("brand_id", brandId).order("created_at");
+  const { data } = await db().from("mail_domains").select("id, name, status, receiving, records, verified_at, created_at, linked").eq("brand_id", brandId).order("created_at");
   return (data ?? []) as MailDomain[];
 }
 

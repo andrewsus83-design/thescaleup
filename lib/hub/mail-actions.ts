@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import type { FormState } from "./actions";
 import { getThread, listAddresses, listDomains } from "./mail/data";
 import { MAIL_LIMITS, domainError, fromHeader, localPartError, messageIds, parseRecipients, replySubject, snippet, textToHtml } from "./mail/model";
-import { createDomain, deleteDomain, getDomain, isResendReady, sendEmail, verifyDomain } from "./mail/resend";
+import { createDomain, deleteDomain, enableReceiving, findDomain, getDomain, isResendReady, sendEmail, verifyDomain, type ResendDomain } from "./mail/resend";
 import { atLeast } from "./permissions";
 import { allow } from "./ratelimit";
 import { canManageTeam } from "./rules";
@@ -42,25 +42,52 @@ export async function addDomain(_prev: FormState, fd: FormData): Promise<FormSta
   const { data: existing } = await ctx.admin.from("mail_domains").select("id").eq("name", name).maybeSingle();
   if (existing) return { error: "That domain is already in use." };
 
-  const made = await createDomain(name, fd.get("receiving") === "on");
-  if (!made.ok) return { error: `Resend said: ${made.error}` };
+  const wantReceiving = fd.get("receiving") === "on";
+
+  // A domain that is already in the agency's Resend account (other projects send from it) is linked, not created again.
+  // If the lookup itself fails, fall through to creating it: Resend then answers with the real reason.
+  const found = await findDomain(name);
+  if (!found.ok) console.warn("[mail] domain lookup failed, creating instead:", found.error);
+  const linked = found.ok && found.data !== null;
+
+  let domain: ResendDomain;
+  if (found.ok && found.data) {
+    let got = await getDomain(found.data.id);
+    if (!got.ok) return { error: `Resend said: ${got.error}` };
+    if (wantReceiving && got.data.capabilities?.receiving !== "enabled") {
+      const on = await enableReceiving(found.data.id);
+      if (!on.ok) return { error: `Resend said: ${on.error}` };
+      got = await getDomain(found.data.id); // the receiving record only exists after receiving is on
+      if (!got.ok) return { error: `Resend said: ${got.error}` };
+    }
+    domain = got.data;
+  } else {
+    const made = await createDomain(name, wantReceiving);
+    if (!made.ok) return { error: `Resend said: ${made.error}` };
+    domain = made.data;
+  }
+
   const { error } = await ctx.admin.from("mail_domains").insert({
     brand_id: ctx.brandId,
     name,
-    resend_id: made.data.id,
-    status: asStatus(made.data.status),
-    receiving: made.data.capabilities?.receiving === "enabled",
-    records: made.data.records ?? [],
+    resend_id: domain.id,
+    status: asStatus(domain.status),
+    receiving: domain.capabilities?.receiving === "enabled",
+    records: domain.records ?? [],
+    linked,
+    verified_at: domain.status === "verified" ? new Date().toISOString() : null,
     created_by: ctx.user.id,
   });
   if (error) {
     console.error("[mail] addDomain insert failed:", error.message);
-    await deleteDomain(made.data.id); // do not leave a domain in Resend that the app does not know about
+    if (!linked) await deleteDomain(domain.id); // do not leave a domain in Resend that the app does not know about; a linked one is not ours to delete
     return { error: error.code === "23505" ? "That domain is already in use." : "Could not save the domain. Try again." };
   }
-  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "mail.domain.add", target: name });
+  await audit({ actor: ctx.user, brandId: ctx.brandId, action: linked ? "mail.domain.link" : "mail.domain.add", target: name });
   refresh(ctx.slug);
-  return { message: "Added. Add the DNS records below at your domain provider, then press Check." };
+  if (!linked) return { message: "Added. Add the DNS records below at your domain provider, then press Check DNS." };
+  const todo = (domain.records ?? []).some((r) => r.status && r.status !== "verified");
+  return { message: todo ? "Linked to the domain already in Resend. Add the DNS record below, then press Check DNS." : "Linked to the domain already in Resend. It is verified, so you can add addresses now." };
 }
 
 export async function checkDomain(_prev: FormState, fd: FormData): Promise<FormState> {
@@ -96,14 +123,14 @@ export async function removeDomain(_prev: FormState, fd: FormData): Promise<Form
   const { ctx } = c;
   const id = str(fd, "domainId");
   if (!UUID.test(id)) return { error: "Unknown domain." };
-  const { data: row } = await ctx.admin.from("mail_domains").select("id, name, resend_id").eq("brand_id", ctx.brandId).eq("id", id).maybeSingle();
+  const { data: row } = await ctx.admin.from("mail_domains").select("id, name, resend_id, linked").eq("brand_id", ctx.brandId).eq("id", id).maybeSingle();
   if (!row) return { error: "Unknown domain." };
-  await deleteDomain(row.resend_id as string); // best effort: the domain may already be gone in Resend
+  if (!row.linked) await deleteDomain(row.resend_id as string); // best effort: the domain may already be gone in Resend. A linked domain stays in Resend: other projects use it
   const { error } = await ctx.admin.from("mail_domains").delete().eq("id", id);
   if (error) return { error: "Could not remove the domain. Try again." };
   await audit({ actor: ctx.user, brandId: ctx.brandId, action: "mail.domain.remove", target: row.name as string });
   refresh(ctx.slug);
-  return { message: "Domain removed. Past conversations are kept." };
+  return { message: row.linked ? "Unlinked. The domain stays in Resend. Past conversations are kept." : "Domain removed. Past conversations are kept." };
 }
 
 // ---------------------------------------------------------------------------------------------- addresses

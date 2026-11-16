@@ -9,7 +9,7 @@ export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
 export const isResendReady = () => Boolean(process.env.RESEND_API_KEY);
 
-async function call<T>(method: "GET" | "POST" | "DELETE", path: string, body?: unknown, idempotencyKey?: string): Promise<Result<T>> {
+async function call<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: unknown, idempotencyKey?: string): Promise<Result<T>> {
   const key = process.env.RESEND_API_KEY;
   if (!key) return { ok: false, error: "Mail is not connected yet: RESEND_API_KEY is not set on the server." };
   try {
@@ -41,6 +41,29 @@ export type ResendDomain = { id: string; name: string; status: string; capabilit
 export const createDomain = (name: string, receiving: boolean) =>
   call<ResendDomain>("POST", "/domains", { name, capabilities: { sending: "enabled", receiving: receiving ? "enabled" : "disabled" } });
 export const getDomain = (id: string) => call<ResendDomain>("GET", `/domains/${encodeURIComponent(id)}`);
+/** Turns receiving on for a domain that was created without it. Sending is left as it is. */
+export const enableReceiving = (id: string) => call<{ id: string }>("PATCH", `/domains/${encodeURIComponent(id)}`, { capabilities: { receiving: "enabled" } });
+
+/**
+ * Finds a domain by name in the Resend account, or null when the account does not have it. Reads up to 10 pages of 100,
+ * which is far more domains than one agency has; a failed read comes back as an error so the caller can fall back.
+ */
+export async function findDomain(name: string): Promise<Result<ResendDomain | null>> {
+  let after: string | undefined;
+  for (let page = 0; page < 10; page++) {
+    const q = new URLSearchParams({ limit: "100" });
+    if (after) q.set("after", after);
+    const got = await call<{ data?: ResendDomain[]; has_more?: boolean }>("GET", `/domains?${q}`);
+    if (!got.ok) return got;
+    const rows = got.data.data ?? [];
+    const hit = rows.find((d) => d.name?.toLowerCase() === name);
+    if (hit) return { ok: true, data: hit };
+    if (!got.data.has_more || rows.length === 0) break;
+    after = rows[rows.length - 1].id;
+  }
+  return { ok: true, data: null };
+}
+
 export const verifyDomain = (id: string) => call<{ id: string }>("POST", `/domains/${encodeURIComponent(id)}/verify`);
 export const deleteDomain = (id: string) => call<{ id: string }>("DELETE", `/domains/${encodeURIComponent(id)}`);
 
