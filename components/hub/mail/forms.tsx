@@ -68,7 +68,7 @@ export function AddDomainForm({ brandId }: { brandId: string }) {
         </label>
         <input id="md-domain" name="domain" required maxLength={253} autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="mail.brand.com" className={cn(compactField, "h-12 w-full")} />
         <p className="mt-2 text-caption text-ink-500">
-          To receive mail here, use a subdomain such as mail.brand.com. Receiving on a domain that already has mailboxes (Google Workspace, for example) would send all of its mail to this inbox.
+          A domain that is already in Resend is linked as it is, not created again. To receive mail, Resend needs an MX record on this exact domain, so use a subdomain such as mail.brand.com if the domain already has mailboxes (Google Workspace, for example).
         </p>
       </div>
       <label className="flex min-h-11 items-center gap-3 text-small text-ink-800">
@@ -82,7 +82,7 @@ export function AddDomainForm({ brandId }: { brandId: string }) {
   );
 }
 
-export function DomainActions({ brandId, domainId, verified }: { brandId: string; domainId: string; verified: boolean }) {
+export function DomainActions({ brandId, domainId, verified, linked }: { brandId: string; domainId: string; verified: boolean; linked: boolean }) {
   const [check, checkAction, checking] = useActionState<FormState, FormData>(checkDomain, {});
   const [rm, rmAction, removing] = useActionState<FormState, FormData>(removeDomain, {});
   return (
@@ -100,14 +100,16 @@ export function DomainActions({ brandId, domainId, verified }: { brandId: string
         <details className="group">
           <summary className="hit-44 inline-flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-full px-3 text-small font-semibold text-ink-500 hover:text-ink-800 [&::-webkit-details-marker]:hidden">
             <Trash2 className="size-4" aria-hidden />
-            Remove
+            {linked ? "Unlink" : "Remove"}
           </summary>
           <form action={rmAction} className="mt-3 flex flex-wrap items-center gap-3 rounded-field bg-paper-100 p-4">
             <input type="hidden" name="brandId" value={brandId} />
             <input type="hidden" name="domainId" value={domainId} />
-            <p className="text-small text-ink-800">Its addresses stop working. Past conversations are kept.</p>
+            <p className="text-small text-ink-800">
+              {linked ? "Its addresses stop working here. The domain itself stays in Resend, so other projects keep sending. Past conversations are kept." : "Its addresses stop working. Past conversations are kept."}
+            </p>
             <Btn type="submit" variant="danger" size="sm" disabled={removing}>
-              {removing ? <Spin label="Removing" /> : "Remove domain"}
+              {removing ? <Spin label={linked ? "Unlinking" : "Removing"} /> : linked ? "Unlink domain" : "Remove domain"}
             </Btn>
           </form>
         </details>
