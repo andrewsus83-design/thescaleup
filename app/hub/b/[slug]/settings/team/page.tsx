@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { Card, Chip } from "@/components/brand/primitives";
 import { btnCls } from "@/components/brand/styles";
+import { AccessCards } from "@/components/hub/access-cards";
 import { InviteForm } from "@/components/hub/forms";
 import { SettingsShell } from "@/components/hub/settings-shell";
 import { removeMember, revokeInvite } from "@/lib/hub/actions";
@@ -88,6 +89,17 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
         <div className="mt-6 border-t border-ink-100 pt-6">
           <h2 className="mb-4 font-title text-body font-bold text-ink-800">Invite someone</h2>
           <InviteForm brandId={brand.id} roles={invitableRoles(actor)} />
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="font-title text-h3 text-ink-800">Roles and access</h2>
+        <p className="mt-2 text-body text-ink-500">
+          Choose what each role can open and change, per function. The founder and the agency always have full access.
+          {actor === "founder" && " Access for agency staff is set by the agency."}
+        </p>
+        <div className="mt-6 space-y-8">
+          <AccessCards brandId={brand.id} actor={actor} />
         </div>
       </Card>
     </SettingsShell>
