@@ -8,7 +8,7 @@ export const LEVELS = ["none", "view", "edit"] as const;
 export type Level = (typeof LEVELS)[number];
 export const LEVEL_LABEL: Record<Level, string> = { none: "No access", view: "Can view", edit: "Can edit" };
 
-export const FUNCTIONS = ["brand", "tasks", "inbox", "mail", "social", "content", "wiki", "assets", "team", "payroll", "finance", "products"] as const;
+export const FUNCTIONS = ["brand", "tasks", "inbox", "mail", "social", "ads", "content", "wiki", "assets", "team", "payroll", "finance", "products"] as const;
 export type Fn = (typeof FUNCTIONS)[number];
 
 export const FUNCTION_INFO: Record<Fn, { label: string; hint: string }> = {
@@ -18,6 +18,7 @@ export const FUNCTION_INFO: Record<Fn, { label: string; hint: string }> = {
   mail: { label: "Mail", hint: "Email only: read, reply and send from the brand's addresses" },
   social: { label: "Social Media", hint: "Analytics for the connected accounts" },
   content: { label: "Content", hint: "Plan, write and calendar the posts, emails and ads" },
+  ads: { label: "Ads", hint: "What the brand's ads cost and how they do: running, past, and what to boost" },
   wiki: { label: "Wiki", hint: "What the company knows: brand, how-tos, training and research" },
   assets: { label: "Assets", hint: "Graphics, logos and the design system" },
   team: { label: "Team", hint: "Team tasks, clock in and out, KPI, calendar" },
@@ -39,9 +40,9 @@ export const isLevel = (v: unknown): v is Level => typeof v === "string" && (LEV
 export type Access = Record<Fn, Level>;
 
 export const DEFAULTS: Record<ConfigurableRole, Access> = {
-  staff: { brand: "edit", tasks: "edit", inbox: "edit", mail: "edit", social: "edit", content: "edit", wiki: "edit", assets: "edit", team: "view", payroll: "none", finance: "none", products: "edit" },
-  ops: { brand: "view", tasks: "edit", inbox: "edit", mail: "edit", social: "view", content: "view", wiki: "view", assets: "edit", team: "view", payroll: "none", finance: "none", products: "view" },
-  viewer: { brand: "view", tasks: "view", inbox: "none", mail: "none", social: "view", content: "none", wiki: "none", assets: "view", team: "none", payroll: "none", finance: "none", products: "view" },
+  staff: { brand: "edit", tasks: "edit", inbox: "edit", mail: "edit", social: "edit", ads: "none", content: "edit", wiki: "edit", assets: "edit", team: "view", payroll: "none", finance: "none", products: "edit" },
+  ops: { brand: "view", tasks: "edit", inbox: "edit", mail: "edit", social: "view", ads: "view", content: "view", wiki: "view", assets: "edit", team: "view", payroll: "none", finance: "none", products: "view" },
+  viewer: { brand: "view", tasks: "view", inbox: "none", mail: "none", social: "view", ads: "none", content: "none", wiki: "none", assets: "view", team: "none", payroll: "none", finance: "none", products: "view" },
 };
 
 export const FULL: Access = Object.fromEntries(FUNCTIONS.map((f) => [f, "edit"])) as Access;
