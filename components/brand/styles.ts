@@ -9,14 +9,14 @@ export const motion = "transition-[color,background-color,border-color,box-shado
 
 // ---------------------------------------------------------------------------------------------- Buttons
 export type BtnVariant = "primary" | "dark" | "secondary" | "ghost" | "danger";
-/** 48 / 44 / 40 / 36px high. `lg` is the page-level call to action, `md` sits in panels, `sm` is inline in chat, `xs` is compact. */
+/** 52 / 48 / 44 / 40px high. `lg` is the page-level call to action, `md` sits in panels, `sm` is inline in chat, `xs` is compact. */
 export type BtnSize = "lg" | "md" | "sm" | "xs";
 
 const BTN_SIZE = {
-  lg: "h-12 px-7 text-button",
-  md: "h-11 px-6 text-button",
-  sm: "hit-44 h-10 px-5 text-button",
-  xs: "hit-44 h-9 px-4 text-caption",
+  lg: "h-13 px-8 text-button",
+  md: "h-12 px-6 text-button",
+  sm: "hit-44 h-11 px-5 text-button",
+  xs: "hit-44 h-10 px-4 text-caption",
 } as const;
 
 const BTN_VARIANT = {
@@ -59,10 +59,10 @@ export function iconBtnCls(variant: "primary" | "quiet" = "quiet", className?: s
 /** Small metadata pill (tags, source chips, scope chips): Paper fill, Mono 500 / 11, 28px high. */
 export const tagCls = "inline-flex h-7 items-center gap-2 rounded-full bg-paper-100 px-3 font-mono text-micro font-medium leading-none text-ink-800";
 
-/** A filter/toggle pill (36px, aria-pressed). Active is Ink on Paper, like the segmented control. */
+/** A filter/toggle pill (44px, aria-pressed). Active is Ink on Paper, like the segmented control. */
 export const pillCls = (active: boolean) =>
   cn(
-    "hit-44 inline-flex h-9 items-center gap-2 rounded-full border-control px-4 text-caption font-semibold leading-none",
+    "hit-44 inline-flex h-11 items-center gap-2 rounded-full border-control px-5 text-button font-semibold leading-none",
     motion,
     active ? "border-ink-800 bg-ink-800 text-paper-100" : "border-ink-200 text-ink-800 hover:bg-paper-100",
   );
@@ -74,8 +74,9 @@ export const segItem = (active: boolean, size: "md" | "sm" = "md") =>
   cn(
     "inline-flex items-center justify-center rounded-full font-semibold leading-none",
     motion,
-    size === "md" ? "hit-44 h-10 px-5 text-small" : "hit-44 h-8 px-4 text-caption",
-    active ? "bg-ink-800 text-paper-100" : "text-ink-500 hover:text-ink-800",
+    size === "md" ? "hit-44 h-11 px-5 text-button" : "hit-44 h-9 px-4 text-caption",
+    // Inside a brand menu the active item takes that menu's colour (see `[data-acc]`); elsewhere it is Ink.
+    active ? "bg-[var(--acc-ink,#262626)] text-paper-0" : "text-ink-500 hover:text-ink-800",
   );
 
 // ---------------------------------------------------------------------------------------------- Page frame
@@ -85,10 +86,10 @@ export const chatX = "px-5 sm:px-8 xl:px-12";
 
 /** BRAND "Card": white, radius 28, 32px padding (24 on phones), hairline border, raised shadow. `small` is the 24px-radius card for lists and side panels. */
 export const cardCls = (small?: boolean, interactive?: boolean) =>
-  cn("border border-hairline bg-paper-0 shadow-raised", small ? "rounded-bubble p-5" : "rounded-card p-6 sm:p-8", interactive && cn("hover:shadow-overlay", motion));
+  cn("border border-hairline bg-paper-0 shadow-raised", small ? "rounded-bubble p-6" : "rounded-card p-6 sm:p-8", interactive && cn("hover:shadow-overlay", motion));
 
 /** A tile inside a card: Paper fill, radius 16, no line (BRAND: use Paper to separate areas, not borders). */
-export const tileCls = "rounded-field bg-paper-100 p-5";
+export const tileCls = "rounded-bubble bg-paper-100 p-6";
 
 /** Section label above a group: Mono 500 / 11 caps. */
 export const capsCls = "label-caps text-ink-500";
