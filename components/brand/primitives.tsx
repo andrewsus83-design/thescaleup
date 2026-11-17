@@ -5,6 +5,7 @@
 // The interactive ones (Segmented, Sheet) stay in components/room/ui.tsx.
 
 import { cn } from "@/lib/utils";
+import { MenuBadge } from "@/components/hub/menu-badge";
 import { btnCls, cardCls, iconBtnCls, tagCls, type BtnSize, type BtnVariant } from "./styles";
 
 // ---------------------------------------------------------------------------------------------- Buttons
@@ -168,10 +169,13 @@ export function BudgetPanel({
 
 export function PageHeader({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
   return (
-    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
-      <div className="min-w-0">
-        <h1 className="font-title text-balance text-h2 text-ink-800">{title}</h1>
-        {description && <p className="mt-2 max-w-chat text-pretty text-body text-ink-500">{description}</p>}
+    <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+      <div className="flex min-w-0 items-start gap-4">
+        <MenuBadge />
+        <div className="min-w-0">
+          <h1 className="font-title text-balance text-h2 text-ink-800">{title}</h1>
+          {description && <p className="mt-2 max-w-chat text-pretty text-body text-ink-500">{description}</p>}
+        </div>
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>

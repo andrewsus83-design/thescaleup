@@ -163,6 +163,26 @@
   --font-text: var(--font-instrument), ui-sans-serif, system-ui, sans-serif; /* Instrument Sans 400/500/600 */
 }
 
+/* =========================================================================
+   MENU COLOURS. Each menu has a tint (shapes behind an icon, the active tab), a fill (decorative only) and an ink (the colour of
+   any text or icon on the tint). Ink on tint is 5.8:1 or better on every pair, and ink on white 7:1 or better. A wrapper with
+   data-acc="<menu>" sets the three variables for everything inside it: `bg-(--acc-tint) text-(--acc-ink)`.
+   ========================================================================= */
+[data-acc] { --acc-tint: #ffe4d8; --acc-fill: #f9703e; --acc-ink: #8c300a; }
+[data-acc="tasks"] { --acc-tint: #dff0fc; --acc-fill: #2f8fd8; --acc-ink: #14568f; }
+[data-acc="inbox"] { --acc-tint: #ebe5fa; --acc-fill: #7656d6; --acc-ink: #4b2fa0; }
+[data-acc="mail"] { --acc-tint: #fde3ea; --acc-fill: #e04a6e; --acc-ink: #9b1f40; }
+[data-acc="social"] { --acc-tint: #d8f2ee; --acc-fill: #1c9d8c; --acc-ink: #0c6155; }
+[data-acc="ads"] { --acc-tint: #fdeabf; --acc-fill: #eea016; --acc-ink: #744600; }
+[data-acc="content"] { --acc-tint: #f6e0f2; --acc-fill: #bd47ad; --acc-ink: #84227a; }
+[data-acc="crm"] { --acc-tint: #eadff1; --acc-fill: #8a4aa8; --acc-ink: #58286f; }
+[data-acc="wiki"] { --acc-tint: #e1e6fb; --acc-fill: #4b62d8; --acc-ink: #2a3a9a; }
+[data-acc="assets"] { --acc-tint: #eaf0c4; --acc-fill: #8aa31a; --acc-ink: #4f5e0a; }
+[data-acc="team"] { --acc-tint: #d9f0f7; --acc-fill: #1b9bbd; --acc-ink: #0b5f78; }
+[data-acc="finance"] { --acc-tint: #d6f0e0; --acc-fill: #2b9a62; --acc-ink: #176540; }
+[data-acc="products"] { --acc-tint: #f1e6dc; --acc-fill: #a8693a; --acc-ink: #6b3f1c; }
+[data-acc="settings"] { --acc-tint: #e9e7e2; --acc-fill: #6b6862; --acc-ink: #3a3a3a; }
+
 @keyframes fade-up {
   from {
     opacity: 0;
