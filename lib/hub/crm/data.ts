@@ -1,6 +1,7 @@
 import "server-only";
+import { cache } from "react";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { LIMITS, isKind, isStageFor, type Kind, type Person } from "./model";
+import { LIMITS, closedKeys, isKind, parseStages, type Kind, type LogRow, type Person, type StageDef } from "./model";
 
 // Reads for the CRM pages. They use the service role, so every function takes the brand id and filters on it: the caller has
 // already checked that this person may open the CRM in this brand.
@@ -12,7 +13,7 @@ const COLUMNS = "id, kind, name, company, email, phone, source, stage, value, ne
 export type Note = { id: string; person_id: string; body: string; author_id: string | null; author_label: string; created_at: string };
 
 function normalize(r: Record<string, unknown>): Person | null {
-  if (typeof r.id !== "string" || !isKind(r.kind) || typeof r.name !== "string" || !isStageFor(r.kind, r.stage)) return null;
+  if (typeof r.id !== "string" || !isKind(r.kind) || typeof r.name !== "string" || typeof r.stage !== "string" || !r.stage) return null;
   const s = (v: unknown) => (typeof v === "string" ? v : "");
   const value = r.value === null || r.value === undefined ? null : Number(r.value);
   return {
@@ -32,6 +33,12 @@ function normalize(r: Record<string, unknown>): Person | null {
     updated_at: s(r.updated_at),
   };
 }
+
+/** The brand's stages: its own list, or the standard one. Read once per request. */
+export const getStages = cache(async (brandId: string): Promise<StageDef[]> => {
+  const { data } = await db().from("crm_workflows").select("stages").eq("brand_id", brandId).maybeSingle();
+  return parseStages(data?.stages);
+});
 
 /** The brand's leads or clients, most recently touched first (up to `limit`; `total` is how many exist). */
 export async function listPeople(brandId: string, kind: Kind, limit: number = LIMITS.list): Promise<{ items: Person[]; total: number }> {
@@ -75,6 +82,10 @@ export async function listNotes(brandId: string, personId: string): Promise<Note
 
 /** How many open leads and open clients have a follow-up today or earlier. */
 export async function countDue(brandId: string, today: string): Promise<{ lead: number; client: number }> {
+  // Stage keys are limited to a-z, 0-9, "-" and "_" (and never start with "-"), so they are safe inside the list.
+  // "-" stands in when no stage is closed: it can never be a real key.
+  const closed = closedKeys(await getStages(brandId));
+  const notIn = `(${(closed.length ? closed : ["-"]).join(",")})`;
   const one = async (kind: Kind) => {
     const { count, error } = await db()
       .from("crm_people")
@@ -83,10 +94,28 @@ export async function countDue(brandId: string, today: string): Promise<{ lead: 
       .eq("kind", kind)
       .not("next_follow_up", "is", null)
       .lte("next_follow_up", today)
-      .not("stage", "in", "(lost,churned)");
+      .not("stage", "in", notIn);
     if (error) throw new Error(error.message);
     return count ?? 0;
   };
   const [lead, client] = await Promise.all([one("lead"), one("client")]);
   return { lead, client };
+}
+
+/** How many people are in a stage right now. */
+export async function countInStage(brandId: string, kind: Kind, stage: string): Promise<number> {
+  const { count } = await db().from("crm_people").select("id", { count: "exact", head: true }).eq("brand_id", brandId).eq("kind", kind).eq("stage", stage);
+  return count ?? 0;
+}
+
+/** Stage changes since `sinceIso` (all of them when null), oldest first, up to 20,000. */
+export async function listStageLog(brandId: string, sinceIso: string | null): Promise<LogRow[]> {
+  let q = db().from("crm_stage_log").select("person_id, kind, from_stage, to_stage, converted, at").eq("brand_id", brandId);
+  if (sinceIso) q = q.gte("at", sinceIso);
+  const { data, error } = await q.order("at", { ascending: true }).limit(20000);
+  if (error) {
+    console.error("[crm] log failed:", error.message);
+    return [];
+  }
+  return (data ?? []).flatMap((r) => (isKind(r.kind) && typeof r.person_id === "string" && typeof r.to_stage === "string" ? [{ person_id: r.person_id, kind: r.kind, from_stage: typeof r.from_stage === "string" ? r.from_stage : null, to_stage: r.to_stage, converted: r.converted === true, at: String(r.at) }] : []));
 }
