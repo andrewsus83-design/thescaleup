@@ -27,7 +27,7 @@ function href(base: string, f: F) {
 }
 
 /** The Leads and Clients lists are one page with a different kind. Search, filters, counts and paging are done by the database, so a list of thousands is searched whole. */
-export async function CrmList({ slug, brandId, kind, canEdit, manager, sp }: { slug: string; brandId: string; kind: Kind; canEdit: boolean; manager: boolean; sp: Record<string, string | string[] | undefined> }) {
+export async function CrmList({ slug, brandId, kind, canEdit, manager, contacts, sp }: { slug: string; brandId: string; kind: Kind; canEdit: boolean; manager: boolean; contacts: boolean; sp: Record<string, string | string[] | undefined> }) {
   const today = todayIn(hubTz());
   const base = listPath(slug, kind);
   const noun = kind === "lead" ? "lead" : "client";
@@ -41,7 +41,7 @@ export async function CrmList({ slug, brandId, kind, canEdit, manager, sp }: { s
   const tag = parseTags(one(sp.tag) ?? "")[0] ?? "";
   const filtered = Boolean(q || stage || due || tag);
   const cur: F = { q, stage, due, tag };
-  const filter = { q, stage, due, tag, importId: null };
+  const filter = { q, stage, due, tag, importId: null, contacts };
 
   const wanted = Math.max(1, Math.floor(Number(one(sp.page))) || 1);
   let { items, total } = await findPeople(brandId, kind, filter, today, wanted, PER_PAGE);

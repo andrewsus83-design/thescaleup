@@ -7,6 +7,7 @@ import { getFormByToken, recentEntries } from "./crm/form-data";
 import { STAMP_MAX_MS, STAMP_MIN_MS, connectionKey, stampAge } from "./crm/form-guard";
 import { runRules } from "./crm/flow";
 import { DEFAULT_THANKS, TOKEN, newLeadNote, parseAnswer, repeatNote } from "./crm/forms";
+import { sealNote, trySeal } from "./crm/seal";
 import { firstStage } from "./crm/model";
 import { unsubscribeKey } from "./email/secret";
 import { allow } from "./ratelimit";
@@ -50,6 +51,12 @@ export async function submitLead(_prev: FormState, fd: FormData): Promise<FormSt
   if (fromHere >= 6) return { error: "Too many answers from this connection. Try again later." };
   if (onForm >= 150) return { error: BUSY };
 
+  // The notes go in wrapped, like every other note about a person. A visitor is never told about the server's keys.
+  const notes = trySeal(() => ({ fresh: sealNote(form.brand_id, newLeadNote(form, a)), again: sealNote(form.brand_id, repeatNote(form, a)) }));
+  if (!notes.ok) {
+    console.error("[crm] form answer not saved:", notes.error);
+    return { error: "Could not send your answer. Try again in a moment." };
+  }
   const admin = createSupabaseAdminClient();
   const stage = firstStage(await getStages(form.brand_id), "lead");
   const { data, error } = await admin.rpc("crm_capture", {
@@ -62,8 +69,8 @@ export async function submitLead(_prev: FormState, fd: FormData): Promise<FormSt
     p_source: form.source || form.name.slice(0, 60),
     p_stage: stage,
     p_tags: form.tags,
-    p_note_new: newLeadNote(form, a),
-    p_note_again: repeatNote(form, a),
+    p_note_new: notes.value.fresh,
+    p_note_again: notes.value.again,
     p_ip: ip,
   });
   if (error) {

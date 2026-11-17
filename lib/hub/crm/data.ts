@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { fetchAll } from "../db-page";
+import { open } from "../field-crypto";
 import { LIMITS, closedKeys, isKind, parseRules, parseStages, type Kind, type LogRow, type Person, type StageDef, type StageRule } from "./model";
 
 // Reads for the CRM pages. They use the service role, so every function takes the brand id and filters on it: the caller has
@@ -13,7 +14,7 @@ const COLUMNS = "id, kind, name, company, email, phone, source, stage, value, ne
 
 export type Note = { id: string; person_id: string; body: string; author_id: string | null; author_label: string; created_at: string };
 
-function normalize(r: Record<string, unknown>): Person | null {
+function normalize(r: Record<string, unknown>, brandId: string): Person | null {
   if (typeof r.id !== "string" || !isKind(r.kind) || typeof r.name !== "string" || typeof r.stage !== "string" || !r.stage) return null;
   const s = (v: unknown) => (typeof v === "string" ? v : "");
   const value = r.value === null || r.value === undefined ? null : Number(r.value);
@@ -28,7 +29,7 @@ function normalize(r: Record<string, unknown>): Person | null {
     stage: r.stage,
     value: value !== null && Number.isFinite(value) ? value : null,
     next_follow_up: typeof r.next_follow_up === "string" ? r.next_follow_up : null,
-    summary: s(r.summary),
+    summary: open(brandId, "crm_people.summary", s(r.summary)),
     tags: Array.isArray(r.tags) ? r.tags.filter((t): t is string => typeof t === "string") : [],
     converted_at: typeof r.converted_at === "string" ? r.converted_at : null,
     created_at: s(r.created_at),
@@ -64,7 +65,7 @@ export async function listPeople(brandId: string, kind: Kind, limit: number = LI
     return { items: [], total: 0 };
   }
   const items = (data ?? []).flatMap((r) => {
-    const p = normalize(r as Record<string, unknown>);
+    const p = normalize(r as Record<string, unknown>, brandId);
     return p ? [p] : [];
   });
   return { items, total: count ?? items.length };
@@ -72,7 +73,7 @@ export async function listPeople(brandId: string, kind: Kind, limit: number = LI
 
 export async function getPerson(brandId: string, id: string): Promise<Person | null> {
   const { data } = await db().from("crm_people").select(COLUMNS).eq("brand_id", brandId).eq("id", id).maybeSingle();
-  return data ? normalize(data as Record<string, unknown>) : null;
+  return data ? normalize(data as Record<string, unknown>, brandId) : null;
 }
 
 export async function listNotes(brandId: string, personId: string): Promise<Note[]> {
@@ -87,7 +88,7 @@ export async function listNotes(brandId: string, personId: string): Promise<Note
     console.error("[crm] notes failed:", error.message);
     return [];
   }
-  return (data ?? []) as Note[];
+  return ((data ?? []) as Note[]).map((n) => ({ ...n, body: open(brandId, "crm_notes.body", n.body) }));
 }
 
 /** How many open leads and open clients have a follow-up today or earlier. */
@@ -130,7 +131,7 @@ export async function listDue(brandId: string, today: string, limit = 30): Promi
     return { items: [], total: 0 };
   }
   const items = (data ?? []).flatMap((r) => {
-    const p = normalize(r as Record<string, unknown>);
+    const p = normalize(r as Record<string, unknown>, brandId);
     return p ? [p] : [];
   });
   return { items, total: count ?? items.length };
@@ -162,11 +163,12 @@ export async function listStageLog(brandId: string, sinceIso: string | null): Pr
 // The list, the counts, the export and the bulk changes all ask the database (crm_find and friends), because the API stops at 1,000 rows.
 
 /** What the person typed and picked. `stage`: "" for any, "open" for people still being worked, or a stage key. `tag`: "" for any. */
-export type PeopleFilter = { q: string; stage: string; due: boolean; tag: string; importId: string | null };
-export const NO_FILTER: PeopleFilter = { q: "", stage: "", due: false, tag: "", importId: null };
+export type PeopleFilter = { q: string; stage: string; due: boolean; tag: string; importId: string | null; contacts: boolean };
+/** `contacts` is whether the search may look inside email and phone: false for anyone who cannot see them, or typing pieces of an address would give it away. */
+export const NO_FILTER: PeopleFilter = { q: "", stage: "", due: false, tag: "", importId: null, contacts: false };
 
 async function findArgs(brandId: string, kind: Kind, f: PeopleFilter, today: string) {
-  return { p_brand: brandId, p_kind: kind, p_q: f.q, p_stage: f.stage, p_due: f.due, p_tag: f.tag, p_import: f.importId, p_today: today, p_closed: closedKeys(await getStages(brandId)) };
+  return { p_brand: brandId, p_kind: kind, p_q: f.q, p_stage: f.stage, p_due: f.due, p_tag: f.tag, p_import: f.importId, p_today: today, p_closed: closedKeys(await getStages(brandId)), ...(f.contacts || !f.q ? {} : { p_contacts: false }) };
 }
 
 /** One page of the people who match, people to follow up first, then the most recently touched. `total` counts every match, not just this page. */
@@ -183,7 +185,7 @@ export async function findPeople(brandId: string, kind: Kind, f: PeopleFilter, t
     return { items: [], total: 0 };
   }
   const items = ((data ?? []) as Record<string, unknown>[]).flatMap((r) => {
-    const p = normalize(r);
+    const p = normalize(r, brandId);
     return p ? [p] : [];
   });
   return { items, total: count ?? items.length };
@@ -205,7 +207,7 @@ export async function findAll(brandId: string, kind: Kind, f: PeopleFilter, toda
     max,
   );
   return rows.flatMap((r) => {
-    const p = normalize(r);
+    const p = normalize(r, brandId);
     return p ? [p] : [];
   });
 }

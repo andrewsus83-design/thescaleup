@@ -6,6 +6,7 @@ import { getDocPages, getListTasks, listDocs, listSpaceLists, listSpaces, listWo
 import { insertPages } from "./clickup/insert";
 import { docWhere, idOf, isDestination, planDoc, readDocRefs, shapeDoc, toContentRow, toLeadRow, toTaskRow, type DocsDone, type Failure, type Scan, type TasksDone } from "./clickup/model";
 import { getStages } from "./crm/data";
+import { sealSummary, trySeal } from "./crm/seal";
 import { allow } from "./ratelimit";
 import { canManageTeam } from "./rules";
 import { getBrandKey } from "./secrets";
@@ -194,7 +195,9 @@ export async function importList(brandId: string, listId: string, listName: stri
         refused++;
         continue;
       }
-      rows.push({ id: randomUUID(), ext: t.id, row: { ...r.value, brand_id: ctx.brandId, created_by: ctx.user.id, converted_at: r.value.kind === "client" ? now : null } });
+      const summary = trySeal(() => sealSummary(ctx.brandId, r.value.summary));
+      if (!summary.ok) return { ok: false, error: summary.error };
+      rows.push({ id: randomUUID(), ext: t.id, row: { ...r.value, summary: summary.value, brand_id: ctx.brandId, created_by: ctx.user.id, converted_at: r.value.kind === "client" ? now : null } });
     }
   } else {
     for (const t of fresh) {
