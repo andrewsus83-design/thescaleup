@@ -2,15 +2,17 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Btn, Card } from "@/components/brand/primitives";
 import { BackLink } from "@/components/hub/back-link";
+import { Checklist } from "@/components/hub/tasks/checklist";
 import { Comments } from "@/components/hub/tasks/comments";
 import { Avatar, DueLabel, PriorityMark, SourceTag, StatusLabel, TagList } from "@/components/hub/tasks/parts";
 import { CommentComposer, DecisionPanel, SummarizeButton, TaskForm } from "@/components/hub/tasks/task-detail";
 import { requireFunction } from "@/lib/hub/access";
 import { deleteTask } from "@/lib/hub/task-actions";
-import { getTask, getWorkflow, hasAiKey, listComments, listMembers } from "@/lib/hub/tasks/data";
+import { getTask, getWorkflow, hasAiKey, listComments, listItems, listMembers } from "@/lib/hub/tasks/data";
 import { fmtDay, hubTz, todayIn } from "@/lib/hub/tasks/dates";
 import { shortName } from "@/lib/hub/tasks/model";
 import { allowedStatuses, canComment, canDecide, canDelete, canEditFields } from "@/lib/hub/tasks/rules";
+import { atLeast } from "@/lib/hub/permissions";
 
 export const metadata: Metadata = { title: "Task" };
 export const dynamic = "force-dynamic";
@@ -33,12 +35,13 @@ export default async function TaskPage({ params }: { params: Promise<{ slug: str
   const who = { actor, level: access.tasks, userId: user.id };
   const tz = hubTz();
   const today = todayIn(tz);
-  const [workflow, members, comments] = await Promise.all([getWorkflow(brand.id), listMembers(brand.id), listComments(brand.id, task.id)]);
+  const [workflow, members, comments, items] = await Promise.all([getWorkflow(brand.id), listMembers(brand.id), listComments(brand.id, task.id), listItems(brand.id, task.id)]);
   const status = workflow.statuses.find((s) => s.key === task.status);
   const assignee = members.find((m) => m.userId === task.assignee_id);
   const statuses = allowedStatuses(who, task, workflow);
   const editFields = canEditFields(who, task);
   const editable = editFields || statuses.length > 1;
+  const canTick = editFields || (actor === "ops" && atLeast(access.tasks, "edit") && task.assignee_id === user.id);
   const aiReady = canComment(who) && (await hasAiKey(brand.id));
 
   return (
@@ -103,6 +106,15 @@ export default async function TaskPage({ params }: { params: Promise<{ slug: str
           )}
         </section>
 
+        {(items.length > 0 || editFields || canTick) && (
+          <section aria-labelledby="checklist">
+            <h2 id="checklist" className="mb-4 font-title text-h3 text-ink-800">
+              Checklist
+            </h2>
+            <Checklist brandId={brand.id} taskId={task.id} initial={items} canEdit={editFields} canTick={canTick} />
+          </section>
+        )}
+
         <section aria-labelledby="comments" className="space-y-6">
           <h2 id="comments" className="font-title text-h3 text-ink-800">
             Comments
@@ -122,7 +134,7 @@ export default async function TaskPage({ params }: { params: Promise<{ slug: str
               <form action={deleteTask} className="mt-3 space-y-3">
                 <input type="hidden" name="brandId" value={brand.id} />
                 <input type="hidden" name="taskId" value={task.id} />
-                <p className="text-small text-ink-500">This removes the task and its comments for everyone. It cannot be undone.</p>
+                <p className="text-small text-ink-500">This removes the task, its checklist and its comments for everyone. It cannot be undone.</p>
                 <Btn type="submit" variant="danger">
                   Delete task
                 </Btn>

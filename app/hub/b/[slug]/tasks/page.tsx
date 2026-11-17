@@ -7,7 +7,7 @@ import { ListView } from "@/components/hub/tasks/list-view";
 import { Toolbar, type Query, type View } from "@/components/hub/tasks/toolbar";
 import { requireFunction } from "@/lib/hub/access";
 import { canManageTeam } from "@/lib/hub/rules";
-import { getWorkflow, hasAiKey, listMembers, listTasks } from "@/lib/hub/tasks/data";
+import { getWorkflow, hasAiKey, itemCounts, listMembers, listTasks } from "@/lib/hub/tasks/data";
 import { monthGrid, parseMonth } from "@/lib/hub/tasks/calendar";
 import { addDays, dayIn, hubTz, isIsoDate, todayIn } from "@/lib/hub/tasks/dates";
 import { allowedStatuses, canCreate, canDecide, canSeeStage } from "@/lib/hub/tasks/rules";
@@ -58,6 +58,7 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
     const since = addDays(today, -30);
     const tasks = all.filter((t) => t.stage !== "closed" || dayIn(tz, t.completed_at ?? t.updated_at) >= since);
     const email = new Map(members.map((m) => [m.userId, m.email]));
+    const counts = await itemCounts(brand.id, tasks.map((t) => t.id));
     const cards: BoardCard[] = tasks.map((t) => ({
       id: t.id,
       title: t.title,
@@ -68,6 +69,7 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
       tags: t.tags,
       moves: allowedStatuses(who, t, workflow).map((s) => s.key),
       closed: t.stage === "closed",
+      items: counts.get(t.id),
     }));
     body = (
       <>
@@ -77,7 +79,8 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
     );
   } else {
     const tasks = await listTasks(brand.id, actor, { ...base, status: query.status, due: query.due });
-    body = <ListView slug={slug} brandId={brand.id} tasks={tasks} workflow={workflow} members={members} today={today} canDecide={canDecide(who)} filtered={filtered} />;
+    const counts = await itemCounts(brand.id, tasks.map((t) => t.id));
+    body = <ListView slug={slug} brandId={brand.id} tasks={tasks} workflow={workflow} members={members} today={today} canDecide={canDecide(who)} filtered={filtered} counts={counts} />;
   }
 
   return (

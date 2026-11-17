@@ -6,7 +6,7 @@ import { Alert } from "@/components/brand/primitives";
 import { moveTask } from "@/lib/hub/task-actions";
 import type { Priority, Stage } from "@/lib/hub/tasks/model";
 import { cn } from "@/lib/utils";
-import { Avatar, DueLabel, PriorityMark, STAGE_DOT, TagList, compactField } from "./parts";
+import { Avatar, ChecklistChip, DueLabel, PriorityMark, STAGE_DOT, TagList, compactField } from "./parts";
 
 export type BoardColumn = { key: string; label: string; stage: Stage };
 export type BoardCard = {
@@ -20,6 +20,7 @@ export type BoardCard = {
   /** The status keys this person may move the card to (includes its own). Under two means it cannot move. */
   moves: string[];
   closed: boolean;
+  items?: { done: number; total: number };
 };
 
 /**
@@ -112,6 +113,7 @@ export function Board({ slug, brandId, columns, cards, today }: { slug: string; 
                       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
                         <PriorityMark priority={c.priority} />
                         <DueLabel due={c.due} today={today} closed={c.closed} />
+                        <ChecklistChip progress={c.items} />
                         <span className="ml-auto">
                           <Avatar person={c.assigneeEmail ? { email: c.assigneeEmail } : null} size="sm" />
                         </span>

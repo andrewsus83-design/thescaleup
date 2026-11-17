@@ -1,4 +1,4 @@
-import { Flag, UserRound } from "lucide-react";
+import { Flag, ListChecks, UserRound } from "lucide-react";
 import { dueInfo } from "@/lib/hub/tasks/dates";
 import { initials, PRIORITY_LABEL, SOURCE_LABEL, type Member, type Priority, type Stage, type TaskSource } from "@/lib/hub/tasks/model";
 import { cn } from "@/lib/utils";
@@ -77,3 +77,20 @@ export function TagList({ tags }: { tags: string[] }) {
 /** Compact field styles for the filter bar and the task form (the brand Input is 56px, too tall for a toolbar). */
 export const compactField =
   "h-11 rounded-full border-control border-ink-200 bg-paper-0 px-4 text-small text-ink-800 outline-none placeholder:text-ink-500 focus-visible:border-ink-800 focus-visible:shadow-focus";
+
+/** "3/5" with a checklist icon, for a card or a row. Nothing when the task has no checklist. */
+export function ChecklistChip({ progress }: { progress?: { done: number; total: number } }) {
+  if (!progress || progress.total === 0) return null;
+  const all = progress.done === progress.total;
+  return (
+    <span className={cn("inline-flex items-center gap-1 text-caption", all ? "text-success" : "text-ink-500")}>
+      <ListChecks className="size-3.5" aria-hidden />
+      <span aria-hidden>
+        {progress.done}/{progress.total}
+      </span>
+      <span className="sr-only">
+        {progress.done} of {progress.total} checklist items done
+      </span>
+    </span>
+  );
+}

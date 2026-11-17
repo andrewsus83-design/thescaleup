@@ -5,12 +5,12 @@ import { btnCls } from "@/components/brand/styles";
 import { approveInline } from "@/lib/hub/task-actions";
 import type { Member, Task, Workflow, WorkflowStatus } from "@/lib/hub/tasks/model";
 import { cn } from "@/lib/utils";
-import { Avatar, DueLabel, PriorityMark, SourceTag, StatusLabel, TagList } from "./parts";
+import { Avatar, ChecklistChip, DueLabel, PriorityMark, SourceTag, StatusLabel, TagList } from "./parts";
 
-type Props = { slug: string; brandId: string; tasks: Task[]; workflow: Workflow; members: Member[]; today: string; canDecide: boolean; filtered: boolean };
+type Props = { slug: string; brandId: string; tasks: Task[]; workflow: Workflow; members: Member[]; today: string; canDecide: boolean; filtered: boolean; counts?: Map<string, { done: number; total: number }> };
 
 /** One task per row. The whole row opens the task; the Approve button sits above that link. */
-function Row({ t, slug, brandId, who, today, canDecide }: { t: Task; slug: string; brandId: string; who: Member | undefined; today: string; canDecide: boolean }) {
+function Row({ t, slug, brandId, who, today, canDecide, progress }: { t: Task; slug: string; brandId: string; who: Member | undefined; today: string; canDecide: boolean; progress?: { done: number; total: number } }) {
   const closed = t.stage === "closed";
   return (
     <li className="relative flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 hover:bg-paper-50 sm:flex-nowrap">
@@ -31,6 +31,7 @@ function Row({ t, slug, brandId, who, today, canDecide }: { t: Task; slug: strin
         <SourceTag source={t.source} />
         <PriorityMark priority={t.priority} />
         <DueLabel due={t.due_date} today={today} closed={closed} />
+        <ChecklistChip progress={progress} />
         <Avatar person={who} />
         {canDecide && t.stage === "proposed" && (
           <form action={approveInline} className="relative z-10">
@@ -70,7 +71,7 @@ function Group({ status, count, collapsed, children }: { status: WorkflowStatus;
   );
 }
 
-export function ListView({ slug, brandId, tasks, workflow, members, today, canDecide, filtered }: Props) {
+export function ListView({ slug, brandId, tasks, workflow, members, today, canDecide, filtered, counts }: Props) {
   if (!tasks.length) {
     return (
       <EmptyState
@@ -93,7 +94,7 @@ export function ListView({ slug, brandId, tasks, workflow, members, today, canDe
         return (
           <Group key={s.key} status={s} count={rows.length} collapsed={s.stage === "closed" || s.stage === "rejected"}>
             {rows.map((t) => (
-              <Row key={t.id} t={t} slug={slug} brandId={brandId} who={t.assignee_id ? who.get(t.assignee_id) : undefined} today={today} canDecide={canDecide} />
+              <Row key={t.id} t={t} slug={slug} brandId={brandId} who={t.assignee_id ? who.get(t.assignee_id) : undefined} today={today} canDecide={canDecide} progress={counts?.get(t.id)} />
             ))}
           </Group>
         );

@@ -6,6 +6,7 @@ import { getBrandKey } from "../secrets";
 import type { Actor } from "../rules";
 import { isBrandRole } from "../rules";
 import { isPriority, isStage, TASK_COLUMNS, type Member, type Task, type TaskComment, type Workflow, type WorkflowStatus } from "./model";
+import { progressOf, type Item } from "./items";
 import { canSeeStage } from "./rules";
 
 const DEFAULT_WORKFLOW: Workflow = {
@@ -123,6 +124,38 @@ export async function listComments(brandId: string, taskId: string): Promise<Tas
     .order("created_at", { ascending: true })
     .limit(300);
   return (data ?? []) as TaskComment[];
+}
+
+// ---------------------------------------------------------------------------------------------- checklists (service role only)
+// Read only for tasks the caller already got through listTasks or getTask, which apply the stage rules. A missing table (the
+// database step has not run yet) is the same as no items, so the task pages keep working.
+export async function listItems(brandId: string, taskId: string): Promise<Item[]> {
+  const { data, error } = await createSupabaseAdminClient().from("task_items").select("id, body, done, position").eq("brand_id", brandId).eq("task_id", taskId).order("position").order("created_at").limit(200);
+  if (error) {
+    if (error.code !== "42P01") console.error("[hub] listItems failed:", error.message);
+    return [];
+  }
+  return (data ?? []).map((r) => ({ id: r.id as string, body: String(r.body), done: r.done === true, position: Number(r.position) }));
+}
+
+/** "3 of 5 done" per task, for the board and the list. Tasks without items are left out. */
+export async function itemCounts(brandId: string, taskIds: readonly string[]): Promise<Map<string, { done: number; total: number }>> {
+  const out = new Map<string, { done: number; total: number }>();
+  const ids = [...new Set(taskIds)].filter((id) => UUID.test(id));
+  const parts: string[][] = [];
+  for (let i = 0; i < ids.length; i += 100) parts.push(ids.slice(i, i + 100));
+  const admin = createSupabaseAdminClient();
+  const rows = await Promise.all(parts.map((p) => admin.from("task_items").select("task_id, done").eq("brand_id", brandId).in("task_id", p).limit(5000)));
+  const grouped = new Map<string, { done: boolean }[]>();
+  for (const r of rows) {
+    if (r.error) {
+      if (r.error.code !== "42P01") console.error("[hub] itemCounts failed:", r.error.message);
+      continue;
+    }
+    for (const x of r.data ?? []) grouped.set(x.task_id as string, [...(grouped.get(x.task_id as string) ?? []), { done: x.done === true }]);
+  }
+  for (const [id, list] of grouped) out.set(id, progressOf(list));
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------------- time entries (service role only)
