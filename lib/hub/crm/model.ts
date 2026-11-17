@@ -159,8 +159,8 @@ export type Person = {
 export type PersonInput = { name: string; company: string; email: string; phone: string; source: string; value: number | null; next_follow_up: string | null; summary: string };
 
 // Control characters and line breaks have no place in a single-line field.
-const oneLine = (s: string, max: number) => s.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const oneLine = (s: string, max: number) => s.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Reads the person form. The kind and stage are not here: they come from the page and from the stage buttons. */
 export function parsePerson(get: (k: string) => string): { ok: true; value: PersonInput } | { ok: false; error: string } {
