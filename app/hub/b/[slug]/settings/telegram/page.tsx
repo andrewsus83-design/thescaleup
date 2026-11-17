@@ -3,19 +3,23 @@ import { Card } from "@/components/brand/primitives";
 import { KeysSection } from "@/components/hub/keys-section";
 import { SettingsShell } from "@/components/hub/settings-shell";
 import { TelegramHowTo } from "@/components/hub/telegram/how-to";
+import { MyTelegram } from "@/components/hub/telegram/my-telegram";
 import { TelegramPanel } from "@/components/hub/telegram/telegram-panel";
 import { canManageTeam } from "@/lib/hub/rules";
 import { secretStatus } from "@/lib/hub/secrets";
 import { requireBrand } from "@/lib/hub/session";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = { title: "Telegram" };
 export const dynamic = "force-dynamic";
 
 export default async function TelegramPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { brand, actor } = await requireBrand(slug);
+  const { user, brand, actor } = await requireBrand(slug);
   const manage = canManageTeam(actor);
   const keys = manage ? await secretStatus(brand.id) : null;
+  // Whether this person has linked their own Telegram (false until the database step has run).
+  const { data: mine } = await createSupabaseAdminClient().from("telegram_links").select("user_id").eq("brand_id", brand.id).eq("user_id", user.id).maybeSingle();
   return (
     <SettingsShell
       slug={slug}
@@ -38,6 +42,10 @@ export default async function TelegramPage({ params }: { params: Promise<{ slug:
           </Card>
         </>
       ) : null}
+      <Card>
+        <h2 className="mb-3 font-title text-h3 text-ink-800">Your Telegram</h2>
+        <MyTelegram brandId={brand.id} linked={Boolean(mine)} />
+      </Card>
       {Boolean(keys?.telegram) && <TelegramHowTo canConnect={manage} />}
     </SettingsShell>
   );
