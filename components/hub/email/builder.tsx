@@ -21,6 +21,8 @@ type Props = {
   addresses: { id: string; email: string; name: string }[];
   templates: { id: string; name: string }[];
   stages: { lead: string[]; client: string[] };
+  /** The tags people have in the CRM, most used first. */
+  tags: { tag: string; n: number }[];
   /** What is missing on the server for sending, in words. Empty when sending works. */
   blocker: string;
 };
@@ -34,7 +36,7 @@ function Skips({ c }: { c: Counted }) {
   return parts.length ? <span className="text-ink-500"> Left out: {parts.join(", ")}.</span> : null;
 }
 
-export function CampaignBuilder({ brandId, slug, brandName, id: id0, initial, addresses, templates, stages, blocker }: Props) {
+export function CampaignBuilder({ brandId, slug, brandName, id: id0, initial, addresses, templates, stages, tags, blocker }: Props) {
   const router = useRouter();
   const uid = useId();
   const [id, setId] = useState(id0);
@@ -321,7 +323,7 @@ export function CampaignBuilder({ brandId, slug, brandName, id: id0, initial, ad
               {AUDIENCE_KINDS.map((k) => {
                 const on = audience.kinds.includes(k);
                 return (
-                  <button key={k} type="button" aria-pressed={on} onClick={() => setAud({ kinds: on ? audience.kinds.filter((x) => x !== k) : [...audience.kinds, k], stages: [] })} className={pillCls(on)}>
+                  <button key={k} type="button" aria-pressed={on} onClick={() => setAud({ ...audience, kinds: on ? audience.kinds.filter((x) => x !== k) : [...audience.kinds, k], stages: [] })} className={pillCls(on)}>
                     {KIND_LABEL[k]}
                   </button>
                 );
@@ -336,6 +338,22 @@ export function CampaignBuilder({ brandId, slug, brandName, id: id0, initial, ad
                     return (
                       <button key={s} type="button" aria-pressed={on} onClick={() => setAud({ ...audience, stages: on ? audience.stages.filter((x) => x !== s) : [...audience.stages, s] })} className={pillCls(on)}>
                         {s}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {(tags.length > 0 || audience.tags.length > 0) && (
+              <div>
+                <p className="mb-2 text-caption text-ink-500">Only people with at least one of these tags. Pick none to include everyone above.</p>
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Tags">
+                  {[...tags, ...audience.tags.filter((t) => !tags.some((x) => x.tag === t)).map((t) => ({ tag: t, n: 0 }))].map((t) => {
+                    const on = audience.tags.includes(t.tag);
+                    return (
+                      <button key={t.tag} type="button" aria-pressed={on} onClick={() => setAud({ ...audience, tags: on ? audience.tags.filter((x) => x !== t.tag) : [...audience.tags, t.tag].slice(0, 10) })} className={pillCls(on)}>
+                        {t.tag}
+                        {t.n > 0 && <span className="font-mono text-micro opacity-70">{t.n}</span>}
                       </button>
                     );
                   })}

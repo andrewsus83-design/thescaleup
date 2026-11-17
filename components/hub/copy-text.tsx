@@ -5,7 +5,7 @@ import { Check, Copy } from "lucide-react";
 import { Btn } from "@/components/brand/primitives";
 
 /** A block of text with a Copy button, for something the person will paste into another app. */
-export function CopyText({ text, label }: { text: string; label: string }) {
+export function CopyText({ text, label, button = "Copy message" }: { text: string; label: string; button?: string }) {
   const [state, setState] = useState<"idle" | "copied" | "blocked">("idle");
   async function copy() {
     try {
@@ -22,7 +22,7 @@ export function CopyText({ text, label }: { text: string; label: string }) {
       <div className="flex flex-wrap items-center gap-3">
         <Btn variant="secondary" onClick={copy} aria-label={label}>
           {state === "copied" ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
-          {state === "copied" ? "Copied" : "Copy message"}
+          {state === "copied" ? "Copied" : button}
         </Btn>
         {state === "blocked" && <span className="text-caption text-ink-500" role="status">Your browser would not copy it. Select the text above and copy it by hand.</span>}
       </div>

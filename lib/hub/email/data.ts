@@ -52,6 +52,7 @@ export async function resolveAudience(brandId: string, audience: Audience, max?:
     data = await fetchAll<Record<string, unknown>>((from, to) => {
       let q = db().from("crm_people").select("id, email, name, company, kind, stage").eq("brand_id", brandId).in("kind", audience.kinds).neq("email", "").order("created_at").order("id");
       if (audience.stages.length) q = q.in("stage", audience.stages);
+      if (audience.tags.length) q = q.overlaps("tags", audience.tags);
       return q.range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
     });
   } catch (e) {

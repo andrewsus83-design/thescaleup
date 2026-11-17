@@ -56,6 +56,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ slug:
           addresses={data.addresses}
           templates={data.templates}
           stages={data.stages}
+          tags={data.tags}
           blocker={data.blocker}
         />
         <div className="mt-10 border-t border-hairline pt-6">

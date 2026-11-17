@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BriefcaseBusiness, Download, Search, Upload, X } from "lucide-react";
+import { BriefcaseBusiness, Download, Mail, Search, Upload, X } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/brand/primitives";
 import { btnCls, iconBtnCls, pillCls, tileCls } from "@/components/brand/styles";
 import { CrmNav, crmBase, listPath } from "@/components/hub/crm/parts";
@@ -164,12 +164,20 @@ export async function CrmList({ slug, brandId, kind, canEdit, manager, sp }: { s
                   {fmtNum(total)} {total === 1 ? noun : nouns}
                   {filtered ? " match" : ""}. People to follow up come first.
                 </p>
-                {manager && (
-                  <a href={exportHref} className={btnCls("secondary", "sm")}>
-                    <Download className="size-4" aria-hidden />
-                    Download CSV
-                  </a>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  {tag && canEdit && (
+                    <Link href={`/hub/b/${slug}/mail/campaigns/new?${new URLSearchParams({ tag, kind }).toString()}`} className={btnCls("secondary", "sm")}>
+                      <Mail className="size-4" aria-hidden />
+                      Email people tagged {tag}
+                    </Link>
+                  )}
+                  {manager && (
+                    <a href={exportHref} className={btnCls("secondary", "sm")}>
+                      <Download className="size-4" aria-hidden />
+                      Download CSV
+                    </a>
+                  )}
+                </div>
               </div>
               <PeopleTable rows={rows} brandId={brandId} slug={slug} kind={kind} stages={stages} total={total} filter={{ q, stage, due, tag }} canEdit={canEdit} manager={manager} />
               {pages > 1 && (
