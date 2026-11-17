@@ -33,7 +33,7 @@ export async function sendDailyDigests(): Promise<DailyResult> {
         result.noToken += chatIds.length;
         continue;
       }
-      const today = await loadToday({ brandId, actor: "founder", userId: "", access: { tasks: "view", crm: "view", content: "view", mail: "view" }, day, scope: "team" });
+      const today = await loadToday({ brandId, actor: "founder", userId: "", access: { tasks: "view", crm: "view", content: "view", mail: "view" }, day, scope: "team", service: true });
       const done: number[] = [];
       if (isEmpty(today)) {
         result.empty += chatIds.length;

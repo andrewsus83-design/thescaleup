@@ -8,7 +8,7 @@ What you need to do:
 2. Tap the invite link to our group: [paste the group link here]
 3. That is all.
 
-The bot only posts updates from the hub. It does not keep your messages.`;
+The bot posts updates from the hub. It does not keep your messages.`;
 
 type Step = { title: string; body: React.ReactNode };
 
@@ -34,7 +34,9 @@ const code = (t: string) => <code className="rounded bg-paper-100 px-1.5 py-0.5 
 
 const FIXES: { q: string; a: React.ReactNode }[] = [
   { q: "The hub says the token is not accepted", a: <>Copy the whole token again from BotFather, with no spaces before or after it. If you lost the message, send {code("/token")} to @BotFather, pick your bot and it shows the token again.</> },
-  { q: "Find chats shows nothing", a: <>Telegram only lets the hub see messages from about the last 24 hours. Write a new message to the bot (or in the group, see Part 3), wait a few seconds, then press Find chats again.</> },
+  { q: "Find chats shows nothing", a: <>The hub only sees messages from about the last 24 hours. Write a new message to the bot (or in the group, see Part 3), wait a few seconds, then press Find chats again. With commands on, the hub keeps the chats it has seen, so a message sent after you turned commands on is enough.</> },
+  { q: "The bot ignores my code", a: <>Codes work once, only in a private chat with the bot, and expire after 15 minutes. Press Link my Telegram for a fresh one and send it again. After eight wrong tries in an hour the hub makes you wait.</> },
+  { q: "Commands did not turn on", a: <>The hub shows the reason under Commands. If it says another tool is listening, that tool owns the bot: make a new bot for the hub. If it mentions the database step, ask the person who manages the database to run the latest migration.</> },
   { q: "The bot does not answer in the group", a: <>That is normal: in a group a bot only notices messages that call it by name. Send {code("/start@yourbotname")} in the group (use your bot&apos;s own username), then press Find chats.</> },
   { q: "The hub mentions a webhook", a: <>Another tool is already listening to this bot, and a bot can only have one listener. The simplest fix is to make a fresh bot for the hub with @BotFather and save its token here.</> },
   { q: "I want to stop the messages", a: <>Press Remove next to the chat above. To switch the bot off everywhere, send {code("/revoke")} to @BotFather: the old token stops working at once.</> },
@@ -55,7 +57,7 @@ export function TelegramHowTo({ canConnect }: { canConnect: boolean }) {
             ]}
           />
         </div>
-        <p className="mt-4 text-small text-ink-500">The bot only posts updates. It does not keep your messages.</p>
+        <p className="mt-4 text-small text-ink-500">If your owner or founder has turned on commands, you can also link your own Telegram under Your Telegram on this page, then ask the bot for your tasks with /tasks, add one with /add, or mark one done with /done.</p>
       </Card>
     );
   }
@@ -95,6 +97,16 @@ export function TelegramHowTo({ canConnect }: { canConnect: boolean }) {
             { title: "Add the bot to the group", body: <p>Open the group, tap its name, Add members, search for your bot&apos;s username and add it.</p> },
             { title: "Wake the bot up in the group", body: <p>Send {code("/start@yourbotname")} in the group, using your bot&apos;s own username.</p> },
             { title: "Link the group", body: <p>Back here press Find chats, then Link next to the group, then Send a test.</p> },
+          ]}
+        />
+
+        <h3 className="mt-8 mb-3 font-semibold text-ink-800">Part 4. Let your team use the bot (optional)</h3>
+        <Steps
+          from={14}
+          steps={[
+            { title: "Turn on commands", body: <p>Above, under Commands, press Turn on. A bot can only have one listener, so use a bot made for the hub.</p> },
+            { title: "Everyone links their own Telegram", body: <p>Each person opens this page, presses Link my Telegram under Your Telegram, and sends the code to the bot in a private chat. The bot does everything as that person, with their role.</p> },
+            { title: "Try it", body: <p>Send {code("/today")} or {code("/tasks")}. Send {code("/help")} to see every command.</p> },
           ]}
         />
       </Card>

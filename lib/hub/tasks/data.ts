@@ -105,6 +105,27 @@ export async function listTasks(brandId: string, actor: Actor | null, f: TaskFil
   return (data ?? []).map((r) => normalize(r as Record<string, unknown>)).filter((t) => canSeeStage(actor, t.stage));
 }
 
+/**
+ * The same read for code that has no signed-in person (the daily cron, the Telegram bot). It uses the service role, so the database
+ * policies do not filter: the caller has already decided who is asking, and `actor` applies the stage rule (ops and viewers never get
+ * proposals or rejected work) exactly as listTasks does.
+ */
+export async function listTasksService(brandId: string, actor: Actor | null, f: TaskFilters): Promise<Task[]> {
+  let q = createSupabaseAdminClient().from("tasks").select(TASK_COLUMNS).eq("brand_id", brandId);
+  if (f.assignee === "me") q = q.eq("assignee_id", f.userId);
+  else if (f.assignee && UUID.test(f.assignee)) q = q.eq("assignee_id", f.assignee);
+  if (f.dueTo) q = q.lte("due_date", f.dueTo);
+  const { data, error } = await q
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(Math.min(f.limit ?? 500, 1000));
+  if (error) {
+    console.error("[hub] listTasksService failed:", error.message);
+    return [];
+  }
+  return (data ?? []).map((r) => normalize(r as Record<string, unknown>)).filter((t) => canSeeStage(actor, t.stage));
+}
+
 export async function getTask(brandId: string, taskId: string, actor: Actor | null): Promise<Task | null> {
   if (!UUID.test(taskId)) return null;
   const supabase = await createSupabaseServerClient();

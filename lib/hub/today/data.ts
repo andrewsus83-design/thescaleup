@@ -4,18 +4,19 @@ import { listDue } from "../crm/data";
 import { listPlanned } from "../content/data";
 import { countUnread } from "../mail/data";
 import type { Actor } from "../rules";
-import { listTasks } from "../tasks/data";
+import { listTasks, listTasksService } from "../tasks/data";
 import { LIMITS, pickTasks, type Today } from "./model";
 
 /**
  * Everything that falls on `day` for one person: their open tasks that are late or due (or the whole team's), CRM follow-ups,
  * content planned for the day and unread mail. Only the menus they can open are read, and a failed read becomes null.
  */
-export async function loadToday(opts: { brandId: string; actor: Actor | null; userId: string; access: Pick<Access, "tasks" | "crm" | "content" | "mail">; day: string; scope: "me" | "team" }): Promise<Today> {
+export async function loadToday(opts: { brandId: string; actor: Actor | null; userId: string; access: Pick<Access, "tasks" | "crm" | "content" | "mail">; day: string; scope: "me" | "team"; /** No signed-in person (the cron, the Telegram bot): read tasks with the service role instead of a browser session. */ service?: boolean }): Promise<Today> {
   const { brandId, actor, userId, access, day, scope } = opts;
+  const readTasks = opts.service ? listTasksService : listTasks;
   const [tasks, people, content, unread] = await Promise.all([
     access.tasks !== "none"
-      ? listTasks(brandId, actor, { userId, assignee: scope === "me" ? "me" : undefined, dueTo: day, limit: 300 }).then((r) => pickTasks(r, day)).catch(() => null)
+      ? readTasks(brandId, actor, { userId, assignee: scope === "me" ? "me" : undefined, dueTo: day, limit: 300 }).then((r) => pickTasks(r, day)).catch(() => null)
       : null,
     access.crm !== "none"
       ? listDue(brandId, day, LIMITS.page).then((r) => ({

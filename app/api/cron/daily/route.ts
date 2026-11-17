@@ -2,6 +2,7 @@ import { cronAuthorized } from "@/lib/hub/telegram/daily-model";
 import { sendDailyDigests } from "@/lib/hub/telegram/daily";
 import { runSequences } from "@/lib/hub/email/sequence-run";
 import { makeDueTasks } from "@/lib/hub/tasks/recurrence-run";
+import { pruneTelegram } from "@/lib/hub/telegram/prune";
 
 // Called once a morning by Vercel Cron (see vercel.json). It first makes the repeating tasks that are due (so the digest already lists them), then
 // sends each opted-in Telegram chat its brand's day, then the emails of every running
@@ -27,5 +28,7 @@ export async function GET(req: Request) {
   } catch (e) {
     console.error("[sequences] run failed:", e instanceof Error ? e.message : e);
   }
+  const pruned = await pruneTelegram();
+  console.log("[telegram-prune]", JSON.stringify(pruned));
   return Response.json({ ok: true, ...result, sequences, repeating });
 }

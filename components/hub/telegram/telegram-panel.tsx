@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Alert, Btn, Chip } from "@/components/brand/primitives";
-import { checkTelegram, findTelegramChats, linkTelegramChat, sendTodayToTelegram, setTelegramDaily, testTelegramChat, unlinkTelegramChat } from "@/lib/hub/telegram-actions";
+import { checkTelegram, disableTelegramCommands, enableTelegramCommands, findTelegramChats, linkTelegramChat, sendTodayToTelegram, setTelegramDaily, testTelegramChat, unlinkTelegramChat, unlinkTelegramPerson, type Commands, type Person } from "@/lib/hub/telegram-actions";
 import { KIND_LABEL, MAX_LINKED, type Bot, type Chat, type Linked } from "@/lib/hub/telegram/model";
 
 /** Checks the bot, links the chats that should receive the hub's messages, and sends a test. */
@@ -11,6 +11,8 @@ export function TelegramPanel({ brandId, hasToken }: { brandId: string; hasToken
   const [bot, setBot] = useState<Bot | null>(null);
   const [linked, setLinked] = useState<Linked[]>([]);
   const [found, setFound] = useState<Chat[] | null>(null);
+  const [commands, setCommands] = useState<Commands>({ on: false, problem: "" });
+  const [people, setPeople] = useState<Person[]>([]);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
@@ -29,6 +31,8 @@ export function TelegramPanel({ brandId, hasToken }: { brandId: string; hasToken
     run("check", () => checkTelegram(brandId), (r) => {
       setBot(r.bot);
       setLinked(r.linked);
+      setCommands(r.commands);
+      setPeople(r.people);
     });
   const find = () => run("find", () => findTelegramChats(brandId), (r) => setFound(r.chats));
   const link = (id: number) =>
@@ -41,6 +45,12 @@ export function TelegramPanel({ brandId, hasToken }: { brandId: string; hasToken
     setLinked(r.linked);
     setNote(on ? "This chat will get the day's summary every morning." : "The morning summary is off for this chat.");
   });
+  const switchCommands = (on: boolean) =>
+    run(on ? "cmd-on" : "cmd-off", () => (on ? enableTelegramCommands(brandId) : disableTelegramCommands(brandId)), (r) => {
+      setCommands(r.commands);
+      setNote(on ? "Commands are on. Everyone can now link their own Telegram below." : "Commands are off. The bot only sends messages now.");
+    });
+  const removePerson = (userId: string) => run(`person-${userId}`, () => unlinkTelegramPerson(brandId, userId), (r) => setPeople(r.people));
   const unlink = (id: number) => run(`unlink-${id}`, () => unlinkTelegramChat(brandId, id), (r) => setLinked(r.linked));
   const today = () =>
     run("today", () => sendTodayToTelegram(brandId), (r) => setNote(r.failed ? `Summary sent to ${r.sent} chat${r.sent === 1 ? "" : "s"}. ${r.failed} did not accept it.` : `Summary sent to ${r.sent} chat${r.sent === 1 ? "" : "s"}.`));
@@ -116,6 +126,51 @@ export function TelegramPanel({ brandId, hasToken }: { brandId: string; hasToken
                 </Btn>
                 <p className="text-caption text-ink-500">Posts what is late or due, the content planned for today, the number of CRM follow-ups and unread mail to every chat above. Customer names are never included. “Every morning” sends it for you at 08:00 Jakarta time, only on days that have something in them.</p>
               </div>
+            )}
+          </section>
+
+          <section aria-labelledby="tg-cmds" className="space-y-3">
+            <h3 id="tg-cmds" className="font-title text-h4 text-ink-800">
+              Commands
+            </h3>
+            <p className="text-small text-ink-600">
+              Lets your team write to the bot: <code className="font-mono">/today</code>, <code className="font-mono">/tasks</code>, <code className="font-mono">/add</code>, <code className="font-mono">/remind</code> and <code className="font-mono">/done</code>. Each person first links their own Telegram to their hub login with a one-time code, and every command runs as them, with their own role. In a group only linked chats are answered, and a person&apos;s own task list goes to them privately.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Chip tone={commands.on ? "ok" : "neutral"}>{commands.on ? "On" : "Off"}</Chip>
+              {commands.on ? (
+                <Btn onClick={() => switchCommands(false)} disabled={busy !== ""}>
+                  {spin("cmd-off")}
+                  Turn off
+                </Btn>
+              ) : (
+                <Btn variant="primary" onClick={() => switchCommands(true)} disabled={busy !== ""}>
+                  {spin("cmd-on")}
+                  Turn on
+                </Btn>
+              )}
+            </div>
+            {commands.problem && <Alert tone="warn">{commands.problem}</Alert>}
+            {!commands.on && <p className="text-caption text-ink-500">Turning this on tells Telegram to send this bot&apos;s messages to the hub. A bot has one listener, so use a bot made for the hub.</p>}
+            {commands.on && (
+              <>
+                <h4 className="text-small font-semibold text-ink-800">People linked ({people.length})</h4>
+                {people.length === 0 ? (
+                  <p className="text-small text-ink-500">Nobody yet. Each person links their own below, under Your Telegram.</p>
+                ) : (
+                  <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100">
+                    {people.map((p) => (
+                      <li key={p.userId} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                        <span className="min-w-0 flex-1 truncate text-body text-ink-800">{p.email}</span>
+                        <Btn size="sm" onClick={() => removePerson(p.userId)} disabled={busy !== ""}>
+                          {spin(`person-${p.userId}`)}
+                          Remove
+                        </Btn>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
           </section>
 
