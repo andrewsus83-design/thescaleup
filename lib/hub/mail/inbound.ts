@@ -132,12 +132,23 @@ export async function ingestReceived(emailId: string): Promise<IngestResult> {
  */
 async function recordCampaignEvent(admin: ReturnType<typeof db>, type: string, resendId: string, bounceType?: string): Promise<void> {
   if (type !== "email.bounced" && type !== "email.complained") return;
-  const { data: row } = await admin.from("email_sends").select("id, brand_id, email").eq("resend_id", resendId).maybeSingle();
-  if (!row) return;
   const complained = type === "email.complained";
-  await admin.from("email_sends").update({ status: complained ? "complained" : "bounced" }).eq("id", row.id);
-  if (complained || /permanent/i.test(bounceType ?? "")) {
-    await admin.from("email_suppressions").upsert({ brand_id: row.brand_id, email: String(row.email).toLowerCase(), reason: complained ? "complained" : "bounced" }, { onConflict: "brand_id,email", ignoreDuplicates: true });
+  const never = complained || /permanent/i.test(bounceType ?? "");
+  const suppress = (brandId: unknown, email: unknown) =>
+    admin.from("email_suppressions").upsert({ brand_id: brandId, email: String(email).toLowerCase(), reason: complained ? "complained" : "bounced" }, { onConflict: "brand_id,email", ignoreDuplicates: true });
+  const { data: row } = await admin.from("email_sends").select("id, brand_id, email").eq("resend_id", resendId).maybeSingle();
+  if (row) {
+    await admin.from("email_sends").update({ status: complained ? "complained" : "bounced" }).eq("id", row.id);
+    if (never) await suppress(row.brand_id, row.email);
+    return;
+  }
+  // Not a campaign email: it may be one of a sequence. The person leaves the sequence too, so no later email goes to a dead address.
+  const { data: step } = await admin.from("email_step_sends").select("id, brand_id, email, enrollment_id").eq("resend_id", resendId).maybeSingle();
+  if (!step) return;
+  await admin.from("email_step_sends").update({ status: complained ? "complained" : "bounced" }).eq("id", step.id);
+  if (never) {
+    await suppress(step.brand_id, step.email);
+    await admin.from("email_enrollments").update({ status: "stopped", stop_reason: complained ? "complained" : "bounced", next_on: null }).eq("id", step.enrollment_id).eq("status", "active");
   }
 }
 
