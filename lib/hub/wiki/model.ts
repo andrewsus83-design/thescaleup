@@ -26,7 +26,7 @@ export const aiDefault = (t: PageType) => TYPE_INFO[t].ai;
 export const MAX = { title: 120, summary: 300, body: 50_000, tags: 10, tag: 30, query: 80 } as const;
 
 /** Slugs that would collide with the Wiki's own pages. */
-const RESERVED = new Set(["new", "edit", "history"]);
+const RESERVED = new Set(["new", "edit", "history", "build"]);
 
 /** "Sales, Q3 plan,, sales" → ["sales", "q3 plan"]: lower case, no duplicates, short, at most ten. Returns an error for a tag that is too long. */
 export function parseTags(raw: string): { ok: true; tags: string[] } | { ok: false; error: string } {

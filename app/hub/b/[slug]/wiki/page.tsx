@@ -61,9 +61,14 @@ export default async function WikiPage({ params, searchParams }: { params: Promi
         description="What the company knows: the brand, how we work, training and research. Private to your team."
         action={
           canEdit && (
-            <Link href={`${base}/new`} className={btnCls("primary", "md")}>
-              New page
-            </Link>
+            <span className="flex flex-wrap items-center gap-2">
+              <Link href={`${base}/build`} className={btnCls("secondary", "md")}>
+                Build with AI
+              </Link>
+              <Link href={`${base}/new`} className={btnCls("primary", "md")}>
+                New page
+              </Link>
+            </span>
           )
         }
       />
