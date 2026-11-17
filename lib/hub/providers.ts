@@ -4,7 +4,7 @@
 //  - scope "brand":     a connection that belongs to one brand and never falls back (the brand's own accounts).
 // "wired" is false while nothing in the app reads that key yet: the page says so instead of implying it is in use.
 
-export type GroupId = "ai" | "research" | "media" | "pages" | "social" | "ads" | "cost" | "google" | "import";
+export type GroupId = "ai" | "research" | "media" | "pages" | "social" | "ads" | "cost" | "google" | "import" | "telegram";
 export type Scope = "both" | "workspace" | "brand";
 export type ProviderDef = { key: string; label: string; use: string; hint: string; group: GroupId; scope: Scope; wired: boolean };
 
@@ -18,6 +18,7 @@ export const GROUPS: { id: GroupId; label: string; hint: string }[] = [
   { id: "cost", label: "Cost control", hint: "See what every AI call costs, per brand" },
   { id: "google", label: "Google", hint: "Drive files and Calendar events" },
   { id: "import", label: "Import from other tools", hint: "Bring a brand's existing work over from the tool it uses today" },
+  { id: "telegram", label: "Telegram", hint: "A bot of your own that the hub uses to message the team" },
 ];
 
 export const PROVIDERS: ProviderDef[] = [
@@ -47,6 +48,7 @@ export const PROVIDERS: ProviderDef[] = [
   { key: "langfuse_public", label: "Langfuse public key", use: "Traces tokens and cost of AI calls, tagged by brand", hint: "pk-lf-...", group: "cost", scope: "both", wired: false },
   { key: "langfuse_secret", label: "Langfuse secret key", use: "Pairs with the public key above", hint: "sk-lf-...", group: "cost", scope: "both", wired: false },
 
+  { key: "telegram", label: "Telegram bot token", use: "Lets this brand's hub message its team on Telegram through a bot you own. Create the bot with @BotFather in Telegram, then paste the token it gives you", hint: "123456789:AA... (from @BotFather)", group: "telegram", scope: "brand", wired: true },
   { key: "clickup", label: "ClickUp personal API token", use: "Reads this brand's ClickUp workspace once, to move its Docs into the Wiki and its tasks into Tasks. Nothing is written back to ClickUp", hint: "pk_... (ClickUp, Settings, Apps, API Token)", group: "import", scope: "brand", wired: true },
 
   { key: "google_client_id", label: "Google OAuth client ID", use: "Lets a brand sign in with Google for Drive and Calendar", hint: "...apps.googleusercontent.com", group: "google", scope: "workspace", wired: false },
