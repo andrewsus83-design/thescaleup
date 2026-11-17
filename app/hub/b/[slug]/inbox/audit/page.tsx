@@ -19,7 +19,7 @@ export default async function AuditListPage({ params }: { params: Promise<{ slug
   const today = todayIn(tz);
   const canRun = atLeast(access.inbox, "edit");
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-8">
+    <div className="w-full space-y-8">
       <Link href={`/hub/b/${slug}/inbox`} className="inline-flex min-h-11 items-center gap-2 text-small font-semibold text-ink-500 hover:text-ink-800">
         Inbox
       </Link>

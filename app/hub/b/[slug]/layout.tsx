@@ -19,7 +19,7 @@ export default async function BrandLayout({ children, params }: { children: Reac
       <HubBar email={user.email} isOwner={user.isOwner} brandName={brand.name} />
       <AccentScope>
         {/* The bottom padding keeps the last line of a page clear of the floating menu bar. */}
-        <main className="mx-auto w-full max-w-5xl px-6 pt-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))] sm:px-8 sm:pt-6">{children}</main>
+        <main className="mx-auto w-full px-6 pt-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))] sm:w-[90%] sm:px-0 sm:pt-6">{children}</main>
         <BrandTabs slug={brand.slug} tabs={tabs} bar={bar} more={more} />
       </AccentScope>
     </>

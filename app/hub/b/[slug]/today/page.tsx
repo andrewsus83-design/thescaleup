@@ -36,7 +36,7 @@ export default async function TodayPage({ params, searchParams }: { params: Prom
   );
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-8">
+    <div className="w-full space-y-8">
       <Link href={base} className="inline-flex min-h-11 items-center gap-2 text-small font-semibold text-ink-500 hover:text-ink-800">
         <ArrowLeft className="size-4" aria-hidden />
         Home
