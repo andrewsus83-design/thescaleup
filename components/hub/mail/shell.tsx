@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCheck, Inbox, Megaphone, PenSquare, Send, Trash2 } from "lucide-react";
+import { CheckCheck, Inbox, Megaphone, PenSquare, Repeat, Send, Trash2 } from "lucide-react";
 import { btnCls, iconBtnCls, motion } from "@/components/brand/styles";
 import { mailHref, type Folder } from "@/lib/hub/mail/model";
 import { cn } from "@/lib/utils";
@@ -15,9 +15,9 @@ const item = (active: boolean) => cn("flex h-11 shrink-0 items-center gap-3 whit
 
 /**
  * The frame of every Mail page, laid out like Gmail: a Compose button and folders down the left on a wide screen, the same folders as
- * a scrolling row on a phone (with a round Compose button above the tab bar). Pass `active` null when no folder is open (a search, the writing page); `campaigns` marks the Campaigns pages.
+ * a scrolling row on a phone (with a round Compose button above the tab bar). Pass `active` null when no folder is open (a search, the writing page); `campaigns` and `sequences` mark those pages.
  */
-export function MailShell({ slug, active, unread, addresses, addressId, canCompose, fab, campaigns, children }: { slug: string; active: Folder | null; unread: number; addresses: { id: string; local_part: string }[]; addressId?: string; canCompose: boolean; fab?: boolean; campaigns?: boolean; children: React.ReactNode }) {
+export function MailShell({ slug, active, unread, addresses, addressId, canCompose, fab, campaigns, sequences, children }: { slug: string; active: Folder | null; unread: number; addresses: { id: string; local_part: string }[]; addressId?: string; canCompose: boolean; fab?: boolean; campaigns?: boolean; sequences?: boolean; children: React.ReactNode }) {
   const base = `/hub/b/${slug}/mail`;
   return (
     <div className="md:grid md:grid-cols-[13.5rem_minmax(0,1fr)] md:items-start md:gap-8">
@@ -46,6 +46,10 @@ export function MailShell({ slug, active, unread, addresses, addressId, canCompo
           <Link href={`${base}/campaigns`} aria-current={campaigns ? "page" : undefined} className={item(!!campaigns)}>
             <Megaphone className="size-5" aria-hidden />
             Campaigns
+          </Link>
+          <Link href={`${base}/sequences`} aria-current={sequences ? "page" : undefined} className={item(!!sequences)}>
+            <Repeat className="size-5" aria-hidden />
+            Sequences
           </Link>
         </nav>
         {addresses.length > 1 && (
