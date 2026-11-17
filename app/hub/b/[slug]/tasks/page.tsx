@@ -10,7 +10,8 @@ import { canManageTeam } from "@/lib/hub/rules";
 import { getWorkflow, hasAiKey, itemCounts, listMembers, listTasks } from "@/lib/hub/tasks/data";
 import { monthGrid, parseMonth } from "@/lib/hub/tasks/calendar";
 import { addDays, dayIn, hubTz, isIsoDate, todayIn } from "@/lib/hub/tasks/dates";
-import { allowedStatuses, canCreate, canDecide, canSeeStage } from "@/lib/hub/tasks/rules";
+import { makeDueTasks } from "@/lib/hub/tasks/recurrence-run";
+import { allowedStatuses, canCreate, canDecide, canSeeRepeats, canSeeStage } from "@/lib/hub/tasks/rules";
 
 export const metadata: Metadata = { title: "Tasks" };
 export const dynamic = "force-dynamic";
@@ -23,6 +24,8 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
   const who = { actor, level: access.tasks, userId: user.id };
   const tz = hubTz();
   const today = todayIn(tz);
+  // Repeating tasks that are due today appear before the list is read. It also runs from the daily cron; whichever comes first makes them.
+  await makeDueTasks({ brandId: brand.id, today });
   const [workflow, members] = await Promise.all([getWorkflow(brand.id), listMembers(brand.id)]);
 
   const rawView = one(sp.v);
@@ -92,7 +95,7 @@ export default async function TasksPage({ params, searchParams }: { params: Prom
           <Alert tone="info">You see the tasks assigned to you and the rest of the team&apos;s approved work. You can move your own tasks and comment.</Alert>
         </div>
       )}
-      <Toolbar slug={slug} query={query} members={members} statuses={visible} />
+      <Toolbar slug={slug} query={query} members={members} statuses={visible} repeats={canSeeRepeats(who)} />
       {body}
     </div>
   );

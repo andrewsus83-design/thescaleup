@@ -31,6 +31,14 @@ export const canCreate = ({ actor, level }: Who) => atLeast(level, "edit") && is
 export const canDecide = ({ actor, level }: Who) => atLeast(level, "edit") && isDecider(actor);
 export const canComment = ({ actor, level }: Who) => atLeast(level, "edit") && (isStaffUp(actor) || actor === "ops");
 
+/**
+ * Set up, change, pause or delete a repeating task. What a recipe makes goes straight onto the board, so when the brand wants new work
+ * approved only the people who approve may set one up; otherwise anyone who can add tasks may.
+ */
+export const canRepeat = (w: Who, workflow: Pick<Workflow, "approvalRequired">) => (workflow.approvalRequired ? canDecide(w) : canCreate(w));
+/** See the list of repeating tasks (everyone who can add tasks or approve them). */
+export const canSeeRepeats = (w: Who) => canCreate(w) || canDecide(w);
+
 /** Change title, description, assignee, dates, priority and tags. */
 export function canEditFields(w: Who, t: TaskLike): boolean {
   return atLeast(w.level, "edit") && canSeeStage(w.actor, t.stage) && isStaffUp(w.actor);
