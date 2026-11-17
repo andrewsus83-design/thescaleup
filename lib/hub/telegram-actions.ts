@@ -31,12 +31,14 @@ async function context(brandId: unknown): Promise<{ ok: true; ctx: Ctx; token: s
 }
 
 async function linkedChats(ctx: Ctx): Promise<Linked[] | null> {
-  const { data, error } = await ctx.admin.from("telegram_chats").select("chat_id, kind, title").eq("brand_id", ctx.brandId).order("created_at").limit(MAX_LINKED + 5);
-  if (error) {
-    console.error("[telegram] telegram_chats not ready:", error.message);
+  // `daily` comes from a later database step: until it has run, read without it and show every chat as "not every morning".
+  let res = await ctx.admin.from("telegram_chats").select("chat_id, kind, title, daily").eq("brand_id", ctx.brandId).order("created_at").limit(MAX_LINKED + 5);
+  if (res.error?.code === "42703") res = (await ctx.admin.from("telegram_chats").select("chat_id, kind, title").eq("brand_id", ctx.brandId).order("created_at").limit(MAX_LINKED + 5)) as unknown as typeof res;
+  if (res.error) {
+    console.error("[telegram] telegram_chats not ready:", res.error.message);
     return null;
   }
-  return (data ?? []).flatMap((r) => (isChatKind(r.kind) && Number.isSafeInteger(Number(r.chat_id)) ? [{ chat_id: Number(r.chat_id), kind: r.kind, title: String(r.title ?? "") }] : []));
+  return (res.data ?? []).flatMap((r) => (isChatKind(r.kind) && Number.isSafeInteger(Number(r.chat_id)) ? [{ chat_id: Number(r.chat_id), kind: r.kind, title: String(r.title ?? ""), daily: (r as { daily?: unknown }).daily === true }] : []));
 }
 
 /** Asks Telegram who the bot is (proves the token works) and lists the chats already linked. */
@@ -127,4 +129,21 @@ export async function sendTodayToTelegram(brandId: string): Promise<{ ok: true; 
   await audit({ actor: ctx.user, brandId: ctx.brandId, action: "telegram.today", target: day, meta: { chats: linked.length, sent } });
   if (sent === 0) return { ok: false, error: "Telegram would not take the message in any chat. Use Send a test to see why." };
   return { ok: true, sent, failed: linked.length - sent };
+}
+
+/** Turns the morning summary on or off for one linked chat. It is sent once a day, and only when there is something in the day. */
+export async function setTelegramDaily(brandId: string, chatId: number, on: boolean): Promise<{ ok: true; linked: Linked[] } | Failure> {
+  const c = await context(brandId);
+  if (!c.ok) return c;
+  const { ctx } = c;
+  if (!Number.isSafeInteger(chatId)) return { ok: false, error: "That chat is not valid." };
+  const { data, error } = await ctx.admin.from("telegram_chats").update({ daily: on === true, last_daily: null }).eq("brand_id", ctx.brandId).eq("chat_id", chatId).select("chat_id");
+  if (error) {
+    console.error("[telegram] daily failed:", error.message);
+    return { ok: false, error: error.code === "42703" ? "The morning summary needs its database step first (20261117330000_telegram_daily.sql). Ask the person who runs the database updates." : "Could not change that. Try again." };
+  }
+  if (!data?.length) return { ok: false, error: "That chat is not linked any more. Reload the page." };
+  await audit({ actor: ctx.user, brandId: ctx.brandId, action: on ? "telegram.daily.on" : "telegram.daily.off", target: String(chatId) });
+  const linked = await linkedChats(ctx);
+  return linked ? { ok: true, linked } : { ok: false, error: NOT_READY };
 }

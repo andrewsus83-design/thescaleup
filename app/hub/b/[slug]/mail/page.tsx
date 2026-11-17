@@ -21,6 +21,7 @@ const EMPTY = {
   inbox: { title: "Nothing waiting", hint: "New mail to the brand's addresses shows up here." },
   sent: { title: "Nothing sent yet", hint: "Messages you write from here are kept here." },
   done: { title: "Nothing marked done yet", hint: "Conversations you mark done are kept here." },
+  trash: { title: "Trash is empty", hint: "Deleted conversations wait here until you restore them or delete them for good." },
 } as const;
 
 export default async function MailPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -92,7 +93,7 @@ export default async function MailPage({ params, searchParams }: { params: Promi
         )
       ) : (
         <>
-          <ThreadList threads={threads} brandId={brand.id} base={base} back={here} folder={folder} tz={tz} today={today} canEdit={canWrite} />
+          <ThreadList threads={threads} brandId={brand.id} base={base} back={here} folder={folder} tz={tz} today={today} canEdit={canWrite} canPurge={canWrite && canManageTeam(actor)} />
           <div className="mt-4 flex items-center justify-between">
             {before ? (
               <Link href={mailHref(base, folder, { addressId, q: q || undefined })} className={btnCls("secondary", "xs")}>
