@@ -3,13 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { FormState } from "./actions";
-import { getStages, countInStage } from "./crm/data";
-import { logStage } from "./crm/flow";
-import { firstStage, followUpIn, isKind, isStageFor, parseNote, parsePerson, parseStagesInput } from "./crm/model";
+import { getRules, getStages, countInStage } from "./crm/data";
+import { logStage, runRules } from "./crm/flow";
+import { firstStage, followUpIn, isKind, isStageFor, parseNote, parsePerson, parseRulesInput, parseStagesInput, pruneRules } from "./crm/model";
 import { atLeast } from "./permissions";
 import { allow } from "./ratelimit";
 import { canManageTeam } from "./rules";
 import { audit } from "./session";
+import { listMembers } from "./tasks/data";
 import { hubTz, todayIn } from "./tasks/dates";
 import { UUID, str, taskContext, type Ctx } from "./tasks/context";
 
@@ -59,6 +60,7 @@ export async function savePerson(_prev: FormState, fd: FormData): Promise<FormSt
     return { error: "Could not add them. Try again." };
   }
   await logStage(ctx, { personId: data.id, kind, from: null, to: start });
+  await runRules(ctx, { id: data.id, kind, name: parsed.value.name, company: parsed.value.company }, start, { keepFollowUp: parsed.value.next_follow_up !== null });
   await audit({ actor: ctx.user, brandId: ctx.brandId, action: "crm.create", target: data.id, meta: { kind } });
   refresh(ctx.slug);
   redirect(`/hub/b/${ctx.slug}/crm/${data.id}`);
@@ -71,12 +73,13 @@ export async function setStage(fd: FormData): Promise<void> {
   const { ctx } = c;
   const id = str(fd, "id");
   if (!UUID.test(id)) return;
-  const { data: row } = await ctx.admin.from("crm_people").select("kind, stage").eq("brand_id", ctx.brandId).eq("id", id).maybeSingle();
+  const { data: row } = await ctx.admin.from("crm_people").select("kind, stage, name, company").eq("brand_id", ctx.brandId).eq("id", id).maybeSingle();
   const stage = str(fd, "stage");
   if (!row || !isKind(row.kind) || row.stage === stage || !isStageFor(await getStages(ctx.brandId), row.kind, stage)) return;
   const { error } = await ctx.admin.from("crm_people").update({ stage }).eq("brand_id", ctx.brandId).eq("id", id);
   if (!error) {
     await logStage(ctx, { personId: id, kind: row.kind, from: row.stage, to: stage });
+    await runRules(ctx, { id, kind: row.kind, name: String(row.name ?? ""), company: String(row.company ?? "") }, stage);
     await audit({ actor: ctx.user, brandId: ctx.brandId, action: "crm.stage", target: id, meta: { stage } });
   }
   refresh(ctx.slug);
@@ -89,7 +92,7 @@ export async function convertToClient(fd: FormData): Promise<void> {
   const { ctx } = c;
   const id = str(fd, "id");
   if (!UUID.test(id)) return;
-  const { data: before } = await ctx.admin.from("crm_people").select("stage").eq("brand_id", ctx.brandId).eq("id", id).eq("kind", "lead").maybeSingle();
+  const { data: before } = await ctx.admin.from("crm_people").select("stage, name, company").eq("brand_id", ctx.brandId).eq("id", id).eq("kind", "lead").maybeSingle();
   if (!before) return;
   const start = firstStage(await getStages(ctx.brandId), "client");
   const { data, error } = await ctx.admin
@@ -102,6 +105,7 @@ export async function convertToClient(fd: FormData): Promise<void> {
     .maybeSingle();
   if (!error && data) {
     await logStage(ctx, { personId: id, kind: "client", from: before.stage, to: start, converted: true });
+    await runRules(ctx, { id, kind: "client", name: String(before.name ?? ""), company: String(before.company ?? "") }, start);
     await audit({ actor: ctx.user, brandId: ctx.brandId, action: "crm.convert", target: id });
   }
   refresh(ctx.slug);
@@ -190,7 +194,9 @@ export async function saveStages(_prev: FormState, fd: FormData): Promise<FormSt
     if (n > 0) return { error: `${n} ${n === 1 ? "person is" : "people are"} still in "${gone.label}". Move them to another stage first, then remove it.` };
   }
   if (!allow(`crm-stages:${ctx.user.id}`, 60)) return { error: "That is a lot of changes in an hour. Try again a bit later." };
-  const { error } = await ctx.admin.from("crm_workflows").upsert({ brand_id: ctx.brandId, stages: parsed.stages, updated_by: ctx.user.id, updated_at: new Date().toISOString() }, { onConflict: "brand_id" });
+  // Rules follow their stages: one for a stage that is gone (or no longer takes a follow-up) goes with it.
+  const keptRules = pruneRules((await getRules(ctx.brandId)).rules, parsed.stages);
+  const { error } = await ctx.admin.from("crm_workflows").upsert({ brand_id: ctx.brandId, stages: parsed.stages, rules: keptRules, updated_by: ctx.user.id, updated_at: new Date().toISOString() }, { onConflict: "brand_id" });
   if (error) {
     console.error("[crm] stages failed:", error.message);
     return { error: "Could not save the stages. Try again." };
@@ -198,4 +204,24 @@ export async function saveStages(_prev: FormState, fd: FormData): Promise<FormSt
   await audit({ actor: ctx.user, brandId: ctx.brandId, action: "crm.stages", meta: { count: parsed.stages.length } });
   refresh(ctx.slug);
   return { message: "Stages saved." };
+}
+
+/** Saves what each stage does when someone enters it. Managers only. */
+export async function saveRules(_prev: FormState, fd: FormData): Promise<FormState> {
+  const c = await editContext(str(fd, "brandId"));
+  if (!c.ok) return { error: c.error };
+  const { ctx } = c;
+  if (!canManageTeam(ctx.actor)) return { error: "Only a manager can change the automations." };
+  const [stages, members] = await Promise.all([getStages(ctx.brandId), listMembers(ctx.brandId)]);
+  const parsed = parseRulesInput(str(fd, "rules"), stages, new Set(members.map((m) => m.userId)));
+  if (!parsed.ok) return { error: parsed.error };
+  if (!allow(`crm-rules:${ctx.user.id}`, 60)) return { error: "That is a lot of changes in an hour. Try again a bit later." };
+  const { error } = await ctx.admin.from("crm_workflows").upsert({ brand_id: ctx.brandId, stages, rules: parsed.rules, updated_by: ctx.user.id, updated_at: new Date().toISOString() }, { onConflict: "brand_id" });
+  if (error) {
+    console.error("[crm] rules failed:", error.message);
+    return { error: "Could not save the automations. Try again." };
+  }
+  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "crm.rules", meta: { count: parsed.rules.length } });
+  refresh(ctx.slug);
+  return { message: parsed.rules.length ? "Automations saved." : "Saved. No stage does anything on its own." };
 }

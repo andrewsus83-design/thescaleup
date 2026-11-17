@@ -336,3 +336,137 @@ export function funnelStats(stages: readonly StageDef[], kind: Kind, log: readon
 
 /** The moment `days` ago, as an ISO string, for "the last 30 days". */
 export const daysAgoIso = (days: number, now: number = Date.now()) => new Date(now - days * 86_400_000).toISOString();
+
+// ---------------------------------------------------------------------------------------------- automations
+/** Who a rule's task goes to: nobody, whoever moved the person, or one member (their user id). */
+export const MOVER = "mover";
+
+/** What happens when someone enters a stage. One rule per stage; each part is optional but a rule has at least one. */
+export type StageRule = {
+  /** Key of the stage that starts it. */
+  stage: string;
+  /** Set the next follow-up this many days from today (1 to 60). Only for stages that are still being worked. */
+  followUpDays: number | null;
+  /** Add a task. `{name}` and `{company}` in the title are replaced. `dueDays` of 0 means today; null means no due date. */
+  task: { title: string; dueDays: number | null; assignee: string | null } | null;
+};
+
+export const RULE_LIMITS = { title: 120, days: 60 } as const;
+
+const intIn = (v: unknown, min: number, max: number): number | null => (typeof v === "number" && Number.isInteger(v) && v >= min && v <= max ? v : null);
+
+/** Reads one stored or submitted rule. `strict` says why it failed instead of dropping it quietly. */
+function readRule(raw: unknown, stages: readonly StageDef[], memberIds: ReadonlySet<string> | null, strict: boolean): { ok: true; rule: StageRule | null } | { ok: false; error: string } {
+  const bad = (error: string) => (strict ? ({ ok: false, error } as const) : ({ ok: true, rule: null } as const));
+  if (!raw || typeof raw !== "object") return bad("An automation could not be read. Reload the page and try again.");
+  const o = raw as Record<string, unknown>;
+  const stage = stages.find((s) => s.key === o.stage);
+  if (!stage) return bad("An automation is for a stage that no longer exists. Reload the page and try again.");
+  const name = `"${stage.label}"`;
+
+  let followUpDays: number | null = null;
+  if (o.followUpDays !== null && o.followUpDays !== undefined) {
+    followUpDays = intIn(o.followUpDays, 1, RULE_LIMITS.days);
+    if (followUpDays === null) return bad(`${name}: the follow-up is 1 to ${RULE_LIMITS.days} days.`);
+    if (!stage.open) {
+      if (strict) return bad(`${name} ends the story, so it has no follow-up. Remove it or make the stage "still being worked".`);
+      followUpDays = null; // a stage that was closed later keeps its task and loses the follow-up
+    }
+  }
+
+  let task: StageRule["task"] = null;
+  const t = o.task;
+  if (t !== null && t !== undefined) {
+    if (typeof t !== "object") return bad(`${name}: the task could not be read.`);
+    const x = t as Record<string, unknown>;
+    const title = typeof x.title === "string" ? x.title.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim() : "";
+    if (!title) return bad(`${name}: give the task a title.`);
+    if (title.length > RULE_LIMITS.title) return bad(`${name}: keep the task title under ${RULE_LIMITS.title} characters.`);
+    let dueDays: number | null = null;
+    if (x.dueDays !== null && x.dueDays !== undefined) {
+      dueDays = intIn(x.dueDays, 0, RULE_LIMITS.days);
+      if (dueDays === null) return bad(`${name}: the task is due in 0 to ${RULE_LIMITS.days} days.`);
+    }
+    let assignee: string | null = null;
+    if (x.assignee !== null && x.assignee !== undefined && x.assignee !== "") {
+      if (typeof x.assignee !== "string") return bad(`${name}: pick who gets the task.`);
+      if (x.assignee === MOVER) assignee = MOVER;
+      else if (memberIds ? memberIds.has(x.assignee) : /^[0-9a-f-]{36}$/i.test(x.assignee)) assignee = x.assignee;
+      else if (strict) return bad(`${name}: that person is not in this brand's team any more.`);
+    }
+    task = { title, dueDays, assignee };
+  }
+
+  if (followUpDays === null && !task) return { ok: true, rule: null };
+  return { ok: true, rule: { stage: stage.key, followUpDays, task } };
+}
+
+/** A brand's rules as stored: anything unusable (a removed stage, a bad number) is left out, and a stage gets at most one. */
+export function parseRules(raw: unknown, stages: readonly StageDef[]): StageRule[] {
+  if (!Array.isArray(raw)) return [];
+  const out: StageRule[] = [];
+  for (const r of raw.slice(0, stages.length)) {
+    const res = readRule(r, stages, null, false);
+    if (res.ok && res.rule && !out.some((o) => o.stage === res.rule!.stage)) out.push(res.rule);
+  }
+  return out;
+}
+
+/** The rules a manager submitted, checked against the brand's stages and team. */
+export function parseRulesInput(json: string, stages: readonly StageDef[], memberIds: ReadonlySet<string>): { ok: true; rules: StageRule[] } | { ok: false; error: string } {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch {
+    return { ok: false, error: "The automations could not be read. Reload the page and try again." };
+  }
+  if (!Array.isArray(raw) || raw.length > stages.length) return { ok: false, error: "The automations could not be read. Reload the page and try again." };
+  const out: StageRule[] = [];
+  for (const r of raw) {
+    const res = readRule(r, stages, memberIds, true);
+    if (!res.ok) return res;
+    if (!res.rule) continue;
+    if (out.some((o) => o.stage === res.rule!.stage)) return { ok: false, error: "A stage has two automations. Reload the page and try again." };
+    out.push(res.rule);
+  }
+  return { ok: true, rules: out };
+}
+
+/** Drops rules whose stage was removed (or no longer takes a follow-up) after the stages change. */
+export function pruneRules(rules: readonly StageRule[], stages: readonly StageDef[]): StageRule[] {
+  return parseRules(rules, stages);
+}
+
+/** The task title for one person: `{name}` and `{company}` replaced, spaces tidied, never over the task title limit. */
+export function taskTitle(template: string, p: { name: string; company: string }): string {
+  const t = template.replace(/\{name\}/gi, p.name).replace(/\{company\}/gi, p.company).replace(/\s+/g, " ").trim();
+  return t.length > 200 ? `${t.slice(0, 199).trimEnd()}…` : t;
+}
+
+export type RulePlan = {
+  /** The new follow-up day, or null to leave it as it is. */
+  followUp: string | null;
+  task: { title: string; due: string | null; assignee: string | null } | null;
+};
+
+/** What a rule does for one person today. `memberIds` are who can be assigned; `moverId` is whoever moved the person. */
+export function planRule(rule: StageRule, p: { name: string; company: string }, today: string, who: { moverId: string; memberIds: ReadonlySet<string> }): RulePlan {
+  const t = rule.task;
+  let assignee: string | null = null;
+  if (t?.assignee) {
+    const id = t.assignee === MOVER ? who.moverId : t.assignee;
+    assignee = who.memberIds.has(id) ? id : null;
+  }
+  return {
+    followUp: rule.followUpDays ? followUpIn(today, rule.followUpDays) : null,
+    task: t ? { title: taskTitle(t.title, p), due: t.dueDays === null ? null : addDays(today, t.dueDays), assignee } : null,
+  };
+}
+
+/** A line saying what a rule does, for the editor and the audit trail. */
+export function describeRule(rule: StageRule): string {
+  const parts: string[] = [];
+  if (rule.followUpDays) parts.push(`follow up in ${rule.followUpDays} ${rule.followUpDays === 1 ? "day" : "days"}`);
+  if (rule.task) parts.push(`add the task "${rule.task.title}"`);
+  return parts.join(", then ");
+}

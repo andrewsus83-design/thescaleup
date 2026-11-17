@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { LIMITS, closedKeys, isKind, parseStages, type Kind, type LogRow, type Person, type StageDef } from "./model";
+import { LIMITS, closedKeys, isKind, parseRules, parseStages, type Kind, type LogRow, type Person, type StageDef, type StageRule } from "./model";
 
 // Reads for the CRM pages. They use the service role, so every function takes the brand id and filters on it: the caller has
 // already checked that this person may open the CRM in this brand.
@@ -34,10 +34,18 @@ function normalize(r: Record<string, unknown>): Person | null {
   };
 }
 
+const getWorkflowRow = cache(async (brandId: string) => {
+  const { data } = await db().from("crm_workflows").select("stages, rules, updated_by").eq("brand_id", brandId).maybeSingle();
+  return data;
+});
+
 /** The brand's stages: its own list, or the standard one. Read once per request. */
-export const getStages = cache(async (brandId: string): Promise<StageDef[]> => {
-  const { data } = await db().from("crm_workflows").select("stages").eq("brand_id", brandId).maybeSingle();
-  return parseStages(data?.stages);
+export const getStages = cache(async (brandId: string): Promise<StageDef[]> => parseStages((await getWorkflowRow(brandId))?.stages));
+
+/** What the brand's stages do when someone enters them, and who last saved the rules (they are the ones who approved the tasks). */
+export const getRules = cache(async (brandId: string): Promise<{ rules: StageRule[]; updatedBy: string | null }> => {
+  const [row, stages] = await Promise.all([getWorkflowRow(brandId), getStages(brandId)]);
+  return { rules: parseRules(row?.rules, stages), updatedBy: typeof row?.updated_by === "string" ? row.updated_by : null };
 });
 
 /** The brand's leads or clients, most recently touched first (up to `limit`; `total` is how many exist). */
