@@ -14,3 +14,54 @@ export async function askClaude(apiKey: string, system: string, user: string, ma
     .join("\n");
   return { text, tokens: { in: resp.usage?.input_tokens ?? 0, out: resp.usage?.output_tokens ?? 0 } };
 }
+
+/** The Anthropic account behind the key cannot use web search (it is switched off for the organisation, or the key may not use it). */
+export class SearchUnavailable extends Error {}
+
+/**
+ * One request in which Claude may search the public web. Only the web search tool is given: the model cannot open pages itself, run
+ * code or call anything else. A long search can pause the turn; the turn is continued up to `rounds` times, never past `deadline`.
+ */
+export async function askClaudeSearching(
+  apiKey: string,
+  system: string,
+  user: string,
+  o: { maxTokens: number; maxSearches: number; blocked: readonly string[]; timeoutMs: number; deadline: number; rounds?: number },
+) {
+  const client = new Anthropic({ apiKey });
+  const messages: Anthropic.MessageParam[] = [{ role: "user", content: user }];
+  const texts: string[] = [];
+  const total = { in: 0, out: 0, searches: 0 };
+  for (let round = 0; round < (o.rounds ?? 3); round++) {
+    const left = o.deadline - Date.now();
+    if (left < 8_000) break;
+    let resp: Anthropic.Message;
+    try {
+      resp = await client.messages.create(
+        {
+          model: aiModel(),
+          max_tokens: o.maxTokens,
+          system,
+          messages,
+          tools: [{ type: "web_search_20250305", name: "web_search", max_uses: o.maxSearches, blocked_domains: [...o.blocked] }],
+        },
+        { timeout: Math.min(o.timeoutMs, left) },
+      );
+    } catch (e) {
+      if (e instanceof Anthropic.APIError && (e.status === 400 || e.status === 403) && /web[ _-]?search/i.test(e.message)) throw new SearchUnavailable(e.message);
+      throw e;
+    }
+    total.in += resp.usage?.input_tokens ?? 0;
+    total.out += resp.usage?.output_tokens ?? 0;
+    total.searches += resp.usage?.server_tool_use?.web_search_requests ?? 0;
+    texts.push(
+      resp.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("\n"),
+    );
+    if (resp.stop_reason !== "pause_turn") break;
+    messages.push({ role: "assistant", content: resp.content });
+  }
+  return { text: texts.join("\n"), tokens: { in: total.in, out: total.out }, searches: total.searches };
+}
