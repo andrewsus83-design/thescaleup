@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BriefcaseBusiness, Download, Mail, Search, Upload, X } from "lucide-react";
+import { BriefcaseBusiness, Download, Mail, Search, Sparkles, Upload, X } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/brand/primitives";
 import { btnCls, iconBtnCls, pillCls, tileCls } from "@/components/brand/styles";
 import { CrmNav, crmBase, listPath } from "@/components/hub/crm/parts";
@@ -66,6 +66,12 @@ export async function CrmList({ slug, brandId, kind, canEdit, manager, contacts,
                 <Upload className="size-4" aria-hidden />
                 Import
               </Link>
+              {kind === "lead" && (
+                <Link href={`${crmBase(slug)}/find`} className={btnCls("secondary", "md")}>
+                  <Sparkles className="size-4" aria-hidden />
+                  Find leads
+                </Link>
+              )}
               <Link href={`${crmBase(slug)}/new?kind=${kind}`} className={btnCls("primary", "md")}>
                 Add {noun}
               </Link>
@@ -90,6 +96,12 @@ export async function CrmList({ slug, brandId, kind, canEdit, manager, contacts,
                 <Upload className="size-4" aria-hidden />
                 Import from a file
               </Link>
+              {kind === "lead" && (
+                <Link href={`${crmBase(slug)}/find`} className={btnCls("secondary", "md")}>
+                  <Sparkles className="size-4" aria-hidden />
+                  Find leads with AI
+                </Link>
+              )}
             </div>
           )}
         </EmptyState>
