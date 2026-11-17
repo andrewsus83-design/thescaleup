@@ -1,7 +1,7 @@
 import type { Access, Fn } from "./permissions";
 
 // The sections of a brand, in the order of the bottom bar on a wide screen. Home (the greeting and what needs you) is on the far left.
-export const TAB_KEYS = ["home", "brand", "tasks", "inbox", "mail", "social", "ads", "content", "wiki", "assets", "team", "finance", "products", "settings"] as const;
+export const TAB_KEYS = ["home", "brand", "tasks", "inbox", "mail", "social", "ads", "content", "crm", "wiki", "assets", "team", "finance", "products", "settings"] as const;
 export type TabKey = (typeof TAB_KEYS)[number];
 export const isTabKey = (v: unknown): v is TabKey => typeof v === "string" && (TAB_KEYS as readonly string[]).includes(v);
 
@@ -15,6 +15,7 @@ const TAB_FN: Record<TabKey, Fn | null> = {
   social: "social",
   ads: "ads",
   content: "content",
+  crm: "crm",
   wiki: "wiki",
   assets: "assets",
   team: "team",
@@ -34,7 +35,7 @@ export function visibleTabs(access: Access): TabKey[] {
 export const PHONE_BAR_SLOTS = 4;
 
 /** What the bar starts with, and what fills a free slot when a chosen menu is not available in this brand. */
-export const DEFAULT_PHONE_ORDER: readonly TabKey[] = ["home", "tasks", "inbox", "team", "settings", "brand", "mail", "social", "ads", "content", "wiki", "assets", "finance", "products"];
+export const DEFAULT_PHONE_ORDER: readonly TabKey[] = ["home", "tasks", "inbox", "team", "settings", "brand", "mail", "social", "ads", "content", "crm", "wiki", "assets", "finance", "products"];
 
 /** The phone bar for this person in this brand: their choices that they may open, then the defaults; everything else goes under More. */
 export function phoneLayout(allowed: readonly TabKey[], chosen: readonly string[] | null): { bar: TabKey[]; more: TabKey[] } {
