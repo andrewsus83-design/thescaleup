@@ -22,13 +22,13 @@ export default async function InboxPage({ params }: { params: Promise<{ slug: st
             </span>
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-ink-800">Chat audit</p>
-              <p className="text-small text-ink-500">Read WhatsApp, Telegram and social media conversations: who is stuck, who went quiet, what to do next.</p>
+              <p className="text-small text-ink-500">Read WhatsApp, Telegram and social media conversations, from an upload or straight from Zernio: who is stuck, who went quiet, what to do next.</p>
             </div>
             <ChevronRight className="size-5 shrink-0 text-ink-300" aria-hidden />
           </div>
         </Card>
       </Link>
-      <EmptyState icon={<Inbox className="size-6" aria-hidden />} title="One inbox is coming next" hint="Email, social media comments and DMs, and WhatsApp chats in one place, so audits can run on live conversations instead of uploads." />
+      <EmptyState icon={<Inbox className="size-6" aria-hidden />} title="One inbox is coming next" hint="Email, social media comments and DMs, and WhatsApp chats in one place, with replies and the audit running on live conversations." />
     </div>
   );
 }
