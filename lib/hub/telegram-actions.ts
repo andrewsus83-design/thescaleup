@@ -1,12 +1,16 @@
 "use server";
 
+import { accessFor } from "./access";
 import { getMe, recentChats, sendMessage } from "./telegram/api";
 import { MAX_LINKED, isChatKind, type Bot, type Chat, type Linked } from "./telegram/model";
 import { allow } from "./ratelimit";
 import { canManageTeam } from "./rules";
 import { getBrandKey } from "./secrets";
 import { audit } from "./session";
+import { hubTz, todayIn } from "./tasks/dates";
 import { taskContext, type Ctx } from "./tasks/context";
+import { loadToday } from "./today/data";
+import { todayMessage } from "./today/model";
 
 // Connecting a brand to Telegram through a bot the brand owns. The token (Settings → Telegram) is encrypted with the other keys
 // and only used here, on the server. The hub never sets a webhook: to find a chat it asks Telegram which chats have written to
@@ -100,4 +104,27 @@ export async function testTelegramChat(brandId: string, chatId: number): Promise
   if (!linked.some((l) => l.chat_id === chatId)) return { ok: false, error: "That chat is not linked." };
   const sent = await sendMessage(c.token, chatId, "Test message from the hub. If you can read this, Telegram is connected.");
   return sent.ok ? { ok: true } : sent;
+}
+
+/** Sends the team's day (late and due tasks, content planned today, CRM follow-up count, unread mail) to every linked chat. */
+export async function sendTodayToTelegram(brandId: string): Promise<{ ok: true; sent: number; failed: number } | Failure> {
+  const c = await context(brandId);
+  if (!c.ok) return c;
+  const { ctx, token } = c;
+  if (!allow(`telegram-today:${ctx.user.id}`, 10)) return { ok: false, error: "That is a lot of summaries in an hour. Try again later." };
+  const linked = await linkedChats(ctx);
+  if (!linked) return { ok: false, error: NOT_READY };
+  if (!linked.length) return { ok: false, error: "Link a chat first, then send the summary." };
+  const [access, brand] = await Promise.all([accessFor(ctx.brandId, ctx.actor), ctx.admin.from("brands").select("name").eq("id", ctx.brandId).maybeSingle()]);
+  const day = todayIn(hubTz());
+  const today = await loadToday({ brandId: ctx.brandId, actor: ctx.actor, userId: ctx.user.id, access, day, scope: "team" });
+  const text = todayMessage(brand.data?.name ?? "The hub", today);
+  let sent = 0;
+  for (const l of linked) {
+    const r = await sendMessage(token, l.chat_id, text);
+    if (r.ok) sent++;
+  }
+  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "telegram.today", target: day, meta: { chats: linked.length, sent } });
+  if (sent === 0) return { ok: false, error: "Telegram would not take the message in any chat. Use Send a test to see why." };
+  return { ok: true, sent, failed: linked.length - sent };
 }

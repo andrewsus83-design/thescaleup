@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight, CircleCheck } from "lucide-react";
+import { CalendarCheck, ChevronRight, CircleCheck } from "lucide-react";
+import { btnCls } from "@/components/brand/styles";
 import { MENU } from "@/components/hub/menus";
 import { accessFor } from "@/lib/hub/access";
 import { countDue } from "@/lib/hub/crm/data";
@@ -50,9 +51,15 @@ export default async function BrandHome({ params }: { params: Promise<{ slug: st
 
   return (
     <div className="space-y-10">
-      <header>
-        <h1 className="font-title text-balance text-h2 text-ink-800 sm:text-h1">{greeting(hourIn(tz))}</h1>
-        <p className="mt-2 text-body text-ink-500">{dateLine}</p>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-title text-balance text-h2 text-ink-800 sm:text-h1">{greeting(hourIn(tz))}</h1>
+          <p className="mt-2 text-body text-ink-500">{dateLine}</p>
+        </div>
+        <Link href={`${base}/today`} className={btnCls("secondary", "md")}>
+          <CalendarCheck className="size-4" aria-hidden />
+          What&apos;s today
+        </Link>
       </header>
 
       {watching && (

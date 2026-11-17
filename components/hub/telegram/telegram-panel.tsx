@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Alert, Btn, Chip } from "@/components/brand/primitives";
-import { checkTelegram, findTelegramChats, linkTelegramChat, testTelegramChat, unlinkTelegramChat } from "@/lib/hub/telegram-actions";
+import { checkTelegram, findTelegramChats, linkTelegramChat, sendTodayToTelegram, testTelegramChat, unlinkTelegramChat } from "@/lib/hub/telegram-actions";
 import { KIND_LABEL, MAX_LINKED, type Bot, type Chat, type Linked } from "@/lib/hub/telegram/model";
 
 /** Checks the bot, links the chats that should receive the hub's messages, and sends a test. */
@@ -38,6 +38,8 @@ export function TelegramPanel({ brandId, hasToken }: { brandId: string; hasToken
       setNote("Linked. The bot said hello in that chat.");
     });
   const unlink = (id: number) => run(`unlink-${id}`, () => unlinkTelegramChat(brandId, id), (r) => setLinked(r.linked));
+  const today = () =>
+    run("today", () => sendTodayToTelegram(brandId), (r) => setNote(r.failed ? `Summary sent to ${r.sent} chat${r.sent === 1 ? "" : "s"}. ${r.failed} did not accept it.` : `Summary sent to ${r.sent} chat${r.sent === 1 ? "" : "s"}.`));
   const test = (id: number) => run(`test-${id}`, () => testTelegramChat(brandId, id), () => setNote("Test message sent. Check the chat in Telegram."));
 
   const spin = (key: string) => busy === key && <Loader2 className="size-4 animate-spin" aria-hidden />;
@@ -97,6 +99,15 @@ export function TelegramPanel({ brandId, hasToken }: { brandId: string; hasToken
                   </li>
                 ))}
               </ul>
+            )}
+            {linked.length > 0 && (
+              <div className="space-y-2">
+                <Btn onClick={today} disabled={busy !== ""}>
+                  {spin("today")}
+                  Send today&apos;s summary
+                </Btn>
+                <p className="text-caption text-ink-500">Posts what is late or due, the content planned for today, the number of CRM follow-ups and unread mail to every chat above. Customer names are never included.</p>
+              </div>
             )}
           </section>
 
