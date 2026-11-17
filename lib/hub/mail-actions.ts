@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { FormState } from "./actions";
 import { getThread, listAddresses, listDomains } from "./mail/data";
+import { parseFileRefs } from "./mail/forward";
+import { copyForwarded, forwardDeps } from "./mail/forward-files";
 import { ATTACH_LIMITS, attachError, safeFilename, storageKey } from "./mail/files";
 import { MAIL_LIMITS, domainError, fromHeader, localPartError, messageIds, parseRecipients, replySubject, snippet, textToHtml } from "./mail/model";
 import { createDomain, deleteDomain, enableReceiving, findDomain, getDomain, isResendReady, sendEmail, verifyDomain, type ResendDomain } from "./mail/resend";
@@ -228,23 +230,44 @@ export async function sendMail(_prev: FormState, fd: FormData): Promise<FormStat
   if (dom.status !== "verified") return { error: `${dom.name} is not verified yet. Finish its DNS records in Settings, Mailbox.` };
 
   // Files: the browser already uploaded them to storage. Here each one is checked to be this person's, unsent and really there.
-  const wanted = [...new Set(fd.getAll("attachmentId").filter((v): v is string => typeof v === "string" && v !== ""))];
-  if (wanted.length > ATTACH_LIMITS.files) return { error: `Up to ${ATTACH_LIMITS.files} files per message.` };
-  if (!wanted.every((id) => UUID.test(id))) return { error: "An attachment is no longer available. Attach it again." };
+  const picked = [...new Set(fd.getAll("attachmentId").filter((v): v is string => typeof v === "string" && v !== ""))];
+  if (picked.length > ATTACH_LIMITS.files) return { error: `Up to ${ATTACH_LIMITS.files} files per message.` };
+  if (!picked.every((id) => UUID.test(id))) return { error: "An attachment is no longer available. Attach it again." };
+  // A forward can carry the original's files. They are copied into new unsent files first, so from here on they are like uploads.
+  const fwd = parseFileRefs(fd.getAll("fwd"));
+  if (!fwd.ok) return { error: fwd.error };
+  if (picked.length + fwd.list.length > ATTACH_LIMITS.files) return { error: `Up to ${ATTACH_LIMITS.files} files per message.` };
+  let copies: string[] = [];
+  if (fwd.list.length > 0) {
+    if (!isR2Ready()) return { error: "Attachments are not turned on yet: file storage is not set up on the server." };
+    const made = await copyForwarded(forwardDeps(ctx.admin, ctx.brandId, ctx.user.id), ctx.brandId, fwd.list, picked.length);
+    if (!made.ok) return { error: made.error };
+    copies = made.ids;
+  }
+  const wanted = [...picked, ...copies];
+  // Copies are made for this one send: when it stops before the message goes out they are removed, so a retry starts clean.
+  const stop = async (error: string): Promise<FormState> => {
+    const del = forwardDeps(ctx.admin, ctx.brandId, ctx.user.id).forget;
+    if (copies.length > 0) {
+      const { data: rows } = await ctx.admin.from("mail_attachments").select("id, storage_key").eq("brand_id", ctx.brandId).in("id", copies);
+      for (const r of rows ?? []) await del(r.id as string, r.storage_key as string);
+    }
+    return { error };
+  };
   let files: { id: string; filename: string; content_type: string; size: number; storage_key: string }[] = [];
   const outFiles: { filename: string; path: string; contentType: string }[] = [];
   if (wanted.length > 0) {
     if (!isR2Ready()) return { error: "Attachments are not turned on yet: file storage is not set up on the server." };
     const { data: rows } = await ctx.admin.from("mail_attachments").select("id, filename, content_type, size, storage_key").eq("brand_id", ctx.brandId).eq("uploaded_by", ctx.user.id).is("message_id", null).in("id", wanted);
     files = (rows ?? []) as typeof files;
-    if (files.length !== wanted.length) return { error: "An attachment is no longer available. Attach it again." };
-    if (files.reduce((n, f) => n + Number(f.size), 0) > ATTACH_LIMITS.bytes) return { error: `A message can carry up to ${ATTACH_LIMITS.bytes / 1024 / 1024} MB of files in total.` };
+    if (files.length !== wanted.length) return stop("An attachment is no longer available. Attach it again.");
+    if (files.reduce((n, f) => n + Number(f.size), 0) > ATTACH_LIMITS.bytes) return stop(`A message can carry up to ${ATTACH_LIMITS.bytes / 1024 / 1024} MB of files in total.`);
     for (const f of files) {
       const there = await objectSize(f.storage_key);
-      if (there === null) return { error: `${f.filename} did not finish uploading. Remove it and attach it again.` };
-      if (there > ATTACH_LIMITS.bytes || there !== Number(f.size)) return { error: `${f.filename} is not the file that was selected. Remove it and attach it again.` };
+      if (there === null) return stop(`${f.filename} did not finish uploading. Remove it and attach it again.`);
+      if (there > ATTACH_LIMITS.bytes || there !== Number(f.size)) return stop(`${f.filename} is not the file that was selected. Remove it and attach it again.`);
       const link = signedUrl("GET", f.storage_key, 1800);
-      if (!link) return { error: "Attachments are not turned on yet: file storage is not set up on the server." };
+      if (!link) return stop("Attachments are not turned on yet: file storage is not set up on the server.");
       outFiles.push({ filename: f.filename, path: link, contentType: f.content_type });
     }
   }
@@ -255,10 +278,10 @@ export async function sendMail(_prev: FormState, fd: FormData): Promise<FormStat
   if (inReplyTo) headers["In-Reply-To"] = inReplyTo;
   if (refs.length) headers.References = [...new Set([...refs, ...(inReplyTo ? [inReplyTo] : [])])].join(" ");
   // The same message sent twice within a minute (a double click, a retry) is one email at Resend.
-  const key = createHash("sha256").update(JSON.stringify([ctx.brandId, from.email, to, cc.list, subject, body, wanted.slice().sort(), Math.floor(Date.now() / 60_000)])).digest("hex");
+  const key = createHash("sha256").update(JSON.stringify([ctx.brandId, from.email, to, cc.list, subject, body, picked.slice().sort(), fwd.list.map((r) => `${r.messageId}:${r.attachmentId}`).sort(), Math.floor(Date.now() / 60_000)])).digest("hex");
 
   const sent = await sendEmail({ from: fromHeader(from.display_name, from.email), to, cc: cc.list, subject, text: body, html, headers, attachments: outFiles }, key);
-  if (!sent.ok) return { error: `The message was not sent. Resend said: ${sent.error}` };
+  if (!sent.ok) return stop(`The message was not sent. Resend said: ${sent.error}`);
 
   let tid = existingThread;
   if (!tid) {
@@ -311,10 +334,11 @@ export async function sendMail(_prev: FormState, fd: FormData): Promise<FormStat
 }
 
 // ---------------------------------------------------------------------------------------------- conversation state
-const OPS = { done: { status: "done" }, open: { status: "open" }, read: { unread: false }, unread: { unread: true } } as const;
+const OPS = { done: { status: "done" }, open: { status: "open" }, read: { unread: false }, unread: { unread: true }, trash: { status: "trash" }, restore: { status: "open" } } as const;
+const DONE_MESSAGE: Record<string, string> = { trash: "Moved to Trash.", restore: "Restored to the inbox." };
 
 /**
- * Done, reopen, mark read or unread, for the conversations ticked in the list ("act" is the action) or for one row ("act" is
+ * Done, reopen, mark read or unread, delete into Trash and restore from it, for the conversations ticked in the list ("act" is the action) or for one row ("act" is
  * "action:threadId"). From the conversation page "back" is where to go afterwards. Read state is shared by the whole team.
  */
 export async function setThreadsState(_prev: FormState, fd: FormData): Promise<FormState> {
@@ -327,12 +351,79 @@ export async function setThreadsState(_prev: FormState, fd: FormData): Promise<F
   const ids = one ? [one] : fd.getAll("id").filter((v): v is string => typeof v === "string");
   if (ids.length === 0) return { error: "Tick a conversation first." };
   if (ids.length > 100 || !ids.every((id) => UUID.test(id))) return { error: "Unknown conversation." };
-  const { error } = await ctx.admin.from("mail_threads").update(patch).eq("brand_id", ctx.brandId).in("id", ids);
+  // Only Restore brings a deleted conversation back; Done and Reopen leave what is in Trash alone, and Restore touches only what is there.
+  let q = ctx.admin.from("mail_threads").update(patch).eq("brand_id", ctx.brandId).in("id", ids);
+  q = op === "restore" ? q.eq("status", "trash") : op === "read" || op === "unread" ? q : q.neq("status", "trash");
+  const { data: changed, error } = await q.select("id");
   if (error) return { error: "Could not update the conversations. Try again." };
+  if (op === "trash" || op === "restore") await audit({ actor: ctx.user, brandId: ctx.brandId, action: `mail.${op}`, target: ids.length === 1 ? ids[0] : undefined, meta: { count: changed?.length ?? 0 } });
   refresh(ctx.slug);
   const back = safeNext(str(fd, "back"), "");
   if (back.startsWith(`/hub/b/${ctx.slug}/mail`)) redirect(back);
-  return { message: "Updated." };
+  return { message: DONE_MESSAGE[op] ?? "Updated." };
+}
+
+// ---------------------------------------------------------------------------------------------- delete for good
+const chunks = <T,>(xs: T[], n: number): T[][] => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n));
+const PURGE_AT_ONCE = 200;
+
+/**
+ * Deletes conversations from Trash for good: their messages, their files in storage and their records. It only touches what is
+ * already in Trash, so a forged request cannot remove live mail. The founder or the agency only; "purge" is the ticked
+ * conversations (or "purge:id" from the conversation page), "purge-all" is everything in Trash, up to 200 at a time.
+ */
+export async function purgeThreads(_prev: FormState, fd: FormData): Promise<FormState> {
+  const c = await mailContext(fd, "edit");
+  if (!c.ok) return { error: c.error };
+  const { ctx } = c;
+  if (!canManageTeam(ctx.actor)) return { error: "Only the founder or the agency can delete mail for good. Anyone with access can move it to Trash." };
+  if (!allow(`mail-purge:${ctx.user.id}`, 30)) return { error: "You have deleted a lot in the last hour. Try again a bit later." };
+  const [op, one] = str(fd, "act").split(":");
+  let ids: string[];
+  if (op === "purge-all") {
+    const { data } = await ctx.admin.from("mail_threads").select("id").eq("brand_id", ctx.brandId).eq("status", "trash").order("last_message_at", { ascending: false }).limit(PURGE_AT_ONCE);
+    ids = (data ?? []).map((r) => r.id as string);
+  } else if (op === "purge") {
+    ids = one ? [one] : fd.getAll("id").filter((v): v is string => typeof v === "string");
+    if (ids.length === 0) return { error: "Tick a conversation first." };
+    if (ids.length > 100 || !ids.every((id) => UUID.test(id))) return { error: "Unknown conversation." };
+  } else return { error: "Unknown action." };
+  if (ids.length === 0) return { message: "Trash is empty." };
+
+  const { data: inTrash } = await ctx.admin.from("mail_threads").select("id").eq("brand_id", ctx.brandId).eq("status", "trash").in("id", ids);
+  const doomed = (inTrash ?? []).map((r) => r.id as string);
+  if (doomed.length === 0) return { error: "Only conversations in Trash can be deleted for good." };
+
+  // Files first (to know their keys), then the conversations, then the files: if the conversations cannot be deleted, no file is lost.
+  const messageIds: string[] = [];
+  for (const part of chunks(doomed, 50)) {
+    const { data } = await ctx.admin.from("mail_messages").select("id").eq("brand_id", ctx.brandId).in("thread_id", part);
+    messageIds.push(...(data ?? []).map((r) => r.id as string));
+  }
+  const files: { id: string; storage_key: string }[] = [];
+  for (const part of chunks(messageIds, 100)) {
+    const { data } = await ctx.admin.from("mail_attachments").select("id, storage_key").eq("brand_id", ctx.brandId).in("message_id", part);
+    files.push(...((data ?? []) as typeof files));
+  }
+  const { error } = await ctx.admin.from("mail_threads").delete().eq("brand_id", ctx.brandId).eq("status", "trash").in("id", doomed);
+  if (error) {
+    console.error("[mail] could not delete for good:", error.message);
+    return { error: "Could not delete the conversations. Try again." };
+  }
+  let kept = 0;
+  for (const part of chunks(files, 20)) {
+    const gone = await Promise.all(part.map((f) => deleteObject(f.storage_key)));
+    kept += gone.filter((ok) => !ok).length;
+    const okIds = part.filter((_, i) => gone[i]).map((f) => f.id);
+    if (okIds.length > 0) await ctx.admin.from("mail_attachments").delete().eq("brand_id", ctx.brandId).in("id", okIds);
+  }
+  if (kept > 0) console.error(`[mail] ${kept} file(s) could not be removed from storage after a delete; their records are kept for a later cleanup.`);
+  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "mail.purge", target: doomed.length === 1 ? doomed[0] : undefined, meta: { conversations: doomed.length, files: files.length } });
+  refresh(ctx.slug);
+  const back = safeNext(str(fd, "back"), "");
+  if (back.startsWith(`/hub/b/${ctx.slug}/mail`)) redirect(back);
+  const more = op === "purge-all" && doomed.length === PURGE_AT_ONCE;
+  return { message: `Deleted ${doomed.length} ${doomed.length === 1 ? "conversation" : "conversations"} for good.${more ? " There may be more in Trash: press Empty Trash again." : ""}` };
 }
 
 // ---------------------------------------------------------------------------------------------- attachments

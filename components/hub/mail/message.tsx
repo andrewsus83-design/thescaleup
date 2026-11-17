@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Paperclip } from "lucide-react";
+import { Forward, Paperclip } from "lucide-react";
 import { Chip } from "@/components/brand/primitives";
 import type { MessageRow } from "@/lib/hub/mail/data";
 import { sizeLabel } from "@/lib/hub/mail/files";
@@ -20,7 +20,7 @@ const STATUS: Record<string, { tone: "ok" | "bad" | "neutral"; label: string } |
  * One message of a conversation, like Gmail's: a row with the sender's circle, name and time that opens to the full message.
  * Older messages start closed with the start of their text; the newest starts open. It is a <details>, so it works without scripts.
  */
-export function Message({ m, slug, tz, today, open }: { m: MessageRow; slug: string; tz: string; today: string; open: boolean }) {
+export function Message({ m, slug, tz, today, open, forwardHref }: { m: MessageRow; slug: string; tz: string; today: string; open: boolean; forwardHref?: string }) {
   const st = m.direction === "out" ? STATUS[m.status] : undefined;
   const name = personLabel(m.from_name, m.from_email);
   return (
@@ -67,6 +67,12 @@ export function Message({ m, slug, tz, today, open }: { m: MessageRow; slug: str
               </li>
             ))}
           </ul>
+        )}
+        {forwardHref && (
+          <Link href={forwardHref} className="hit-44 inline-flex min-h-11 items-center gap-2 text-small font-semibold text-ink-500 hover:text-ink-800">
+            <Forward className="size-4" aria-hidden />
+            Forward
+          </Link>
         )}
       </div>
     </details>

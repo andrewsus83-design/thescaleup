@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCheck, Inbox, Megaphone, PenSquare, Send } from "lucide-react";
+import { CheckCheck, Inbox, Megaphone, PenSquare, Send, Trash2 } from "lucide-react";
 import { btnCls, iconBtnCls, motion } from "@/components/brand/styles";
 import { mailHref, type Folder } from "@/lib/hub/mail/model";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ const FOLDERS: { id: Folder; label: string; Icon: typeof Inbox }[] = [
   { id: "inbox", label: "Inbox", Icon: Inbox },
   { id: "sent", label: "Sent", Icon: Send },
   { id: "done", label: "Done", Icon: CheckCheck },
+  { id: "trash", label: "Trash", Icon: Trash2 },
 ];
 
 const item = (active: boolean) => cn("flex h-11 shrink-0 items-center gap-3 whitespace-nowrap rounded-full px-4 text-small", motion, active ? "bg-brand-50 font-bold text-ink-900" : "font-medium text-ink-800 hover:bg-paper-100");

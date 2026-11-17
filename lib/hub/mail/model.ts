@@ -117,10 +117,10 @@ export const normalizeSubject = (s: string) =>
 
 // ---------------------------------------------------------------------------------------------- list, search and avatars
 
-export type Folder = "inbox" | "sent" | "done";
+export type Folder = "inbox" | "sent" | "done" | "trash";
 
 /** The folder named in the address bar. Anything unknown (or the old "open") is the inbox. */
-export const folderOf = (raw: unknown): Folder => (raw === "done" || raw === "sent" ? raw : "inbox");
+export const folderOf = (raw: unknown): Folder => (raw === "done" || raw === "sent" || raw === "trash" ? raw : "inbox");
 
 /** The address of a Mail list: the folder, one address and a page are all optional. The inbox with nothing else is just the base. */
 export function mailHref(base: string, folder: Folder, opts: { addressId?: string; before?: string; q?: string } = {}): string {

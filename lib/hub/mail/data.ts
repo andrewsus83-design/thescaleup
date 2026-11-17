@@ -8,7 +8,7 @@ import type { DnsRecord } from "./resend";
 
 export type MailDomain = { id: string; name: string; status: string; receiving: boolean; records: DnsRecord[]; verified_at: string | null; created_at: string; linked: boolean };
 export type MailAddress = { id: string; domain_id: string; local_part: string; display_name: string | null; email: string; domain: string };
-export type ThreadRow = { id: string; address_id: string | null; mailbox: string; subject: string; status: "open" | "done"; unread: boolean; message_count: number; last_message_at: string; last_snippet: string; last_from: string; to?: string };
+export type ThreadRow = { id: string; address_id: string | null; mailbox: string; subject: string; status: "open" | "done" | "trash"; unread: boolean; message_count: number; last_message_at: string; last_snippet: string; last_from: string; to?: string };
 export type Attachment = { id: string; filename?: string | null; content_type?: string | null; size?: number | null };
 export type MessageRow = {
   id: string;
@@ -81,7 +81,9 @@ export async function listThreads(brandId: string, opts: { folder: Folder; addre
     .eq("brand_id", brandId)
     .order("last_message_at", { ascending: false })
     .limit(opts.limit ?? PAGE);
-  if (!opts.q && opts.folder !== "sent") q = q.eq("status", opts.folder === "done" ? "done" : "open");
+  // Trash is its own folder: a search and Sent never show what was deleted.
+  if (!opts.q && opts.folder !== "sent") q = q.eq("status", opts.folder === "done" ? "done" : opts.folder === "trash" ? "trash" : "open");
+  else q = q.neq("status", "trash");
   if (sentTo) q = q.in("id", [...sentTo.keys()].slice(0, 150));
   if (opts.addressId) q = q.eq("address_id", opts.addressId);
   if (opts.before) q = q.lt("last_message_at", opts.before);
@@ -116,4 +118,14 @@ export async function getThread(brandId: string, threadId: string): Promise<{ th
     .eq("thread_id", threadId)
     .order("occurred_at");
   return { thread: thread as ThreadRow, messages: (messages ?? []) as MessageRow[] };
+}
+
+export type ForwardSource = { id: string; direction: "in" | "out"; from_email: string; from_name: string | null; to_emails: string[]; cc_emails: string[]; subject: string; text_body: string; attachments: Attachment[]; occurred_at: string; address_id: string | null };
+
+/** One message with what a forward starts from, and the address its conversation belongs to. Null when it is not this brand's. */
+export async function getForwardSource(brandId: string, messageId: string): Promise<ForwardSource | null> {
+  const { data: m } = await db().from("mail_messages").select("id, thread_id, direction, from_email, from_name, to_emails, cc_emails, subject, text_body, attachments, occurred_at").eq("brand_id", brandId).eq("id", messageId).maybeSingle();
+  if (!m) return null;
+  const { data: t } = await db().from("mail_threads").select("address_id").eq("brand_id", brandId).eq("id", m.thread_id as string).maybeSingle();
+  return { ...(m as unknown as Omit<ForwardSource, "address_id">), attachments: Array.isArray(m.attachments) ? (m.attachments as Attachment[]) : [], address_id: (t?.address_id as string | null | undefined) ?? null };
 }

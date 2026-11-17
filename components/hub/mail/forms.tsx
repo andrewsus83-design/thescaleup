@@ -1,12 +1,13 @@
 "use client";
 
 import { useActionState, useEffect, useId, useRef, useState } from "react";
-import { Check, Copy, CornerUpLeft, Loader2, Trash2 } from "lucide-react";
+import { Check, Copy, CornerUpLeft, Loader2, Paperclip, Trash2 } from "lucide-react";
 import { Alert, Btn } from "@/components/brand/primitives";
 import { labelCls } from "@/components/brand/styles";
 import { compactField } from "@/components/hub/tasks/parts";
 import type { FormState } from "@/lib/hub/actions";
 import { addAddress, addDomain, checkDomain, removeAddress, removeDomain, sendMail } from "@/lib/hub/mail-actions";
+import { sizeLabel } from "@/lib/hub/mail/files";
 import { cn } from "@/lib/utils";
 import { AttachPicker } from "./attach";
 
@@ -184,7 +185,9 @@ const rowInput = "h-12 min-w-0 flex-1 bg-transparent text-body text-ink-800 outl
  * Gmail's writing window: a dark "New message" bar, From / To / Subject on lines with only an underline, a large message area and
  * Send underneath. As a reply (threadId set) the server picks the recipients and the subject, so only the message shows.
  */
-export function Composer({ brandId, from, threadId, replyTo, onCancel, canAttach, attachHint }: { brandId: string; from?: FromOption[]; threadId?: string; replyTo?: string; onCancel?: () => void; canAttach?: boolean; attachHint?: string }) {
+export type ForwardStart = { addressId?: string; subject: string; body: string; files: { value: string; name: string; size: number }[]; leftOut: number };
+
+export function Composer({ brandId, from, threadId, replyTo, onCancel, canAttach, attachHint, start }: { brandId: string; from?: FromOption[]; threadId?: string; replyTo?: string; onCancel?: () => void; canAttach?: boolean; attachHint?: string; start?: ForwardStart }) {
   const [state, action, pending] = useActionState<FormState, FormData>(sendMail, {});
   const [showCc, setShowCc] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -209,7 +212,7 @@ export function Composer({ brandId, from, threadId, replyTo, onCancel, canAttach
                 </p>
               </>
             ) : (
-              <select id={`${id}-from`} name="addressId" required defaultValue={from[0]?.id} className={cn(rowInput, "cursor-pointer")}>
+              <select id={`${id}-from`} name="addressId" required defaultValue={start?.addressId && from.some((a) => a.id === start.addressId) ? start.addressId : from[0]?.id} className={cn(rowInput, "cursor-pointer")}>
                 {from.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.name ? `${a.name} <${a.email}>` : a.email}
@@ -228,7 +231,7 @@ export function Composer({ brandId, from, threadId, replyTo, onCancel, canAttach
               {replyTo}
             </p>
           ) : (
-            <input id={`${id}-to`} name="to" required autoCapitalize="none" spellCheck={false} placeholder="name@company.com, another@company.com" className={rowInput} />
+            <input id={`${id}-to`} name="to" required autoCapitalize="none" spellCheck={false} placeholder="name@company.com, another@company.com" autoFocus={Boolean(start)} className={rowInput} />
           )}
           {!showCc && (
             <button type="button" onClick={() => setShowCc(true)} className="hit-44 min-h-11 shrink-0 rounded-full px-3 text-small font-semibold text-ink-500 hover:text-ink-800">
@@ -249,7 +252,7 @@ export function Composer({ brandId, from, threadId, replyTo, onCancel, canAttach
             <label htmlFor={`${id}-subject`} className={rowLabel}>
               Subject
             </label>
-            <input id={`${id}-subject`} name="subject" required maxLength={200} className={rowInput} />
+            <input id={`${id}-subject`} name="subject" required maxLength={200} defaultValue={start?.subject} className={rowInput} />
           </div>
         )}
       </div>
@@ -264,9 +267,28 @@ export function Composer({ brandId, from, threadId, replyTo, onCancel, canAttach
         rows={reply ? 6 : 14}
         maxLength={50000}
         autoFocus={reply}
-        aria-label={reply ? "Your reply" : "Message"}
+        defaultValue={start?.body}
+        aria-label={reply ? "Your reply" : start ? "Your note and the forwarded message" : "Message"}
         className="block w-full resize-y bg-transparent px-5 py-4 text-body text-ink-800 outline-none placeholder:text-ink-500 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-inset"
       />
+      {start && start.files.length > 0 && canAttach && (
+        <fieldset className="px-5 pb-3">
+          <legend className="pb-1 text-small font-semibold text-ink-800">Files from the original message</legend>
+          <ul>
+            {start.files.map((f) => (
+              <li key={f.value}>
+                <label className="flex min-h-11 items-center gap-3 text-small text-ink-800">
+                  <input type="checkbox" name="fwd" value={f.value} defaultChecked className="size-5 accent-ink-800" />
+                  <Paperclip className="size-4 shrink-0 text-ink-500" aria-hidden />
+                  <span className="min-w-0 truncate">{f.name}</span>
+                  <span className="shrink-0 text-caption text-ink-500">{sizeLabel(f.size)}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+      )}
+      {start && start.leftOut > 0 && <p className="px-5 pb-3 text-caption text-ink-500">{start.leftOut} {start.leftOut === 1 ? "file" : "files"} of the original cannot be forwarded: some kinds of file are refused by mail providers, and very large ones do not fit.</p>}
       {canAttach ? <AttachPicker brandId={brandId} onBusy={setUploading} /> : <p className="px-5 pb-4 text-caption text-ink-500">Attachments are not turned on yet. {attachHint ?? "The founder or the agency can set up file storage."}</p>}
       <div className="flex flex-wrap items-center gap-3 border-t border-hairline px-5 py-3">
         <Btn type="submit" variant="primary" disabled={pending || uploading}>

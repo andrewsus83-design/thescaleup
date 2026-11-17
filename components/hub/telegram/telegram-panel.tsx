@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Alert, Btn, Chip } from "@/components/brand/primitives";
-import { checkTelegram, findTelegramChats, linkTelegramChat, sendTodayToTelegram, testTelegramChat, unlinkTelegramChat } from "@/lib/hub/telegram-actions";
+import { checkTelegram, findTelegramChats, linkTelegramChat, sendTodayToTelegram, setTelegramDaily, testTelegramChat, unlinkTelegramChat } from "@/lib/hub/telegram-actions";
 import { KIND_LABEL, MAX_LINKED, type Bot, type Chat, type Linked } from "@/lib/hub/telegram/model";
 
 /** Checks the bot, links the chats that should receive the hub's messages, and sends a test. */
@@ -37,6 +37,10 @@ export function TelegramPanel({ brandId, hasToken }: { brandId: string; hasToken
       setFound((f) => (f ? f.filter((c) => c.id !== id) : f));
       setNote("Linked. The bot said hello in that chat.");
     });
+  const daily = (id: number, on: boolean) => run(`daily-${id}`, () => setTelegramDaily(brandId, id, on), (r) => {
+    setLinked(r.linked);
+    setNote(on ? "This chat will get the day's summary every morning." : "The morning summary is off for this chat.");
+  });
   const unlink = (id: number) => run(`unlink-${id}`, () => unlinkTelegramChat(brandId, id), (r) => setLinked(r.linked));
   const today = () =>
     run("today", () => sendTodayToTelegram(brandId), (r) => setNote(r.failed ? `Summary sent to ${r.sent} chat${r.sent === 1 ? "" : "s"}. ${r.failed} did not accept it.` : `Summary sent to ${r.sent} chat${r.sent === 1 ? "" : "s"}.`));
@@ -88,6 +92,10 @@ export function TelegramPanel({ brandId, hasToken }: { brandId: string; hasToken
                   <li key={l.chat_id} className="flex flex-wrap items-center gap-3 px-3 py-2">
                     <span className="min-w-0 flex-1 truncate text-body text-ink-800">{l.title || "Unnamed chat"}</span>
                     <Chip>{KIND_LABEL[l.kind]}</Chip>
+                    <label className="flex min-h-11 items-center gap-2 text-small text-ink-800">
+                      <input type="checkbox" checked={l.daily} disabled={busy !== ""} onChange={(e) => daily(l.chat_id, e.target.checked)} className="size-5 accent-ink-800" />
+                      Every morning
+                    </label>
                     <Btn size="sm" onClick={() => test(l.chat_id)} disabled={busy !== ""}>
                       {spin(`test-${l.chat_id}`)}
                       Send a test
@@ -106,7 +114,7 @@ export function TelegramPanel({ brandId, hasToken }: { brandId: string; hasToken
                   {spin("today")}
                   Send today&apos;s summary
                 </Btn>
-                <p className="text-caption text-ink-500">Posts what is late or due, the content planned for today, the number of CRM follow-ups and unread mail to every chat above. Customer names are never included.</p>
+                <p className="text-caption text-ink-500">Posts what is late or due, the content planned for today, the number of CRM follow-ups and unread mail to every chat above. Customer names are never included. “Every morning” sends it for you at 08:00 Jakarta time, only on days that have something in them.</p>
               </div>
             )}
           </section>

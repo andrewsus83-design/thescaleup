@@ -61,4 +61,4 @@ export function messageText(s: string): string {
   return t.length > MAX_MESSAGE ? `${t.slice(0, MAX_MESSAGE - 1)}…` : t;
 }
 
-export type Linked = { chat_id: number; kind: ChatKind; title: string };
+export type Linked = { chat_id: number; kind: ChatKind; title: string; daily: boolean };

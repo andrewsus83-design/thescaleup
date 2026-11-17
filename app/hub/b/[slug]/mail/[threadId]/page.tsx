@@ -39,27 +39,28 @@ export default async function ThreadPage({ params }: { params: Promise<{ slug: s
   const mine = addresses.find((a) => a.id === thread.address_id);
   const canReply = canWrite && !!mine && sendable([mine], domains).length > 0;
   const canCompose = canWrite && sendable(addresses, domains).length > 0;
+  const last = messages[messages.length - 1];
   const lastIn = [...messages].reverse().find((m) => m.direction === "in");
   const replyTo = lastIn ? lastIn.from_email : messages[messages.length - 1]?.to_emails.join(", ");
   const tz = hubTz();
   const today = todayIn(tz);
   const base = `/hub/b/${slug}/mail`;
-  const folder = thread.status === "done" ? "done" : "inbox";
+  const folder = thread.status === "done" ? "done" : thread.status === "trash" ? "trash" : "inbox";
   const back = mailHref(base, folder);
 
   return (
     <MailShell slug={slug} active={folder} unread={Math.max(0, unread - (thread.unread && canWrite && thread.status === "open" ? 1 : 0))} addresses={addresses} canCompose={canCompose}>
-      <ThreadToolbar brandId={brand.id} threadId={thread.id} status={thread.status} back={back} canEdit={canWrite} />
+      <ThreadToolbar brandId={brand.id} threadId={thread.id} status={thread.status} back={back} canEdit={canWrite} canPurge={canManageTeam(actor)} forwardHref={canCompose && last ? `${base}/new?fwd=${last.id}` : undefined} />
       <div className="mb-5">
         <h1 className="break-words font-title text-h2 text-ink-800">{thread.subject || "(no subject)"}</h1>
         <p className="mt-2 flex flex-wrap items-center gap-2">
-          <span className={tagCls}>{thread.status === "done" ? "Done" : "Inbox"}</span>
+          <span className={tagCls}>{thread.status === "done" ? "Done" : thread.status === "trash" ? "Trash" : "Inbox"}</span>
           <span className="min-w-0 truncate font-mono text-micro text-ink-500">{thread.mailbox}</span>
         </p>
       </div>
       <div className="space-y-3">
         {messages.map((m, i) => (
-          <Message key={m.id} m={m} slug={slug} tz={tz} today={today} open={i === messages.length - 1} />
+          <Message key={m.id} m={m} slug={slug} tz={tz} today={today} open={i === messages.length - 1} forwardHref={canCompose ? `${base}/new?fwd=${m.id}` : undefined} />
         ))}
       </div>
       <div className="mt-6">

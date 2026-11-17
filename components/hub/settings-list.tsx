@@ -1,4 +1,4 @@
-import { AtSign, DatabaseZap, KeyRound, Send, Share2, ShieldCheck, Smartphone, Users } from "lucide-react";
+import { AtSign, DatabaseZap, KeyRound, ListChecks, Send, Share2, ShieldCheck, Smartphone, Users } from "lucide-react";
 import { SectionList, type SectionItem } from "@/components/hub/section-list";
 
 const SECTIONS: (Omit<SectionItem, "href"> & { manage: boolean })[] = [
@@ -8,6 +8,7 @@ const SECTIONS: (Omit<SectionItem, "href"> & { manage: boolean })[] = [
   { key: "social", title: "Social media connections", hint: "Connect this brand's social accounts and WhatsApp", icon: Share2, manage: true },
   { key: "telegram", title: "Telegram", hint: "Connect a Telegram bot, with a step-by-step guide", icon: Send, manage: false },
   { key: "import", title: "Import", hint: "Bring work over from ClickUp and other tools, or ask for a new source", icon: DatabaseZap, manage: true },
+  { key: "workflow", title: "Workflow", hint: "The steps a task goes through, and whether new tasks need approval", icon: ListChecks, manage: true },
   { key: "team", title: "Team", hint: "People, roles and what each role can open and change", icon: Users, manage: true },
   { key: "mailbox", title: "Mailbox", hint: "Addresses, forwarding and DNS for the brand's domain", icon: AtSign, manage: true, soon: true },
 ];
