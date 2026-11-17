@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BriefcaseBusiness, Search, X } from "lucide-react";
+import { BriefcaseBusiness, Search, Upload, X } from "lucide-react";
 import { Alert, EmptyState, PageHeader } from "@/components/brand/primitives";
 import { btnCls, iconBtnCls, pillCls, tileCls } from "@/components/brand/styles";
 import { CrmNav, FollowChip, StageChip, crmBase, listPath } from "@/components/hub/crm/parts";
@@ -52,9 +52,15 @@ export async function CrmList({ slug, brandId, kind, canEdit, manager, sp }: { s
         description="Leads who may buy, and clients who already do. Each has a stage, a next follow-up and a log of notes."
         action={
           canEdit && (
-            <Link href={`${crmBase(slug)}/new?kind=${kind}`} className={btnCls("primary", "md")}>
-              Add {noun}
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link href={`${crmBase(slug)}/import?kind=${kind}`} className={btnCls("secondary", "md")}>
+                <Upload className="size-4" aria-hidden />
+                Import
+              </Link>
+              <Link href={`${crmBase(slug)}/new?kind=${kind}`} className={btnCls("primary", "md")}>
+                Add {noun}
+              </Link>
+            </div>
           )
         }
       />
@@ -67,9 +73,15 @@ export async function CrmList({ slug, brandId, kind, canEdit, manager, sp }: { s
           hint={canEdit ? (kind === "lead" ? "Add the people who asked about the brand. Move them along as they reply, and convert them to a client when they buy." : "Add the people who already buy, or convert a lead when they do.") : "Nothing has been added yet."}
         >
           {canEdit && (
-            <Link href={`${crmBase(slug)}/new?kind=${kind}`} className={btnCls("primary", "md")}>
-              Add {noun}
-            </Link>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Link href={`${crmBase(slug)}/new?kind=${kind}`} className={btnCls("primary", "md")}>
+                Add {noun}
+              </Link>
+              <Link href={`${crmBase(slug)}/import?kind=${kind}`} className={btnCls("secondary", "md")}>
+                <Upload className="size-4" aria-hidden />
+                Import from a file
+              </Link>
+            </div>
           )}
         </EmptyState>
       ) : (

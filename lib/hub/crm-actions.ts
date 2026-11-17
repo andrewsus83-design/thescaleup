@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import type { FormState } from "./actions";
 import { getRules, getStages, countInStage } from "./crm/data";
 import { logStage, runRules } from "./crm/flow";
+import { cleanImportRows, type ImportChunkResult } from "./crm/import";
 import { firstStage, followUpIn, isKind, isStageFor, parseNote, parsePerson, parseRulesInput, parseStagesInput, pruneRules } from "./crm/model";
 import { atLeast } from "./permissions";
 import { allow } from "./ratelimit";
@@ -224,4 +225,37 @@ export async function saveRules(_prev: FormState, fd: FormData): Promise<FormSta
   await audit({ actor: ctx.user, brandId: ctx.brandId, action: "crm.rules", meta: { count: parsed.rules.length } });
   refresh(ctx.slug);
   return { message: parsed.rules.length ? "Automations saved." : "Saved. No stage does anything on its own." };
+}
+
+/**
+ * One batch of an import from a spreadsheet. The rows are checked again here, then written in one go by the database, which leaves
+ * out anyone already in the CRM. Stage automations are not run: a file of 2,000 leads would otherwise create 2,000 tasks.
+ */
+export async function importPeopleChunk(input: { brandId: string; kind: string; rows: unknown }): Promise<ImportChunkResult> {
+  const c = await editContext(input?.brandId);
+  if (!c.ok) return { ok: false, error: c.error };
+  const { ctx } = c;
+  if (!isKind(input.kind)) return { ok: false, error: "Pick lead or client." };
+  const kind = input.kind;
+  const rows = cleanImportRows(input.rows);
+  if (!rows) return { ok: false, error: "Some rows were not valid. Reload the page and try the file again." };
+  if (!allow(`crm-import:${ctx.user.id}`, 300)) return { ok: false, error: "That is a lot of importing in an hour. Try again a bit later." };
+  // A stage the brand no longer has falls back to where new people start.
+  const stages = await getStages(ctx.brandId);
+  const start = firstStage(stages, kind);
+  const prepared = rows.map((r) => ({ ...r, stage: isStageFor(stages, kind, r.stage) ? r.stage : start }));
+  const { data, error } = await ctx.admin.rpc("crm_import_chunk", { p_brand: ctx.brandId, p_kind: kind, p_by: ctx.user.id, p_rows: prepared });
+  if (error) {
+    console.error("[crm] import chunk failed:", error.code, error.message);
+    const missing = error.code === "PGRST202" || error.code === "42883";
+    return { ok: false, error: missing ? "The CRM import needs a database update that has not been run yet." : "Could not save these rows. Nothing from this batch was kept; try again." };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  const created = Number(row?.created ?? 0);
+  const skipped = Number(row?.skipped ?? 0);
+  if (created > 0) {
+    await audit({ actor: ctx.user, brandId: ctx.brandId, action: "crm.import", meta: { kind, created, skipped } });
+    refresh(ctx.slug);
+  }
+  return { ok: true, created, skipped };
 }
