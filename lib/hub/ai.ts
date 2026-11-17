@@ -5,9 +5,9 @@ import Anthropic from "@anthropic-ai/sdk";
 export const aiModel = () => process.env.HUB_AI_MODEL?.trim() || "claude-sonnet-5-5";
 
 /** One plain request with no tools. Returns the text and how many tokens it used. */
-export async function askClaude(apiKey: string, system: string, user: string, maxTokens: number) {
+export async function askClaude(apiKey: string, system: string, user: string, maxTokens: number, timeoutMs = 60_000) {
   const client = new Anthropic({ apiKey });
-  const resp = await client.messages.create({ model: aiModel(), max_tokens: maxTokens, system, messages: [{ role: "user", content: user }] }, { timeout: 60_000 });
+  const resp = await client.messages.create({ model: aiModel(), max_tokens: maxTokens, system, messages: [{ role: "user", content: user }] }, { timeout: timeoutMs });
   const text = resp.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
