@@ -8,8 +8,8 @@ import { DeletePerson, NoteForm, PersonForm } from "@/components/hub/crm/forms";
 import { FollowChip, StageChip, listPath, shortDay, stamp } from "@/components/hub/crm/parts";
 import { requireFunction } from "@/lib/hub/access";
 import { convertToClient, deleteNote, setFollowUp, setStage } from "@/lib/hub/crm-actions";
-import { getPerson, listNotes } from "@/lib/hub/crm/data";
-import { STAGE_LABEL, followState, stagesFor } from "@/lib/hub/crm/model";
+import { getPerson, getStages, listNotes } from "@/lib/hub/crm/data";
+import { followState, stagesOf } from "@/lib/hub/crm/model";
 import { atLeast } from "@/lib/hub/permissions";
 import { canManageTeam } from "@/lib/hub/rules";
 import { UUID } from "@/lib/hub/tasks/context";
@@ -26,12 +26,12 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
   if (!UUID.test(id)) notFound();
   const person = await getPerson(brand.id, id);
   if (!person) notFound();
-  const notes = await listNotes(brand.id, id);
+  const [notes, stages] = await Promise.all([listNotes(brand.id, id), getStages(brand.id)]);
   const tz = hubTz();
   const today = todayIn(tz);
   const canEdit = atLeast(access.crm, "edit");
   const manager = canManageTeam(actor);
-  const state = followState(person, today);
+  const state = followState(person, today, stages);
   const kindWord = person.kind === "lead" ? "Lead" : "Client";
 
   return (
@@ -56,14 +56,14 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
             <form action={setStage} className="flex flex-wrap gap-2" aria-label="Move to another stage">
               <input type="hidden" name="brandId" value={brand.id} />
               <input type="hidden" name="id" value={person.id} />
-              {stagesFor(person.kind).map((s) => (
-                <button key={s} type="submit" name="stage" value={s} disabled={s === person.stage} aria-pressed={s === person.stage} className={pillCls(s === person.stage)}>
-                  {STAGE_LABEL[s]}
+              {stagesOf(stages, person.kind).map((s) => (
+                <button key={s.key} type="submit" name="stage" value={s.key} disabled={s.key === person.stage} aria-pressed={s.key === person.stage} className={pillCls(s.key === person.stage)}>
+                  {s.label}
                 </button>
               ))}
             </form>
           ) : (
-            <StageChip stage={person.stage} />
+            <StageChip stages={stages} stage={person.stage} />
           )}
           {canEdit && person.kind === "lead" && (
             <form action={convertToClient} className="mt-4">

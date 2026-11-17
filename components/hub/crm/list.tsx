@@ -4,8 +4,8 @@ import { Alert, EmptyState, PageHeader } from "@/components/brand/primitives";
 import { btnCls, iconBtnCls, pillCls, tileCls } from "@/components/brand/styles";
 import { CrmNav, FollowChip, StageChip, crmBase, listPath } from "@/components/hub/crm/parts";
 import { Stat } from "@/components/hub/products/parts";
-import { listPeople } from "@/lib/hub/crm/data";
-import { STAGE_LABEL, filterPeople, followState, followUpsDue, isStageFor, stagesFor, summarize, type Kind, type Stage } from "@/lib/hub/crm/model";
+import { getStages, listPeople } from "@/lib/hub/crm/data";
+import { filterPeople, followState, followUpsDue, isStageFor, stagesOf, summarize, type Kind } from "@/lib/hub/crm/model";
 import { searchTerm } from "@/lib/hub/mail/model";
 import { fmtNum } from "@/lib/hub/products/model";
 import { hubTz, todayIn } from "@/lib/hub/tasks/dates";
@@ -13,7 +13,7 @@ import { hubTz, todayIn } from "@/lib/hub/tasks/dates";
 const PER_PAGE = 50;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-type F = { q?: string; stage?: Stage | "open"; due?: boolean; page?: number };
+type F = { q?: string; stage?: string; due?: boolean; page?: number };
 function href(base: string, f: F) {
   const p = new URLSearchParams();
   if (f.q) p.set("q", f.q);
@@ -25,24 +25,24 @@ function href(base: string, f: F) {
 }
 
 /** The Leads and Clients lists are one page with a different kind. */
-export async function CrmList({ slug, brandId, kind, canEdit, sp }: { slug: string; brandId: string; kind: Kind; canEdit: boolean; sp: Record<string, string | string[] | undefined> }) {
+export async function CrmList({ slug, brandId, kind, canEdit, manager, sp }: { slug: string; brandId: string; kind: Kind; canEdit: boolean; manager: boolean; sp: Record<string, string | string[] | undefined> }) {
   const today = todayIn(hubTz());
   const base = listPath(slug, kind);
-  const { items, total } = await listPeople(brandId, kind);
+  const [{ items, total }, stages] = await Promise.all([listPeople(brandId, kind), getStages(brandId)]);
   const noun = kind === "lead" ? "lead" : "client";
   const nouns = kind === "lead" ? "leads" : "clients";
 
   const q = searchTerm(one(sp.q));
   const rawStage = one(sp.stage);
-  const stage: F["stage"] = rawStage === "open" ? "open" : isStageFor(kind, rawStage) ? rawStage : undefined;
+  const stage: F["stage"] = rawStage === "open" ? "open" : isStageFor(stages, kind, rawStage) ? rawStage : undefined;
   const due = one(sp.due) === "1";
   const filtered = Boolean(q || stage || due);
-  const rows = filterPeople(items, { q, stage, due }, today);
+  const rows = filterPeople(items, { q, stage, due }, today, stages);
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   const page = Math.min(pages, Math.max(1, Math.floor(Number(one(sp.page))) || 1));
   const shown = rows.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-  const sum = summarize(items);
-  const dueCount = followUpsDue(items, today);
+  const sum = summarize(items, stages);
+  const dueCount = followUpsDue(items, today, stages);
   const cur: F = { q, stage, due };
 
   return (
@@ -58,7 +58,7 @@ export async function CrmList({ slug, brandId, kind, canEdit, sp }: { slug: stri
           )
         }
       />
-      <CrmNav slug={slug} active={kind} />
+      <CrmNav slug={slug} active={kind === "lead" ? "leads" : "clients"} manager={manager} />
 
       {items.length === 0 ? (
         <EmptyState
@@ -114,10 +114,10 @@ export async function CrmList({ slug, brandId, kind, canEdit, sp }: { slug: stri
               Follow up now
               <span className="font-mono text-micro opacity-70">{dueCount}</span>
             </Link>
-            {stagesFor(kind).map((s) => (
-              <Link key={s} href={href(base, { ...cur, stage: stage === s ? undefined : s })} aria-pressed={stage === s} className={pillCls(stage === s)}>
-                {STAGE_LABEL[s]}
-                <span className="font-mono text-micro opacity-70">{sum.byStage[s] ?? 0}</span>
+            {stagesOf(stages, kind).map((s) => (
+              <Link key={s.key} href={href(base, { ...cur, stage: stage === s.key ? undefined : s.key })} aria-pressed={stage === s.key} className={pillCls(stage === s.key)}>
+                {s.label}
+                <span className="font-mono text-micro opacity-70">{sum.byStage[s.key] ?? 0}</span>
               </Link>
             ))}
           </div>
@@ -137,8 +137,8 @@ export async function CrmList({ slug, brandId, kind, canEdit, sp }: { slug: stri
                         <span className="block truncate text-body font-semibold text-ink-800">{p.name}</span>
                         {(p.company || p.source) && <span className="mt-0.5 block truncate text-small text-ink-500">{[p.company, p.source].filter(Boolean).join(" · ")}</span>}
                         <span className="mt-2 flex flex-wrap gap-1.5">
-                          <StageChip stage={p.stage} />
-                          <FollowChip state={followState(p, today)} date={p.next_follow_up} />
+                          <StageChip stages={stages} stage={p.stage} />
+                          <FollowChip state={followState(p, today, stages)} date={p.next_follow_up} />
                         </span>
                       </span>
                       {p.value !== null && p.value > 0 && <span className="shrink-0 font-mono text-body font-medium text-ink-800">{fmtNum(p.value)}</span>}

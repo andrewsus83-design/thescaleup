@@ -1,29 +1,48 @@
 import Link from "next/link";
 import { Chip, type Tone } from "@/components/brand/primitives";
 import { segItem, segWrap } from "@/components/brand/styles";
-import { STAGE_LABEL, type FollowState, type Kind, type Stage } from "@/lib/hub/crm/model";
+import { labelOf, stageDef, stagesOf, type FollowState, type Kind, type StageDef } from "@/lib/hub/crm/model";
 
 export const crmBase = (slug: string) => `/hub/b/${slug}/crm`;
 export const listPath = (slug: string, kind: Kind) => (kind === "lead" ? crmBase(slug) : `${crmBase(slug)}/clients`);
 
-/** Leads and Clients: two lists of the same kind of record. */
-export function CrmNav({ slug, active }: { slug: string; active: Kind }) {
+export type Section = "leads" | "clients" | "board" | "funnel" | "setup";
+
+const SECTIONS: { id: Section; label: string; path: string; manager?: boolean }[] = [
+  { id: "leads", label: "Leads", path: "" },
+  { id: "clients", label: "Clients", path: "/clients" },
+  { id: "board", label: "Board", path: "/board" },
+  { id: "funnel", label: "Funnel", path: "/funnel" },
+  { id: "setup", label: "Setup", path: "/setup", manager: true },
+];
+
+/** The CRM's sections. Setup (stages and automations) is for managers. On a narrow phone the row scrolls sideways. */
+export function CrmNav({ slug, active, manager }: { slug: string; active: Section; manager: boolean }) {
   return (
-    <nav aria-label="CRM sections" className={`${segWrap} mb-6`}>
-      <Link href={listPath(slug, "lead")} aria-current={active === "lead" ? "page" : undefined} className={segItem(active === "lead")}>
-        Leads
-      </Link>
-      <Link href={listPath(slug, "client")} aria-current={active === "client" ? "page" : undefined} className={segItem(active === "client")}>
-        Clients
-      </Link>
-    </nav>
+    <div className="-mx-6 mb-6 overflow-x-auto px-6 sm:mx-0 sm:px-0">
+      <nav aria-label="CRM sections" className={segWrap}>
+        {SECTIONS.filter((s) => manager || !s.manager).map((s) => (
+          <Link key={s.id} href={`${crmBase(slug)}${s.path}`} aria-current={active === s.id ? "page" : undefined} className={`${segItem(active === s.id)} shrink-0`}>
+            {s.label}
+          </Link>
+        ))}
+      </nav>
+    </div>
   );
 }
 
-const STAGE_TONE: Record<Stage, Tone> = { new: "info", contacted: "info", qualified: "brand", proposal: "warn", lost: "neutral", active: "ok", paused: "warn", churned: "neutral" };
+/** The chip's colour follows the stage's place in the brand's own list: closed stages are quiet, the first is blue, the last open lead stage amber. */
+export function stageTone(stages: readonly StageDef[], key: string): Tone {
+  const d = stageDef(stages, key);
+  if (!d || !d.open) return "neutral";
+  if (d.kind === "client") return "ok";
+  const open = stagesOf(stages, "lead").filter((s) => s.open);
+  const i = open.findIndex((s) => s.key === key);
+  return i === 0 ? "info" : i === open.length - 1 && open.length > 2 ? "warn" : "brand";
+}
 
-export function StageChip({ stage }: { stage: Stage }) {
-  return <Chip tone={STAGE_TONE[stage]}>{STAGE_LABEL[stage]}</Chip>;
+export function StageChip({ stages, stage }: { stages: readonly StageDef[]; stage: string }) {
+  return <Chip tone={stageTone(stages, stage)}>{labelOf(stages, stage)}</Chip>;
 }
 
 const FOLLOW_TONE: Record<FollowState, Tone> = { late: "bad", today: "warn", soon: "neutral", later: "neutral" };
