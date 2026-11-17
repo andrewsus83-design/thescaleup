@@ -110,6 +110,30 @@ export async function countDue(brandId: string, today: string): Promise<{ lead: 
   return { lead, client };
 }
 
+/** Open leads and clients with a follow-up today or earlier, oldest first (up to `limit`; `total` is how many are due). */
+export async function listDue(brandId: string, today: string, limit = 30): Promise<{ items: Person[]; total: number }> {
+  const closed = closedKeys(await getStages(brandId));
+  const notIn = `(${(closed.length ? closed : ["-"]).join(",")})`; // same rule as countDue
+  const { data, count, error } = await db()
+    .from("crm_people")
+    .select(COLUMNS, { count: "exact" })
+    .eq("brand_id", brandId)
+    .not("next_follow_up", "is", null)
+    .lte("next_follow_up", today)
+    .not("stage", "in", notIn)
+    .order("next_follow_up", { ascending: true })
+    .limit(limit);
+  if (error) {
+    console.error("[crm] due list failed:", error.message);
+    return { items: [], total: 0 };
+  }
+  const items = (data ?? []).flatMap((r) => {
+    const p = normalize(r as Record<string, unknown>);
+    return p ? [p] : [];
+  });
+  return { items, total: count ?? items.length };
+}
+
 /** How many people are in a stage right now. */
 export async function countInStage(brandId: string, kind: Kind, stage: string): Promise<number> {
   const { count } = await db().from("crm_people").select("id", { count: "exact", head: true }).eq("brand_id", brandId).eq("kind", kind).eq("stage", stage);

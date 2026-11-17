@@ -6,8 +6,8 @@ const SECTIONS: (Omit<SectionItem, "href"> & { manage: boolean })[] = [
   { key: "menu", title: "Phone menu", hint: "Choose the four menus on your phone's bottom bar", icon: Smartphone, manage: false },
   { key: "integrations", title: "Integrations and API keys", hint: "AI models, search, scraping, cost control and Google", icon: KeyRound, manage: true },
   { key: "social", title: "Social media connections", hint: "Connect this brand's social accounts and WhatsApp", icon: Share2, manage: true },
-  { key: "telegram", title: "Telegram", hint: "Connect a Telegram bot so the hub can message your team", icon: Send, manage: true },
-  { key: "clickup", title: "Import from ClickUp", hint: "Move this brand's ClickUp Docs and tasks into the Wiki and Tasks", icon: DatabaseZap, manage: true },
+  { key: "telegram", title: "Telegram", hint: "Connect a Telegram bot, with a step-by-step guide", icon: Send, manage: false },
+  { key: "import", title: "Import", hint: "Bring work over from ClickUp and other tools, or ask for a new source", icon: DatabaseZap, manage: true },
   { key: "team", title: "Team", hint: "People, roles and what each role can open and change", icon: Users, manage: true },
   { key: "mailbox", title: "Mailbox", hint: "Addresses, forwarding and DNS for the brand's domain", icon: AtSign, manage: true, soon: true },
 ];
