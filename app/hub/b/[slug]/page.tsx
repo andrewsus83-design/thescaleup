@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronRight, CircleCheck } from "lucide-react";
 import { MENU } from "@/components/hub/menus";
 import { accessFor } from "@/lib/hub/access";
+import { countDue } from "@/lib/hub/crm/data";
 import { buildSignals, dueSummary, greeting, hourIn, tileNote } from "@/lib/hub/home";
 import { countUnread } from "@/lib/hub/mail/data";
 import { catalogTotals } from "@/lib/hub/products/model";
@@ -28,7 +29,7 @@ export default async function BrandHome({ params }: { params: Promise<{ slug: st
   const base = `/hub/b/${brand.slug}`;
 
   // A failed lookup becomes null (nothing said) instead of breaking Home.
-  const [tasks, unread, stock] = await Promise.all([
+  const [tasks, unread, stock, followUps] = await Promise.all([
     access.tasks !== "none"
       ? listTasks(brand.id, actor, { userId: user.id, assignee: "me", dueTo: today, limit: 200 }).then((r) => dueSummary(r, today)).catch(() => null)
       : null,
@@ -39,10 +40,11 @@ export default async function BrandHome({ params }: { params: Promise<{ slug: st
           return { low: t.low, out: t.out };
         }).catch(() => null)
       : null,
+    access.crm !== "none" ? countDue(brand.id, today).catch(() => null) : null,
   ]);
-  const counts = { tasks, unread, stock };
+  const counts = { tasks, unread, stock, followUps };
   const signals = buildSignals(base, counts);
-  const watching = tasks !== null || unread !== null || stock !== null;
+  const watching = tasks !== null || unread !== null || stock !== null || followUps !== null;
   const menus = visibleTabs(access).filter((k) => k !== "home");
   const dateLine = new Intl.DateTimeFormat("en-US", { weekday: "long", day: "numeric", month: "long", timeZone: tz }).format(new Date());
 
@@ -65,7 +67,7 @@ export default async function BrandHome({ params }: { params: Promise<{ slug: st
               </span>
               <div className="min-w-0">
                 <p className="text-body font-semibold text-ink-800">You&apos;re all caught up</p>
-                <p className="text-small text-ink-500">Nothing is late, unread or running low.</p>
+                <p className="text-small text-ink-500">Nothing is late, unread, due for a follow-up or running low.</p>
               </div>
             </div>
           ) : (

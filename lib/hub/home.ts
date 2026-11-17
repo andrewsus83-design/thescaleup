@@ -31,7 +31,9 @@ export type Signal = { key: string; menu: TabKey; title: string; detail?: string
 const n = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
 
 /** The cards for "Needs you". A null means the person cannot see that menu or the lookup failed, so nothing is said about it. */
-export function buildSignals(base: string, i: { tasks: { overdue: number; today: number } | null; unread: number | null; stock: { low: number; out: number } | null }): Signal[] {
+export type Counts = { tasks: { overdue: number; today: number } | null; unread: number | null; stock: { low: number; out: number } | null; followUps?: { lead: number; client: number } | null };
+
+export function buildSignals(base: string, i: Counts): Signal[] {
   const out: Signal[] = [];
   const t = i.tasks;
   if (t && (t.overdue > 0 || t.today > 0)) {
@@ -45,6 +47,16 @@ export function buildSignals(base: string, i: { tasks: { overdue: number; today:
   }
   if (i.unread && i.unread > 0) {
     out.push({ key: "mail", menu: "mail", title: `${n(i.unread, "unread email")}`, detail: "Waiting in Mail", href: `${base}/mail` });
+  }
+  const f = i.followUps;
+  if (f && f.lead + f.client > 0) {
+    out.push({
+      key: "crm",
+      menu: "crm",
+      title: `${n(f.lead + f.client, "person", "people")} to follow up`,
+      detail: f.lead > 0 && f.client > 0 ? `${n(f.lead, "lead")} and ${n(f.client, "client")}` : f.lead > 0 ? "Leads due today or late" : "Clients due today or late",
+      href: `${base}/crm${f.lead > 0 ? "" : "/clients"}?due=1`,
+    });
   }
   const s = i.stock;
   if (s && (s.out > 0 || s.low > 0)) {
@@ -60,9 +72,10 @@ export function buildSignals(base: string, i: { tasks: { overdue: number; today:
 }
 
 /** The short line under a menu tile ("3 late", "5 unread"), or undefined when there is nothing to say. */
-export function tileNote(menu: TabKey, i: { tasks: { overdue: number; today: number } | null; unread: number | null; stock: { low: number; out: number } | null }): string | undefined {
+export function tileNote(menu: TabKey, i: Counts): string | undefined {
   if (menu === "tasks" && i.tasks) return i.tasks.overdue > 0 ? `${i.tasks.overdue} late` : i.tasks.today > 0 ? `${i.tasks.today} due today` : undefined;
   if (menu === "mail" && i.unread) return `${i.unread} unread`;
+  if (menu === "crm" && i.followUps && i.followUps.lead + i.followUps.client > 0) return `${i.followUps.lead + i.followUps.client} to follow up`;
   if (menu === "products" && i.stock) return i.stock.out > 0 ? `${i.stock.out} out of stock` : i.stock.low > 0 ? `${i.stock.low} running low` : undefined;
   return undefined;
 }
