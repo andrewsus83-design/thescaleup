@@ -45,7 +45,7 @@ export default async function TaskPage({ params }: { params: Promise<{ slug: str
   const aiReady = canComment(who) && (await hasAiKey(brand.id));
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="w-full">
       <BackLink href={`/hub/b/${slug}/tasks`}>Tasks</BackLink>
 
       <header className="mb-8">

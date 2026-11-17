@@ -11,7 +11,7 @@ const roundBtn =
 export function HubBar({ email, isOwner, brandName }: { email: string; isOwner: boolean; brandName?: string }) {
   return (
     <header>
-      <div className="mx-auto flex h-20 w-full max-w-5xl items-center justify-between gap-3 px-6 sm:px-8">
+      <div className="mx-auto flex h-20 w-full items-center justify-between gap-3 px-6 sm:w-[90%] sm:px-0">
         <div className="flex min-w-0 items-center gap-3">
           {/* With a brand open the pill is the way back to all brands; the lockup would only repeat it on a phone. */}
           <Link href="/hub" aria-label="All brands" className={brandName ? "hidden shrink-0 lg:block" : "shrink-0"}>

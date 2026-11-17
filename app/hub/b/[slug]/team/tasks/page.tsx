@@ -42,7 +42,7 @@ export default async function TeamTasksPage({ params }: { params: Promise<{ slug
   const href = (assignee: string) => `/hub/b/${slug}/tasks?assignee=${assignee}`;
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div className="w-full">
       <BackLink href={`/hub/b/${slug}/team`}>Team</BackLink>
       <PageHeader title="Team tasks" description="Open work per person. Open a name to see the tasks." />
       {!members.length ? (

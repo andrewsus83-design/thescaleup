@@ -21,7 +21,7 @@ export function BrandSkeleton() {
   return (
     <>
       <div className="h-16 border-b border-ink-100 bg-paper-0" />
-      <main className="mx-auto w-full max-w-5xl px-5 pt-10 sm:px-8">
+      <main className="mx-auto w-full px-5 pt-10 sm:w-[90%] sm:px-0">
         <PageSkeleton />
       </main>
     </>
