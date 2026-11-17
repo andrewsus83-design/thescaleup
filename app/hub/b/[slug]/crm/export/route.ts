@@ -34,6 +34,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     due: sp.get("due") === "1",
     tag: parseTags(sp.get("tag") ?? "")[0] ?? "",
     importId: UUID.test(importId) ? importId : null,
+    contacts: true, // managers only, and managers always see contact details
   };
 
   const today = todayIn(hubTz());

@@ -6,7 +6,7 @@ import { labelOf, stageDef, stagesOf, type FollowState, type Kind, type StageDef
 export const crmBase = (slug: string) => `/hub/b/${slug}/crm`;
 export const listPath = (slug: string, kind: Kind) => (kind === "lead" ? crmBase(slug) : `${crmBase(slug)}/clients`);
 
-export type Section = "leads" | "clients" | "board" | "funnel" | "forms" | "setup" | "automations";
+export type Section = "leads" | "clients" | "board" | "funnel" | "forms" | "setup" | "automations" | "protection";
 
 const SECTIONS: { id: Section; label: string; path: string; manager?: boolean }[] = [
   { id: "leads", label: "Leads", path: "" },
@@ -16,6 +16,7 @@ const SECTIONS: { id: Section; label: string; path: string; manager?: boolean }[
   { id: "forms", label: "Forms", path: "/forms", manager: true },
   { id: "setup", label: "Setup", path: "/setup", manager: true },
   { id: "automations", label: "Automations", path: "/automations", manager: true },
+  { id: "protection", label: "Protection", path: "/protection", manager: true },
 ];
 
 /** The CRM's sections. Setup (stages and automations) is for managers. On a narrow phone the row scrolls sideways. */

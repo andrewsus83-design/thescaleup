@@ -1,5 +1,6 @@
 "use server";
 
+import { sealNote, sealSummary, trySeal } from "./crm/seal";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { accessFor } from "./access";
@@ -134,8 +135,13 @@ export async function syncCrm(brandId: string, itemId: string): Promise<Done> {
   const today = todayIn(hubTz());
   const next = followUpFor(item.findings, (person.next_follow_up as string | null) ?? null, today);
   const note = `Chat audit "${item.auditName}" (${PLATFORM_LABEL[item.platform]}${item.channel ? `, ${item.channel}` : ""}, ${item.metrics.from} to ${item.metrics.to}): ${item.findings.summary}${item.findings.next_step ? ` Next: ${item.findings.next_step}` : ""}`.slice(0, 2000);
+  const body = trySeal(() => sealNote(ctx.brandId, note));
+  if (!body.ok) {
+    await ctx.admin.from("chat_audit_links").delete().eq("item_id", item.id).eq("kind", "crm").eq("slot", "sync");
+    return fail(body.error);
+  }
   const [n, u] = await Promise.all([
-    ctx.admin.from("crm_notes").insert({ brand_id: ctx.brandId, person_id: item.person_id, body: note, author_id: ctx.user.id, author_label: ctx.user.email }),
+    ctx.admin.from("crm_notes").insert({ brand_id: ctx.brandId, person_id: item.person_id, body: body.value, author_id: ctx.user.id, author_label: ctx.user.email }),
     ctx.admin.from("crm_people").update({ updated_at: new Date().toISOString(), ...(next ? { next_follow_up: next } : {}) }).eq("brand_id", ctx.brandId).eq("id", item.person_id),
   ]);
   if (n.error || u.error) {
@@ -158,10 +164,12 @@ export async function makeLead(brandId: string, itemId: string): Promise<Done> {
   const source = item.channel || PLATFORM_LABEL[item.platform];
   const parsed = parsePerson((k) => ({ name: item.title, company: "", email: "", phone: "", source, value: "", next_follow_up: item.findings.follow_up_date ?? "", summary: `${item.findings.summary}\n\nFrom a chat audit ("${item.auditName}").`.slice(0, 2000) } as Record<string, string>)[k] ?? "");
   if (!parsed.ok) return fail(parsed.error);
+  const wrapped = trySeal(() => ({ ...parsed.value, summary: sealSummary(ctx.brandId, parsed.value.summary) }));
+  if (!wrapped.ok) return fail(wrapped.error);
   const claim = await ctx.admin.from("chat_audit_links").insert({ item_id: item.id, brand_id: ctx.brandId, kind: "lead", slot: "lead" });
   if (claim.error) return claim.error.code === "23505" ? { ok: true, message: "Already added as a lead." } : fail("Could not record it. Try again.");
   const stage = firstStage(await getStages(ctx.brandId), "lead");
-  const { data, error } = await ctx.admin.from("crm_people").insert({ brand_id: ctx.brandId, kind: "lead", stage, created_by: ctx.user.id, ...parsed.value }).select("id").single();
+  const { data, error } = await ctx.admin.from("crm_people").insert({ brand_id: ctx.brandId, kind: "lead", stage, created_by: ctx.user.id, ...wrapped.value }).select("id").single();
   if (error || !data) {
     console.error("[chat] lead failed:", error?.message);
     await ctx.admin.from("chat_audit_links").delete().eq("item_id", item.id).eq("kind", "lead");

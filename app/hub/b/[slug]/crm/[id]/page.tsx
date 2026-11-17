@@ -9,8 +9,9 @@ import { FollowChip, StageChip, listPath, shortDay, stamp } from "@/components/h
 import { requireFunction } from "@/lib/hub/access";
 import { convertToClient, deleteNote, setFollowUp, setStage } from "@/lib/hub/crm-actions";
 import { getPerson, getStages, listNotes } from "@/lib/hub/crm/data";
+import { maskContacts } from "@/lib/hub/crm/mask";
 import { followState, stagesOf } from "@/lib/hub/crm/model";
-import { atLeast } from "@/lib/hub/permissions";
+import { atLeast, canSeeContacts } from "@/lib/hub/permissions";
 import { canManageTeam } from "@/lib/hub/rules";
 import { UUID } from "@/lib/hub/tasks/context";
 import { hubTz, todayIn } from "@/lib/hub/tasks/dates";
@@ -24,8 +25,11 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
   const { slug, id } = await params;
   const { user, brand, actor, access } = await requireFunction(slug, "crm");
   if (!UUID.test(id)) notFound();
-  const person = await getPerson(brand.id, id);
-  if (!person) notFound();
+  const found = await getPerson(brand.id, id);
+  if (!found) notFound();
+  // Without the "Contact details" permission the person is shown with email and phone hidden. The full values never leave the server.
+  const reveal = canSeeContacts(access);
+  const person = reveal ? found : maskContacts(found);
   const [notes, stages] = await Promise.all([listNotes(brand.id, id), getStages(brand.id)]);
   const tz = hubTz();
   const today = todayIn(tz);
@@ -150,7 +154,7 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
             Details
           </h2>
           {canEdit ? (
-            <PersonForm brandId={brand.id} kind={person.kind} person={person} />
+            <PersonForm brandId={brand.id} kind={person.kind} person={person} contactsHidden={!reveal} />
           ) : (
             <dl className="grid gap-4 sm:grid-cols-2">
               {(

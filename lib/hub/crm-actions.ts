@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { accessFor } from "./access";
 import type { FormState } from "./actions";
 import { NO_FILTER, countInStage, findIds, getRules, getStages, type PeopleFilter } from "./crm/data";
 import { logStage, runRules } from "./crm/flow";
@@ -9,7 +10,8 @@ import { cleanImportRows, type ImportChunkResult } from "./crm/import";
 import { BULK_OPS, type BulkInput, type BulkResult } from "./crm/bulk";
 import { firstStage, followUpIn, isKind, isStageFor, parseNote, parsePerson, parseRulesInput, parseStagesInput, parseTags, pruneRules } from "./crm/model";
 import { searchTerm } from "./mail/model";
-import { atLeast } from "./permissions";
+import { sealNote, sealSummary, trySeal } from "./crm/seal";
+import { atLeast, canSeeContacts } from "./permissions";
 import { allow } from "./ratelimit";
 import { canManageTeam } from "./rules";
 import { audit } from "./session";
@@ -35,10 +37,19 @@ export async function savePerson(_prev: FormState, fd: FormData): Promise<FormSt
   const parsed = parsePerson((k) => str(fd, k));
   if (!parsed.ok) return { error: parsed.error };
   const id = str(fd, "id");
+  const wrapped = trySeal(() => ({ ...parsed.value, summary: sealSummary(ctx.brandId, parsed.value.summary) }));
+  if (!wrapped.ok) return { error: wrapped.error };
 
   if (id) {
     if (!UUID.test(id)) return { error: "That person no longer exists." };
-    const { data, error } = await ctx.admin.from("crm_people").update(parsed.value).eq("brand_id", ctx.brandId).eq("id", id).select("id").maybeSingle();
+    // Someone who cannot see contact details never sent them (the form shows them hidden), so their save leaves the stored ones alone.
+    const reveal = canSeeContacts(await accessFor(ctx.brandId, ctx.actor));
+    const patch: Record<string, unknown> = { ...wrapped.value };
+    if (!reveal) {
+      delete patch.email;
+      delete patch.phone;
+    }
+    const { data, error } = await ctx.admin.from("crm_people").update(patch).eq("brand_id", ctx.brandId).eq("id", id).select("id").maybeSingle();
     if (error) {
       console.error("[crm] save failed:", error.message);
       return { error: "Could not save. Try again." };
@@ -55,7 +66,7 @@ export async function savePerson(_prev: FormState, fd: FormData): Promise<FormSt
   const start = firstStage(await getStages(ctx.brandId), kind);
   const { data, error } = await ctx.admin
     .from("crm_people")
-    .insert({ brand_id: ctx.brandId, kind, stage: start, created_by: ctx.user.id, ...parsed.value })
+    .insert({ brand_id: ctx.brandId, kind, stage: start, created_by: ctx.user.id, ...wrapped.value })
     .select("id")
     .single();
   if (error) {
@@ -144,7 +155,9 @@ export async function addNote(_prev: FormState, fd: FormData): Promise<FormState
   if (!allow(`crm-note:${ctx.user.id}`, 400)) return { error: "That is a lot of notes in an hour. Try again a bit later." };
   const { data: person } = await ctx.admin.from("crm_people").select("id").eq("brand_id", ctx.brandId).eq("id", id).maybeSingle();
   if (!person) return { error: "That person no longer exists." };
-  const { error } = await ctx.admin.from("crm_notes").insert({ brand_id: ctx.brandId, person_id: id, body: note.value, author_id: ctx.user.id, author_label: ctx.user.email });
+  const body = trySeal(() => sealNote(ctx.brandId, note.value));
+  if (!body.ok) return { error: body.error };
+  const { error } = await ctx.admin.from("crm_notes").insert({ brand_id: ctx.brandId, person_id: id, body: body.value, author_id: ctx.user.id, author_label: ctx.user.email });
   if (error) {
     console.error("[crm] note failed:", error.message);
     return { error: "Could not add the note. Try again." };
@@ -266,9 +279,10 @@ export async function importPeopleChunk(input: { brandId: string; importId: stri
   // A stage the brand no longer has falls back to where new people start.
   const stages = await getStages(ctx.brandId);
   const start = firstStage(stages, kind);
-  const prepared = rows.map((r) => ({ ...r, stage: isStageFor(stages, kind, r.stage) ? r.stage : start }));
+  const prepared = trySeal(() => rows.map((r) => ({ ...r, summary: sealSummary(ctx.brandId, r.summary), stage: isStageFor(stages, kind, r.stage) ? r.stage : start })));
+  if (!prepared.ok) return { ok: false, error: prepared.error };
   const tags = Array.isArray(imp.tags) ? (imp.tags as unknown[]).filter((t): t is string => typeof t === "string") : [];
-  const { data, error } = await ctx.admin.rpc("crm_import_chunk", { p_brand: ctx.brandId, p_kind: kind, p_by: ctx.user.id, p_rows: prepared, p_import: input.importId, p_tags: tags });
+  const { data, error } = await ctx.admin.rpc("crm_import_chunk", { p_brand: ctx.brandId, p_kind: kind, p_by: ctx.user.id, p_rows: prepared.value, p_import: input.importId, p_tags: tags });
   if (error) {
     console.error("[crm] import chunk failed:", error.code, error.message);
     return { ok: false, error: sqlMissing(error.code) ? MISSING_SQL : "Could not save these rows. Nothing from this batch was kept; try again." };
@@ -342,7 +356,7 @@ export async function bulkPeople(input: BulkInput): Promise<BulkResult> {
   // Who it applies to.
   let ids: string[];
   if (input.all) {
-    const f = readFilter(input.all);
+    const f = readFilter(input.all, canSeeContacts(await accessFor(ctx.brandId, ctx.actor)));
     if (!f.ok) return { ok: false, error: f.error };
     ids = await findIds(ctx.brandId, kind, f.value, todayIn(hubTz()));
   } else {
@@ -366,12 +380,12 @@ export async function bulkPeople(input: BulkInput): Promise<BulkResult> {
   return { ok: true, changed };
 }
 
-/** The list's search and filters as the browser sent them, made safe. */
-function readFilter(raw: unknown): { ok: true; value: PeopleFilter } | { ok: false; error: string } {
+/** The list's search and filters as the browser sent them, made safe. Whether the search may look inside email and phone follows the person's access, never the browser. */
+function readFilter(raw: unknown, contacts: boolean): { ok: true; value: PeopleFilter } | { ok: false; error: string } {
   if (typeof raw !== "object" || raw === null) return { ok: false, error: "The selection could not be read. Reload the page and try again." };
   const o = raw as Record<string, unknown>;
   const stage = typeof o.stage === "string" ? o.stage : "";
   if (stage && stage !== "open" && !/^[a-z0-9][a-z0-9_-]{0,39}$/.test(stage)) return { ok: false, error: "The selection could not be read. Reload the page and try again." };
   const importId = typeof o.importId === "string" && UUID.test(o.importId) ? o.importId : null;
-  return { ok: true, value: { ...NO_FILTER, q: searchTerm(o.q), stage, due: o.due === true, tag: typeof o.tag === "string" ? (parseTags(o.tag)[0] ?? "") : "", importId } };
+  return { ok: true, value: { ...NO_FILTER, q: searchTerm(o.q), stage, due: o.due === true, tag: typeof o.tag === "string" ? (parseTags(o.tag)[0] ?? "") : "", importId, contacts } };
 }

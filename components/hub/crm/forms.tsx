@@ -26,7 +26,7 @@ function Messages({ state }: { state: FormState }) {
 }
 
 /** Adds a lead or client (no `person`) or edits one. Uncontrolled fields: a failed save keeps what was typed because the form is not reset. */
-export function PersonForm({ brandId, kind, person }: { brandId: string; kind: Kind; person?: Person }) {
+export function PersonForm({ brandId, kind, person, contactsHidden = false }: { brandId: string; kind: Kind; person?: Person; contactsHidden?: boolean }) {
   const [state, action, pending] = useActionState<FormState, FormData>(savePerson, {});
   const who = kind === "lead" ? "lead" : "client";
   return (
@@ -34,6 +34,11 @@ export function PersonForm({ brandId, kind, person }: { brandId: string; kind: K
       <input type="hidden" name="brandId" value={brandId} />
       {person ? <input type="hidden" name="id" value={person.id} /> : <input type="hidden" name="kind" value={kind} />}
       <Messages state={state} />
+      {contactsHidden && (
+        <p id="c-hidden" className="text-small text-ink-500">
+          Email and phone are hidden for your role, so they stay as they are when you save. Ask a manager if you need to see them.
+        </p>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="c-name" className={labelCls}>
@@ -51,13 +56,21 @@ export function PersonForm({ brandId, kind, person }: { brandId: string; kind: K
           <label htmlFor="c-email" className={labelCls}>
             Email
           </label>
-          <input id="c-email" name="email" type="email" defaultValue={person?.email} maxLength={LIMITS.email} autoComplete="off" className={inputCls} />
+          {contactsHidden ? (
+            <input id="c-email" type="text" value={person?.email ?? ""} readOnly aria-describedby="c-hidden" className={`${inputCls} text-ink-500`} />
+          ) : (
+            <input id="c-email" name="email" type="email" defaultValue={person?.email} maxLength={LIMITS.email} autoComplete="off" className={inputCls} />
+          )}
         </div>
         <div>
           <label htmlFor="c-phone" className={labelCls}>
             Phone or WhatsApp
           </label>
-          <input id="c-phone" name="phone" type="tel" defaultValue={person?.phone} maxLength={LIMITS.phone} autoComplete="off" className={inputCls} />
+          {contactsHidden ? (
+            <input id="c-phone" type="text" value={person?.phone ?? ""} readOnly aria-describedby="c-hidden" className={`${inputCls} text-ink-500`} />
+          ) : (
+            <input id="c-phone" name="phone" type="tel" defaultValue={person?.phone} maxLength={LIMITS.phone} autoComplete="off" className={inputCls} />
+          )}
         </div>
         <div>
           <label htmlFor="c-source" className={labelCls}>

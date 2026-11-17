@@ -8,7 +8,7 @@ export const LEVELS = ["none", "view", "edit"] as const;
 export type Level = (typeof LEVELS)[number];
 export const LEVEL_LABEL: Record<Level, string> = { none: "No access", view: "Can view", edit: "Can edit" };
 
-export const FUNCTIONS = ["brand", "tasks", "inbox", "mail", "social", "ads", "content", "crm", "wiki", "assets", "team", "payroll", "finance", "products"] as const;
+export const FUNCTIONS = ["brand", "tasks", "inbox", "mail", "social", "ads", "content", "crm", "wiki", "assets", "team", "payroll", "finance", "products", "contacts"] as const;
 export type Fn = (typeof FUNCTIONS)[number];
 
 export const FUNCTION_INFO: Record<Fn, { label: string; hint: string }> = {
@@ -26,6 +26,7 @@ export const FUNCTION_INFO: Record<Fn, { label: string; hint: string }> = {
   payroll: { label: "Salary and payroll", hint: "Sensitive: pay and payslips" },
   finance: { label: "Finance", hint: "Accounting and management" },
   products: { label: "Products", hint: "What the brand sells: SKU, price, stock" },
+  contacts: { label: "Contact details", hint: "Full email and phone of leads and clients. Without it they show hidden, and the CRM search ignores them" },
 };
 
 /** The roles whose access can be changed. The founder is always full, so there is nothing to set. */
@@ -41,9 +42,9 @@ export const isLevel = (v: unknown): v is Level => typeof v === "string" && (LEV
 export type Access = Record<Fn, Level>;
 
 export const DEFAULTS: Record<ConfigurableRole, Access> = {
-  staff: { brand: "edit", tasks: "edit", inbox: "edit", mail: "edit", social: "edit", ads: "none", content: "edit", crm: "edit", wiki: "edit", assets: "edit", team: "view", payroll: "none", finance: "none", products: "edit" },
-  ops: { brand: "view", tasks: "edit", inbox: "edit", mail: "edit", social: "view", ads: "view", content: "view", crm: "view", wiki: "view", assets: "edit", team: "view", payroll: "none", finance: "none", products: "view" },
-  viewer: { brand: "view", tasks: "view", inbox: "none", mail: "none", social: "view", ads: "none", content: "none", crm: "none", wiki: "none", assets: "view", team: "none", payroll: "none", finance: "none", products: "view" },
+  staff: { brand: "edit", tasks: "edit", inbox: "edit", mail: "edit", social: "edit", ads: "none", content: "edit", crm: "edit", wiki: "edit", assets: "edit", team: "view", payroll: "none", finance: "none", products: "edit", contacts: "view" },
+  ops: { brand: "view", tasks: "edit", inbox: "edit", mail: "edit", social: "view", ads: "view", content: "view", crm: "view", wiki: "view", assets: "edit", team: "view", payroll: "none", finance: "none", products: "view", contacts: "none" },
+  viewer: { brand: "view", tasks: "view", inbox: "none", mail: "none", social: "view", ads: "none", content: "none", crm: "none", wiki: "none", assets: "view", team: "none", payroll: "none", finance: "none", products: "view", contacts: "none" },
 };
 
 export const FULL: Access = Object.fromEntries(FUNCTIONS.map((f) => [f, "edit"])) as Access;
@@ -86,3 +87,6 @@ export function parseLevels(get: (name: string) => string | null): Access | null
   }
   return out;
 }
+
+/** Whether this role sees leads' and clients' full email and phone (the rest of the CRM does not depend on it). */
+export const canSeeContacts = (access: Access): boolean => atLeast(access.contacts, "view");
