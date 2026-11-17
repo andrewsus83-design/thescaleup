@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, KanbanSquare, List, Search } from "lucide-react";
+import { CalendarDays, KanbanSquare, List, Repeat, Search } from "lucide-react";
 import { segItem, segWrap } from "@/components/brand/styles";
 import type { Member, Priority, WorkflowStatus } from "@/lib/hub/tasks/model";
 import { PRIORITIES, PRIORITY_LABEL } from "@/lib/hub/tasks/model";
@@ -23,18 +23,26 @@ const VIEWS: { key: View; label: string; icon: typeof List }[] = [
   { key: "calendar", label: "Calendar", icon: CalendarDays },
 ];
 
-export function Toolbar({ slug, query, members, statuses }: { slug: string; query: Query; members: Member[]; statuses: WorkflowStatus[] }) {
+export function Toolbar({ slug, query, members, statuses, repeats }: { slug: string; query: Query; members: Member[]; statuses: WorkflowStatus[]; /** Show the link to the repeating tasks page. */ repeats?: boolean }) {
   const { v, ...rest } = query;
   return (
     <div className="mb-6 space-y-4">
-      <nav aria-label="Task views" className={cn(segWrap, "max-w-full")}>
-        {VIEWS.map(({ key, label, icon: Icon }) => (
-          <Link key={key} href={tasksHref(slug, { ...rest, v: key })} aria-current={v === key ? "page" : undefined} className={cn(segItem(v === key), "gap-2")}>
-            <Icon className="size-4" aria-hidden />
-            {label}
+      <div className="flex flex-wrap items-center gap-3">
+        <nav aria-label="Task views" className={cn(segWrap, "max-w-full")}>
+          {VIEWS.map(({ key, label, icon: Icon }) => (
+            <Link key={key} href={tasksHref(slug, { ...rest, v: key })} aria-current={v === key ? "page" : undefined} className={cn(segItem(v === key), "gap-2")}>
+              <Icon className="size-4" aria-hidden />
+              {label}
+            </Link>
+          ))}
+        </nav>
+        {repeats && (
+          <Link href={`/hub/b/${slug}/tasks/repeat`} className="hit-44 inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-small font-semibold text-brand-700 hover:bg-paper-100">
+            <Repeat className="size-4" aria-hidden />
+            Repeating tasks
           </Link>
-        ))}
-      </nav>
+        )}
+      </div>
 
       {/* A plain GET form: the filters live in the URL, so a view can be bookmarked or sent to someone. */}
       <form method="get" className="flex flex-wrap items-center gap-2" role="search">
