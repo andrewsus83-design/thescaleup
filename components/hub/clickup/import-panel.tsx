@@ -6,12 +6,12 @@ import { Loader2 } from "lucide-react";
 import { Alert, Btn } from "@/components/brand/primitives";
 import { labelCls } from "@/components/brand/styles";
 import { compactField } from "@/components/hub/tasks/parts";
-import { importDocs, importTasks, scanClickUp } from "@/lib/hub/clickup-actions";
-import type { Scan } from "@/lib/hub/clickup/model";
+import { importDocs, importList, scanClickUp } from "@/lib/hub/clickup-actions";
+import { DESTINATIONS, DESTINATION_LABEL, isDestination, suggestDestination, type Destination, type Scan } from "@/lib/hub/clickup/model";
 import { cn } from "@/lib/utils";
 
-type Totals = { pages: number; tasks: number; skipped: number; empty: number; refused: { name: string; reason: string }[] };
-const ZERO: Totals = { pages: 0, tasks: 0, skipped: 0, empty: 0, refused: [] };
+type Totals = { pages: number; tasks: number; leads: number; content: number; skipped: number; empty: number; unreadable: number; refused: { name: string; reason: string }[] };
+const ZERO: Totals = { pages: 0, tasks: 0, leads: 0, content: 0, skipped: 0, empty: 0, unreadable: 0, refused: [] };
 const DOC_BATCH = 3;
 const MAX_TASK_PAGES = 100; // 100 tasks a page: 10,000 tasks per list is the most one run will walk
 
@@ -25,7 +25,7 @@ export function ImportPanel({ brandId, slug, hasToken }: { brandId: string; slug
   const [done, setDone] = useState<Totals | null>(null);
   const [withDocs, setWithDocs] = useState(true);
   const [withClosed, setWithClosed] = useState(true);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [dest, setDest] = useState<Record<string, Destination>>({});
   const stop = useRef(false);
 
   async function read(workspaceId?: string) {
@@ -36,7 +36,7 @@ export function ImportPanel({ brandId, slug, hasToken }: { brandId: string; slug
     setScanning(false);
     if (!r.ok) return setError(r.error);
     setScan(r);
-    setPicked(new Set(r.lists.map((l) => l.id)));
+    setDest(Object.fromEntries(r.lists.map((l) => [l.id, suggestDestination(l.name, l.where)])));
   }
 
   async function run() {
@@ -65,19 +65,23 @@ export function ImportPanel({ brandId, slug, hasToken }: { brandId: string; slug
         t.refused.push(...r.refused);
       }
     }
-    const lists = scan.lists.filter((l) => picked.has(l.id));
+    const lists = scan.lists.filter((l) => (dest[l.id] ?? "skip") !== "skip");
     for (let n = 0; n < lists.length && !stop.current; n++) {
       const l = lists[n];
+      const to = dest[l.id];
       for (let page = 0; page < MAX_TASK_PAGES && !stop.current; page++) {
-        setStatus(`Tasks: list ${n + 1} of ${lists.length}, “${l.name}”, page ${page + 1}`);
-        const r = await importTasks(brandId, l.id, l.name, page, withClosed);
+        setStatus(`${DESTINATION_LABEL[to]}: list ${n + 1} of ${lists.length}, “${l.name}”, page ${page + 1}`);
+        const r = await importList(brandId, l.id, l.name, page, withClosed, to);
         if (!r.ok) {
           setRunning(false);
           setStatus("");
           return fail(r.error);
         }
-        t.tasks += r.imported;
+        if (to === "tasks") t.tasks += r.imported;
+        else if (to === "leads") t.leads += r.imported;
+        else t.content += r.imported;
         t.skipped += r.skipped;
+        t.unreadable += r.refused;
         if (r.last) break;
       }
     }
@@ -87,15 +91,10 @@ export function ImportPanel({ brandId, slug, hasToken }: { brandId: string; slug
     if (stop.current) setError("Stopped. What was imported so far is kept.");
   }
 
-  const toggle = (id: string) =>
-    setPicked((p) => {
-      const n = new Set(p);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
-  const listed = scan ? scan.lists.filter((l) => picked.has(l.id)).reduce((s, l) => s + l.tasks, 0) : 0;
-  const nothing = !scan || (!withDocs && picked.size === 0);
+  const setAll = (to: Destination) => scan && setDest(Object.fromEntries(scan.lists.map((l) => [l.id, to])));
+  const chosen = scan ? scan.lists.filter((l) => (dest[l.id] ?? "skip") !== "skip") : [];
+  const listed = chosen.reduce((sum, l) => sum + l.tasks, 0);
+  const nothing = !scan || (!withDocs && chosen.length === 0);
 
   return (
     <div className="space-y-6">
@@ -167,29 +166,44 @@ export function ImportPanel({ brandId, slug, hasToken }: { brandId: string; slug
           <fieldset>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <legend className={labelCls}>
-                Lists to Tasks ({picked.size} of {scan.lists.length}
-                {listed > 0 ? `, about ${listed.toLocaleString("en-US")} tasks` : ""})
+                Where each list goes ({chosen.length} of {scan.lists.length}
+                {listed > 0 ? `, about ${listed.toLocaleString("en-US")} items` : ""})
               </legend>
-              <div className="flex gap-2">
-                <Btn size="sm" onClick={() => setPicked(new Set(scan.lists.map((l) => l.id)))} disabled={running}>
-                  All
+              <div className="flex flex-wrap gap-2">
+                <Btn size="sm" onClick={() => setAll("tasks")} disabled={running}>
+                  All to Tasks
                 </Btn>
-                <Btn size="sm" onClick={() => setPicked(new Set())} disabled={running}>
-                  None
+                <Btn size="sm" onClick={() => setAll("skip")} disabled={running}>
+                  Skip all
                 </Btn>
               </div>
             </div>
-            <ul className="max-h-80 divide-y divide-ink-100 overflow-y-auto rounded-xl border border-ink-100">
+            <p className="mb-2 text-small text-ink-500">
+              Suggested from each list&apos;s name; change any of them. CRM leads get their email, phone and follow-up date when ClickUp has them, and nothing from the funnel automations runs. A finished item whose status says it was won becomes a client.
+            </p>
+            <ul className="max-h-96 divide-y divide-ink-100 overflow-y-auto rounded-xl border border-ink-100">
               {scan.lists.map((l) => (
-                <li key={l.id}>
-                  <label className="flex items-center gap-3 px-3 py-2 text-body text-ink-800">
-                    <input type="checkbox" className="size-4" checked={picked.has(l.id)} onChange={() => toggle(l.id)} disabled={running} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate">{l.name}</span>
-                      <span className="block truncate text-caption text-ink-500">{l.where}</span>
+                <li key={l.id} className="flex items-center gap-3 px-3 py-2">
+                  <label htmlFor={`dest-${l.id}`} className="min-w-0 flex-1 text-body text-ink-800">
+                    <span className="block truncate">{l.name}</span>
+                    <span className="block truncate text-caption text-ink-500">
+                      {l.where}
+                      {l.tasks > 0 ? ` · ${l.tasks.toLocaleString("en-US")} items` : ""}
                     </span>
-                    {l.tasks > 0 && <span className="text-small text-ink-500">{l.tasks.toLocaleString("en-US")}</span>}
                   </label>
+                  <select
+                    id={`dest-${l.id}`}
+                    value={dest[l.id] ?? "skip"}
+                    onChange={(e) => isDestination(e.target.value) && setDest((d) => ({ ...d, [l.id]: e.target.value as Destination }))}
+                    disabled={running}
+                    className={cn(compactField, "h-10 w-36 shrink-0")}
+                  >
+                    {DESTINATIONS.map((d) => (
+                      <option key={d} value={d}>
+                        {DESTINATION_LABEL[d]}
+                      </option>
+                    ))}
+                  </select>
                 </li>
               ))}
               {scan.lists.length === 0 && <li className="px-3 py-4 text-small text-ink-500">This token sees no lists.</li>}
@@ -222,8 +236,9 @@ export function ImportPanel({ brandId, slug, hasToken }: { brandId: string; slug
       {done && (
         <Alert tone={done.refused.length ? "warn" : "ok"} role="status">
           <p>
-            Brought over {done.pages} Wiki pages and {done.tasks} tasks. Skipped {done.skipped} that were already here
-            {done.empty ? `, and ${done.empty} empty pages` : ""}.
+            Brought over {done.pages} Wiki pages, {done.tasks} tasks, {done.leads} CRM leads and {done.content} content pieces. Skipped {done.skipped} that were already here
+            {done.empty ? `, and ${done.empty} empty pages` : ""}
+            {done.unreadable ? `. ${done.unreadable} items could not be read and were left out` : ""}.
           </p>
           {done.refused.length > 0 && (
             <div className="mt-2">
@@ -244,6 +259,14 @@ export function ImportPanel({ brandId, slug, hasToken }: { brandId: string; slug
             {" · "}
             <Link href={`/hub/b/${slug}/tasks`} className="underline">
               Open Tasks
+            </Link>
+            {" · "}
+            <Link href={`/hub/b/${slug}/crm`} className="underline">
+              Open CRM
+            </Link>
+            {" · "}
+            <Link href={`/hub/b/${slug}/content`} className="underline">
+              Open Content
             </Link>
           </p>
         </Alert>

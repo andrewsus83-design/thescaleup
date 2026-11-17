@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { getDocPages, getListTasks, listDocs, listSpaceLists, listSpaces, listWorkspaces } from "./clickup/api";
 import { insertPages } from "./clickup/insert";
-import { docWhere, idOf, planDoc, readDocRefs, shapeDoc, toTaskRow, type DocsDone, type Failure, type Scan, type TasksDone } from "./clickup/model";
+import { docWhere, idOf, isDestination, planDoc, readDocRefs, shapeDoc, toContentRow, toLeadRow, toTaskRow, type DocsDone, type Failure, type Scan, type TasksDone } from "./clickup/model";
+import { getStages } from "./crm/data";
 import { allow } from "./ratelimit";
 import { canManageTeam } from "./rules";
 import { getBrandKey } from "./secrets";
@@ -33,15 +34,19 @@ async function importContext(brandId: unknown): Promise<{ ok: true; ctx: Ctx; to
 
 const refresh = (slug: string) => revalidatePath(`/hub/b/${slug}`, "layout");
 
-/** Which of these outside ids were already brought over. Null when the table is not there yet. */
-async function known(ctx: Ctx, kind: "doc_page" | "task", ids: string[]): Promise<Map<string, string | null> | null> {
+type RefKind = "doc_page" | "task" | "lead" | "content";
+const REF_COLUMN: Record<RefKind, "page_id" | "task_id" | "person_id" | "content_id"> = { doc_page: "page_id", task: "task_id", lead: "person_id", content: "content_id" };
+
+/** Which of these outside ids were already brought over, and the id of what they became. Null when the table is not there yet. */
+async function known(ctx: Ctx, kind: RefKind, ids: string[]): Promise<Map<string, string | null> | null> {
   if (!ids.length) return new Map();
-  const { data, error } = await ctx.admin.from("import_refs").select("external_id, page_id, task_id").eq("brand_id", ctx.brandId).eq("source", "clickup").eq("kind", kind).in("external_id", ids);
+  const col = REF_COLUMN[kind];
+  const { data, error } = await ctx.admin.from("import_refs").select(`external_id, ${col}`).eq("brand_id", ctx.brandId).eq("source", "clickup").eq("kind", kind).in("external_id", ids);
   if (error) {
     console.error("[clickup] import_refs not ready:", error.message);
     return null;
   }
-  return new Map((data ?? []).map((r) => [r.external_id as string, ((kind === "doc_page" ? r.page_id : r.task_id) as string | null) ?? null]));
+  return new Map((data ?? []).map((r) => [(r as unknown as Record<string, string>).external_id, ((r as unknown as Record<string, string | null>)[col]) ?? null]));
 }
 
 // ---------------------------------------------------------------------------------------------- scan
@@ -75,9 +80,10 @@ export async function scanClickUp(brandId: string, workspaceId?: string): Promis
   const docs = await listDocs(token, workspace.id);
   if (!docs.ok) return docs;
 
-  const [pages, tasks] = await Promise.all(
-    (["doc_page", "task"] as const).map((kind) => ctx.admin.from("import_refs").select("external_id", { count: "exact", head: true }).eq("brand_id", ctx.brandId).eq("source", "clickup").eq("kind", kind)),
-  );
+  const [pages, tasks] = await Promise.all([
+    ctx.admin.from("import_refs").select("external_id", { count: "exact", head: true }).eq("brand_id", ctx.brandId).eq("source", "clickup").eq("kind", "doc_page"),
+    ctx.admin.from("import_refs").select("external_id", { count: "exact", head: true }).eq("brand_id", ctx.brandId).eq("source", "clickup").in("kind", ["task", "lead", "content"]),
+  ]);
   await audit({ actor: ctx.user, brandId: ctx.brandId, action: "import.clickup.scan", target: workspace.name.slice(0, 80), meta: { lists: lists.length, docs: docs.data.docs.length } });
   return {
     ok: true,
@@ -136,54 +142,86 @@ export async function importDocs(brandId: string, workspaceId: string, rawDocs: 
   return out;
 }
 
-// ---------------------------------------------------------------------------------------------- tasks → Tasks
+// ---------------------------------------------------------------------------------------------- lists → Tasks, CRM or Content
 /**
- * Brings one page (up to 100) of a list's tasks over. Each becomes a task in the status of this brand's workflow that matches
- * its stage (done → closed, review-like → review, the rest → active), approved by whoever ran the import. People are matched
- * to this brand's team by email; the others are named in the description. `last` tells the caller to stop asking for pages.
+ * Brings one page (up to 100) of a list over, to where the person sent that list.
+ *  - Tasks: each task goes into the brand's workflow status that matches its stage (done → closed, review-like → review, the
+ *    rest → active), approved by whoever ran the import. People are matched to the team by email; the others are named in the
+ *    description.
+ *  - CRM leads: each becomes a lead in the first stage (a won, finished one becomes a client). Nothing from the funnel
+ *    automations runs: an import must not create a task for every lead.
+ *  - Content plan: each becomes a piece, planned for its due date.
+ * `last` tells the caller to stop asking for pages.
  */
-export async function importTasks(brandId: string, listId: string, listName: string, page: number, includeClosed: boolean): Promise<TasksDone | Failure> {
+export async function importList(brandId: string, listId: string, listName: string, page: number, includeClosed: boolean, destination: string): Promise<TasksDone | Failure> {
   const c = await importContext(brandId);
   if (!c.ok) return c;
   const { ctx, token } = c;
   const list = idOf(listId);
-  if (!list) return { ok: false, error: "Nothing to import." };
+  if (!list || !isDestination(destination) || destination === "skip") return { ok: false, error: "Nothing to import." };
   if (!allow(`clickup-tasks:${ctx.brandId}`, 600)) return { ok: false, error: "That is a lot of importing in an hour. Try again later." };
 
   const got = await getListTasks(token, list, Number.isInteger(page) ? page : 0, includeClosed === true);
   if (!got.ok) return got;
   const { tasks, last } = got.data;
-  const have = await known(ctx, "task", tasks.map((t) => t.id));
+  const refKind: RefKind = destination === "leads" ? "lead" : destination === "content" ? "content" : "task";
+  const have = await known(ctx, refKind, tasks.map((t) => t.id));
   if (!have) return { ok: false, error: NOT_READY };
   const fresh = tasks.filter((t) => !have.has(t.id));
-  if (!fresh.length) return { ok: true, imported: 0, skipped: tasks.length, last };
+  if (!fresh.length) return { ok: true, imported: 0, skipped: tasks.length, refused: 0, last };
 
-  const [workflow, members] = await Promise.all([getWorkflow(ctx.brandId), listMembers(ctx.brandId)]);
-  const fallback = startStatus(workflow, ctx.actor)?.status ?? null;
-  const statusOf = (stage: "active" | "review" | "closed") => statusForStage(workflow, stage) ?? statusForStage(workflow, "active") ?? fallback;
-  if (!statusOf("active")) return { ok: false, error: "This brand's workflow has no status to put tasks in. Check Settings." };
-  const emails = new Map(members.map((m) => [m.email.toLowerCase(), m.userId] as const));
   const tz = hubTz();
   const name = listName.replace(/\s+/g, " ").trim().slice(0, 120) || "ClickUp";
   const now = new Date().toISOString();
+  const rows: { id: string; ext: string; row: Record<string, unknown> }[] = [];
+  let refused = 0;
 
-  const rows = fresh.map((t) => {
-    const row = toTaskRow(t, { tz, listName: name, emails });
-    const { stage, ...rest } = row; // the database copies the stage from the status; it is never sent
-    return { id: randomUUID(), ext: t.id, row: { ...rest, brand_id: ctx.brandId, status: statusOf(stage), source: "import", created_by: ctx.user.id, approved_by: ctx.user.id, approved_at: now } };
-  });
-  const ins = await ctx.admin.from("tasks").insert(rows.map((r) => ({ ...r.row, id: r.id })));
+  if (destination === "tasks") {
+    const [workflow, members] = await Promise.all([getWorkflow(ctx.brandId), listMembers(ctx.brandId)]);
+    const fallback = startStatus(workflow, ctx.actor)?.status ?? null;
+    const statusOf = (stage: "active" | "review" | "closed") => statusForStage(workflow, stage) ?? statusForStage(workflow, "active") ?? fallback;
+    if (!statusOf("active")) return { ok: false, error: "This brand's workflow has no status to put tasks in. Check Settings." };
+    const emails = new Map(members.map((m) => [m.email.toLowerCase(), m.userId] as const));
+    for (const t of fresh) {
+      const { stage, ...rest } = toTaskRow(t, { tz, listName: name, emails }); // the database copies the stage from the status; it is never sent
+      rows.push({ id: randomUUID(), ext: t.id, row: { ...rest, brand_id: ctx.brandId, status: statusOf(stage), source: "import", created_by: ctx.user.id, approved_by: ctx.user.id, approved_at: now } });
+    }
+  } else if (destination === "leads") {
+    const stages = await getStages(ctx.brandId);
+    for (const t of fresh) {
+      const r = toLeadRow(t, { tz, listName: name, stages });
+      if (!r.ok) {
+        refused++;
+        continue;
+      }
+      rows.push({ id: randomUUID(), ext: t.id, row: { ...r.value, brand_id: ctx.brandId, created_by: ctx.user.id, converted_at: r.value.kind === "client" ? now : null } });
+    }
+  } else {
+    for (const t of fresh) {
+      const r = toContentRow(t, { tz, listName: name });
+      if (!r.ok) {
+        refused++;
+        continue;
+      }
+      rows.push({ id: randomUUID(), ext: t.id, row: { ...r.value, brand_id: ctx.brandId, source: "manual", created_by: ctx.user.id } });
+    }
+  }
+  if (!rows.length) return { ok: true, imported: 0, skipped: tasks.length - refused, refused, last };
+
+  const table = destination === "leads" ? "crm_people" : destination === "content" ? "content_items" : "tasks";
+  const ins = await ctx.admin.from(table).insert(rows.map((r) => ({ ...r.row, id: r.id })));
   if (ins.error) {
-    console.error("[clickup] task insert failed:", ins.error.message);
-    return { ok: false, error: "Could not save the tasks. Try again." };
+    console.error(`[clickup] ${table} insert failed:`, ins.error.message);
+    return { ok: false, error: "Could not save them. Try again." };
   }
-  const refs = await ctx.admin.from("import_refs").insert(rows.map((r) => ({ brand_id: ctx.brandId, source: "clickup", kind: "task", external_id: r.ext, task_id: r.id })));
+  const col = REF_COLUMN[refKind];
+  const refs = await ctx.admin.from("import_refs").insert(rows.map((r) => ({ brand_id: ctx.brandId, source: "clickup", kind: refKind, external_id: r.ext, [col]: r.id })));
   if (refs.error) {
-    console.error("[clickup] task refs insert failed:", refs.error.message);
-    await ctx.admin.from("tasks").delete().eq("brand_id", ctx.brandId).in("id", rows.map((r) => r.id)); // undo, so a retry does not make copies
-    return { ok: false, error: "Could not record what was imported. Nothing was kept for this page of tasks. Try again." };
+    console.error("[clickup] refs insert failed:", refs.error.message);
+    await ctx.admin.from(table).delete().eq("brand_id", ctx.brandId).in("id", rows.map((r) => r.id)); // undo, so a retry does not make copies
+    return { ok: false, error: "Could not record what was imported. Nothing was kept for this page. Try again." };
   }
-  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "import.clickup.tasks", target: name.slice(0, 80), meta: { imported: rows.length, skipped: tasks.length - rows.length } });
+  await audit({ actor: ctx.user, brandId: ctx.brandId, action: `import.clickup.${destination}`, target: name.slice(0, 80), meta: { imported: rows.length, skipped: tasks.length - rows.length - refused, refused } });
   refresh(ctx.slug);
-  return { ok: true, imported: rows.length, skipped: tasks.length - rows.length, last };
+  return { ok: true, imported: rows.length, skipped: tasks.length - rows.length - refused, refused, last };
 }
