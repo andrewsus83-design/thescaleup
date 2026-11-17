@@ -5,7 +5,7 @@ import "server-only";
 
 const BASE = "https://api.resend.com";
 
-export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
+export type Result<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
 
 export const isResendReady = () => Boolean(process.env.RESEND_API_KEY);
 
@@ -27,7 +27,7 @@ async function call<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: string
     const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
     if (!res.ok) {
       const message = typeof json?.message === "string" ? json.message : `Resend answered ${res.status}.`;
-      return { ok: false, error: message.slice(0, 300) };
+      return { ok: false, error: message.slice(0, 300), status: res.status };
     }
     return { ok: true, data: json as T };
   } catch (e) {
@@ -86,6 +86,15 @@ export const sendEmail = (m: SendInput, idempotencyKey: string) =>
       reply_to: m.replyTo,
       attachments: m.attachments?.length ? m.attachments.map((a) => ({ filename: a.filename, path: a.path, content_type: a.contentType })) : undefined,
     },
+    idempotencyKey,
+  );
+
+/** Up to 100 emails in one request (no attachments). The ids come back in the order they were sent. One bad email fails the whole request. */
+export const sendBatch = (items: SendInput[], idempotencyKey: string) =>
+  call<{ data: { id: string }[] }>(
+    "POST",
+    "/emails/batch",
+    items.map((m) => ({ from: m.from, to: m.to, subject: m.subject, text: m.text, html: m.html, headers: m.headers, reply_to: m.replyTo })),
     idempotencyKey,
   );
 

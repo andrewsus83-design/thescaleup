@@ -126,13 +126,29 @@ export async function ingestReceived(emailId: string): Promise<IngestResult> {
   return "stored";
 }
 
+/**
+ * A bounce or a complaint on a campaign email: the send is marked, and the address is never emailed again by that brand (a hard
+ * bounce means the address does not exist; a complaint means the person pressed "spam"). A soft bounce (mailbox full) only marks the send.
+ */
+async function recordCampaignEvent(admin: ReturnType<typeof db>, type: string, resendId: string, bounceType?: string): Promise<void> {
+  if (type !== "email.bounced" && type !== "email.complained") return;
+  const { data: row } = await admin.from("email_sends").select("id, brand_id, email").eq("resend_id", resendId).maybeSingle();
+  if (!row) return;
+  const complained = type === "email.complained";
+  await admin.from("email_sends").update({ status: complained ? "complained" : "bounced" }).eq("id", row.id);
+  if (complained || /permanent/i.test(bounceType ?? "")) {
+    await admin.from("email_suppressions").upsert({ brand_id: row.brand_id, email: String(row.email).toLowerCase(), reason: complained ? "complained" : "bounced" }, { onConflict: "brand_id,email", ignoreDuplicates: true });
+  }
+}
+
 const EVENT_STATUS: Record<string, string> = { "email.sent": "sent", "email.delivered": "delivered", "email.bounced": "bounced", "email.complained": "complained", "email.failed": "failed" };
 
 /** Delivery news about an email we sent. Unknown ids (mail sent by other parts of the app) are ignored. */
-export async function applyDeliveryEvent(type: string, data: { email_id?: string; bounce?: { message?: string }; failed?: { reason?: string } }): Promise<void> {
+export async function applyDeliveryEvent(type: string, data: { email_id?: string; bounce?: { message?: string; type?: string }; failed?: { reason?: string } }): Promise<void> {
   const next = EVENT_STATUS[type];
   if (!next || !data.email_id) return;
   const admin = db();
+  await recordCampaignEvent(admin, type, data.email_id, data.bounce?.type);
   const { data: row } = await admin.from("mail_messages").select("id, status").eq("resend_id", data.email_id).eq("direction", "out").maybeSingle();
   if (!row) return;
   const status = moveStatus(row.status as string, next);
