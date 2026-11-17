@@ -128,8 +128,12 @@ export async function previewAudience(brandId: string, rawAudience: unknown): Pr
   const c = await access(brandId);
   if (!c.ok) return c;
   const audience: Audience = parseAudience(rawAudience);
-  const { list, skips, matched } = await resolveAudience(c.ctx.brandId, audience);
-  return { ok: true, count: list.length, matched, skips };
+  try {
+    const { list, skips, matched } = await resolveAudience(c.ctx.brandId, audience);
+    return { ok: true, count: list.length, matched, skips };
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : "Could not read your contacts. Try again.");
+  }
 }
 
 /** One email to the person who is signed in, so they see what a customer will see. */
@@ -172,7 +176,12 @@ export async function startCampaign(brandId: string, id: string, consent: boolea
   const problems = docProblems(camp.doc);
   if (problems.length) return fail(problems[0]);
   if (!(await senderFor(ctx.brandId, camp.address_id))) return fail("Pick an address to send from. Its domain must be verified in Settings, Mailbox.");
-  const { list } = await resolveAudience(ctx.brandId, camp.audience, EMAIL_LIMITS.recipients);
+  let list: Awaited<ReturnType<typeof resolveAudience>>["list"];
+  try {
+    ({ list } = await resolveAudience(ctx.brandId, camp.audience, EMAIL_LIMITS.recipients));
+  } catch (e) {
+    return fail(e instanceof Error ? `${e.message} Nothing was sent.` : "Could not read your contacts. Nothing was sent.");
+  }
   if (list.length === 0) return fail("Nobody to send to. Pick who gets it and check that they have an email address.");
 
   // Whoever presses first wins: the draft becomes "sending" once.

@@ -160,6 +160,7 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
                   ["Phone", person.phone],
                   ["Where they came from", person.source],
                   ["Value", person.value === null ? "" : String(person.value)],
+                  ["Tags", person.tags.join(", ")],
                   ["About", person.summary],
                 ] as const
               )

@@ -3,21 +3,23 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/brand/primitives";
 import { btnCls } from "@/components/brand/styles";
+import { ImportHistory } from "@/components/hub/crm/import-history";
 import { ImportWizard } from "@/components/hub/crm/import-wizard";
 import { listPath } from "@/components/hub/crm/parts";
 import { requireFunction } from "@/lib/hub/access";
-import { getStages } from "@/lib/hub/crm/data";
+import { getStages, listImports } from "@/lib/hub/crm/data";
 import { isKind } from "@/lib/hub/crm/model";
+import { canManageTeam } from "@/lib/hub/rules";
 
 export const metadata: Metadata = { title: "CRM · Import" };
 export const dynamic = "force-dynamic";
 
 export default async function ImportPeoplePage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
-  const { brand } = await requireFunction(slug, "crm", "edit");
+  const { brand, actor } = await requireFunction(slug, "crm", "edit");
   const raw = Array.isArray(sp.kind) ? sp.kind[0] : sp.kind;
   const kind = isKind(raw) ? raw : "lead";
-  const stages = await getStages(brand.id);
+  const [stages, records] = await Promise.all([getStages(brand.id), listImports(brand.id)]);
   return (
     <>
       <PageHeader
@@ -30,7 +32,10 @@ export default async function ImportPeoplePage({ params, searchParams }: { param
           </Link>
         }
       />
-      <ImportWizard brandId={brand.id} slug={slug} initialKind={kind} stages={stages} />
+      <div className="space-y-6">
+        <ImportWizard brandId={brand.id} slug={slug} initialKind={kind} stages={stages} />
+        <ImportHistory brandId={brand.id} records={records} manager={canManageTeam(actor)} />
+      </div>
     </>
   );
 }

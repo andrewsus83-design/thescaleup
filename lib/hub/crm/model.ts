@@ -151,12 +151,38 @@ export type Person = {
   value: number | null;
   next_follow_up: string | null;
   summary: string;
+  tags: string[];
   converted_at: string | null;
   created_at: string;
   updated_at: string;
 };
 
-export type PersonInput = { name: string; company: string; email: string; phone: string; source: string; value: number | null; next_follow_up: string | null; summary: string };
+export type PersonInput = { name: string; company: string; email: string; phone: string; source: string; value: number | null; next_follow_up: string | null; summary: string; tags: string[] };
+
+// ---------------------------------------------------------------------------------------------- tags
+export const TAG_LIMITS = { perPerson: 20, length: 30 } as const;
+
+/** One tag as stored: lower case, single spaces, letters, digits and a few marks only. "" when nothing is left. */
+export function normalizeTag(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N} _&./+-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, TAG_LIMITS.length)
+    .trim();
+}
+
+/** Tags typed in a box, split on commas, semicolons or new lines. Repeats are dropped; at most 20. */
+export function parseTags(raw: string): string[] {
+  const out: string[] = [];
+  for (const part of raw.split(/[,;\n]/)) {
+    const t = normalizeTag(part);
+    if (t && !out.includes(t)) out.push(t);
+    if (out.length >= TAG_LIMITS.perPerson) break;
+  }
+  return out;
+}
 
 // Control characters and line breaks have no place in a single-line field.
 export const oneLine = (s: string, max: number) => s.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
@@ -192,6 +218,7 @@ export function parsePerson(get: (k: string) => string): { ok: true; value: Pers
       next_follow_up: due || null,
       // Notes keep their line breaks.
       summary: get("summary").replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim().slice(0, LIMITS.summary),
+      tags: parseTags(get("tags")),
     },
   };
 }

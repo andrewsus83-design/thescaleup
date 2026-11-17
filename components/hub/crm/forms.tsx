@@ -77,6 +77,13 @@ export function PersonForm({ brandId, kind, person }: { brandId: string; kind: K
           </label>
           <input id="c-follow" name="next_follow_up" type="date" defaultValue={person?.next_follow_up ?? ""} className={inputCls} />
         </div>
+        <div>
+          <label htmlFor="c-tags" className={labelCls}>
+            Tags
+          </label>
+          <input id="c-tags" name="tags" defaultValue={person?.tags?.join(", ") ?? ""} maxLength={300} placeholder="webinar nov, jakarta" autoComplete="off" className={inputCls} />
+          <p className="mt-1 text-caption text-ink-500">Separate tags with commas. Use them to find a group and email only them.</p>
+        </div>
       </div>
       <div>
         <label htmlFor="c-summary" className={labelCls}>
