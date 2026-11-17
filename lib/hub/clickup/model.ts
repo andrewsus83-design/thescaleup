@@ -1,6 +1,8 @@
 // Reading ClickUp's replies and turning them into Wiki pages and tasks. No I/O: the API calls are in api.ts, the writes in the actions.
 // Everything from ClickUp is treated as untrusted text: it is cut to size and checked the same way a typed page or task is.
 
+import { LIMITS as CRM, firstStage, parsePerson, stagesOf, type Kind as PersonKind, type StageDef } from "../crm/model";
+import { parseItem, type Channel, type Status as ContentStatus } from "../content/model";
 import { dayIn } from "../tasks/dates";
 import type { Priority, Stage } from "../tasks/model";
 import { LIMITS, parseTags } from "../tasks/rules";
@@ -140,7 +142,30 @@ export type CkTask = {
   tags: string[];
   url: string;
   parentName: string;
+  email: string;
+  phone: string;
+  company: string;
+  amount: number | null;
 };
+
+/** Email, phone, company and amount from a task's custom fields, found by the field's type or name. Anything else is ignored. */
+function customFields(raw: unknown): Pick<CkTask, "email" | "phone" | "company" | "amount"> {
+  const out = { email: "", phone: "", company: "", amount: null as number | null };
+  for (const f of arr(raw)) {
+    const name = str(o(f).name, 80).toLowerCase();
+    const type = str(o(f).type, 30).toLowerCase();
+    const v = o(f).value;
+    const text = typeof v === "string" ? v.trim() : "";
+    if (!out.email && text && (type === "email" || /e-?mail/.test(name))) out.email = text.slice(0, 254);
+    else if (!out.phone && text && (type === "phone" || /phone|whatsapp|\bwa\b|telp|\bhp\b|mobile/.test(name))) out.phone = text.slice(0, 40);
+    else if (!out.company && text && type === "short_text" && /company|perusahaan|business|usaha/.test(name)) out.company = text.slice(0, 120);
+    else if (out.amount === null && (type === "currency" || type === "number") && /value|amount|nilai|deal|budget|harga|price|revenue/.test(name)) {
+      const n = Number(v);
+      if (Number.isFinite(n) && n >= 0 && n <= 1e12) out.amount = n;
+    }
+  }
+  return out;
+}
 
 const ms = (v: unknown): number | null => {
   const n = typeof v === "string" || typeof v === "number" ? Number(v) : NaN;
@@ -171,6 +196,7 @@ export function parseTasks(j: unknown): { tasks: CkTask[]; last: boolean } {
         tags: arr(o(t).tags).map((g) => str(o(g).name, 60)).filter(Boolean),
         url: /^https:\/\/app\.clickup\.com\//.test(url) ? url : "",
         parentName: "",
+        ...customFields(o(t).custom_fields),
       },
     ];
   });
@@ -240,7 +266,7 @@ export type Scan = {
 };
 export type Failure = { ok: false; error: string };
 export type DocsDone = { ok: true; pages: number; skipped: number; empty: number; refused: { name: string; reason: string }[] };
-export type TasksDone = { ok: true; imported: number; skipped: number; last: boolean };
+export type TasksDone = { ok: true; imported: number; skipped: number; refused: number; last: boolean };
 
 /** What the browser sends back for a Doc: only ids and labels it was shown. Anything else is dropped. */
 export function readDocRefs(raw: unknown): ScanDoc[] {
@@ -325,4 +351,95 @@ export function planDoc(doc: { id: string; name: string; where: string }, shape:
     plan.refs.push({ external_id: external, page_id: id });
   }
   return plan;
+}
+
+// ---------------------------------------------------------------------------------------------- where a list goes
+export const DESTINATIONS = ["tasks", "leads", "content", "skip"] as const;
+export type Destination = (typeof DESTINATIONS)[number];
+export const DESTINATION_LABEL: Record<Destination, string> = { tasks: "Tasks", leads: "CRM leads", content: "Content plan", skip: "Skip" };
+export const isDestination = (v: unknown): v is Destination => typeof v === "string" && (DESTINATIONS as readonly string[]).includes(v);
+
+const LEAD_WORDS = /\b(leads?|prospects?|crm|pipeline|deals?|clients?|customers?|calon|pelanggan|klien|sales)\b/i;
+const CONTENT_WORDS = /\b(content|konten|social|instagram|tiktok|reels?|posts?|captions?|editorial|calendar|kalender|publish|youtube|newsletter)\b/i;
+
+/** A starting guess for where a list belongs, from its name (and where it sat). The person can change every one before importing. */
+export function suggestDestination(name: string, where: string): Destination {
+  for (const text of [name, where]) {
+    if (LEAD_WORDS.test(text)) return "leads";
+    if (CONTENT_WORDS.test(text)) return "content";
+  }
+  return "tasks";
+}
+
+const dayOf = (ms: number | null, tz: string) => (ms ? dayIn(tz, new Date(ms)) : "");
+const isDone = (t: CkTask) => t.statusType === "done" || t.statusType === "closed";
+const clean = (v: string) => v.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim();
+
+// ---------------------------------------------------------------------------------------------- tasks → CRM
+export type LeadRow = { kind: PersonKind; stage: string; name: string; company: string; email: string; phone: string; source: string; value: number | null; next_follow_up: string | null; summary: string };
+export type Made<T> = { ok: true; value: T } | { ok: false; reason: string };
+
+const WON = /\b(won|signed|paid|closed won|customer|client|klien|pelanggan|deal)\b/i;
+
+/**
+ * A ClickUp task as a person in the CRM. Nearly always a lead in the brand's first lead stage. A finished task whose status says
+ * it was won becomes a client. A finished task that was not goes to the brand's closed lead stage if it has one. The follow-up
+ * date is the task's due date, only while it is still open. A bad email or phone is left out rather than refusing the person.
+ */
+export function toLeadRow(t: CkTask, ctx: { tz: string; listName: string; stages: readonly StageDef[] }): Made<LeadRow> {
+  const done = isDone(t);
+  const kind: PersonKind = done && WON.test(t.status) && stagesOf(ctx.stages, "client").length ? "client" : "lead";
+  const closedLead = kind === "lead" && done ? stagesOf(ctx.stages, "lead").find((s) => !s.open) : undefined;
+  const stage = closedLead?.key ?? firstStage(ctx.stages, kind);
+  const foot = [`From the ClickUp list "${ctx.listName}"${t.status ? `, status: ${t.status}` : ""}.`, t.url].filter(Boolean).join("\n");
+  const body = clean(t.description);
+  const room = CRM.summary - foot.length - 2;
+  const summary = `${body.length > room ? `${body.slice(0, Math.max(0, room - 1))}…` : body}${body ? "\n\n" : ""}${foot}`.slice(0, CRM.summary);
+  const fields = (withContact: boolean) => ({ name: t.name.slice(0, CRM.name), company: t.company, email: withContact ? t.email : "", phone: withContact ? t.phone : "", source: "ClickUp", value: withContact && t.amount !== null ? String(t.amount) : "", next_follow_up: !done ? dayOf(t.due, ctx.tz) : "", summary });
+  let parsed = parsePerson((k) => (fields(true) as Record<string, string>)[k] ?? "");
+  if (!parsed.ok) parsed = parsePerson((k) => (fields(false) as Record<string, string>)[k] ?? "");
+  if (!parsed.ok) return { ok: false, reason: parsed.error };
+  return { ok: true, value: { kind, stage, ...parsed.value } };
+}
+
+// ---------------------------------------------------------------------------------------------- tasks → Content plan
+export type ContentRow = { title: string; body: string; kind: "post"; channel: Channel | null; status: ContentStatus; scheduled_for: string | null };
+
+const CHANNEL_WORDS: [RegExp, Channel][] = [
+  [/\b(instagram|ig|reels?)\b/i, "instagram"],
+  [/\btiktok\b/i, "tiktok"],
+  [/\b(facebook|fb)\b/i, "facebook"],
+  [/\blinkedin\b/i, "linkedin"],
+  [/\b(youtube|yt)\b/i, "youtube"],
+  [/\b(twitter|x)\b/i, "x"],
+  [/\b(whatsapp|wa)\b/i, "whatsapp"],
+  [/\b(email|newsletter)\b/i, "email"],
+  [/\bblog\b/i, "blog"],
+];
+
+export function channelFor(text: string): Channel | null {
+  for (const [re, c] of CHANNEL_WORDS) if (re.test(text)) return c;
+  return null;
+}
+
+export function contentStatus(status: string, type: string): ContentStatus {
+  if (type === "done" || type === "closed") return "posted";
+  if (/\b(approved|ready|scheduled|siap|acc)\b/i.test(status)) return "approved";
+  if (/\b(review|revisi|qa|check|tinjau)\b/i.test(status)) return "review";
+  if (/\b(idea|ide|backlog|brainstorm)\b/i.test(status)) return "idea";
+  return "draft";
+}
+
+/** A ClickUp task as a piece in the Content plan: the due date is the day it is planned for, the channel comes from its tags, title or list. */
+export function toContentRow(t: CkTask, ctx: { tz: string; listName: string }): Made<ContentRow> {
+  const foot = ["", `From the ClickUp list "${ctx.listName}".`, t.url].filter((x, i) => i === 0 || x).join("\n");
+  const body = clean(t.description);
+  const room = 20_000 - foot.length;
+  const text = `${body.length > room ? body.slice(0, room) : body}${foot}`;
+  const channel = channelFor([...t.tags, t.name, ctx.listName].join(" "));
+  const day = dayOf(t.due, ctx.tz);
+  const parsed = parseItem((k) => ({ title: t.name.slice(0, 200), body: text, kind: "post", channel: channel ?? "", status: contentStatus(t.status, t.statusType), scheduledFor: day }[k] ?? ""));
+  if (!parsed.ok) return { ok: false, reason: parsed.error };
+  const v = parsed.value;
+  return { ok: true, value: { title: v.title, body: v.body, kind: "post", channel: v.channel, status: v.status, scheduled_for: v.scheduled_for } };
 }
