@@ -59,6 +59,12 @@ export async function startBuild(_prev: FormState, fd: FormData): Promise<FormSt
   if (!allow(`wikibuild:${ctx.user.id}`, 6) || !allow(`wikibuild-brand:${ctx.brandId}`, 12)) return { error: BUSY };
   const key = await getBrandKey(ctx.brandId, "claude", true);
   if (!key) return { error: NO_KEY };
+  // Before any reading or AI cost: is the table there? (The database step may not have been run yet.)
+  const probe = await ctx.admin.from("wiki_builds").select("id").eq("brand_id", ctx.brandId).limit(1);
+  if (probe.error) {
+    console.error("[wiki-ai] wiki_builds not ready:", probe.error.message);
+    return { error: "The Wiki builder needs its database step first (20261117260000_wiki_builds.sql). Ask the person who runs the database updates." };
+  }
 
   const read: ReadNote[] = [];
   const parts: ReadPart[] = [];
