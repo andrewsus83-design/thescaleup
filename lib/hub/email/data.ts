@@ -1,4 +1,6 @@
 import "server-only";
+import { getSummary } from "@/lib/hub/crm/data";
+import { fetchAll } from "@/lib/hub/db-page";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { buildRecipients, parseAudience, parseDoc, type Audience, type Doc, type Person, type Recipient, type Skips } from "./model";
 
@@ -34,19 +36,29 @@ export async function getTemplate(brandId: string, id: string): Promise<Template
 
 /** The stages the brand's CRM uses, for the audience picker. */
 export async function crmStages(brandId: string): Promise<{ lead: string[]; client: string[] }> {
-  const { data } = await db().from("crm_people").select("kind, stage").eq("brand_id", brandId).limit(5000);
-  const out = { lead: new Set<string>(), client: new Set<string>() };
-  for (const r of data ?? []) (r.kind === "client" ? out.client : out.lead).add(r.stage as string);
-  return { lead: [...out.lead].sort(), client: [...out.client].sort() };
+  // The database counts per stage, so this covers everyone however long the list is (a plain read stops at 1,000 rows).
+  const today = new Date().toISOString().slice(0, 10);
+  const [lead, client] = await Promise.all([getSummary(brandId, "lead", today), getSummary(brandId, "client", today)]);
+  const keys = (s: { byStage: Record<string, number> }) => Object.entries(s.byStage).filter(([, n]) => n > 0).map(([k]) => k).sort();
+  return { lead: keys(lead), client: keys(client) };
 }
 
 /** Everyone the audience resolves to today, minus people who unsubscribed or bounced. No email is sent here. */
 export async function resolveAudience(brandId: string, audience: Audience, max?: number): Promise<{ list: Recipient[]; skips: Skips; matched: number }> {
   if (audience.kinds.length === 0) return { list: [], skips: { noEmail: 0, invalid: 0, duplicate: 0, suppressed: 0, overLimit: 0 }, matched: 0 };
-  let q = db().from("crm_people").select("id, email, name, company, kind, stage").eq("brand_id", brandId).in("kind", audience.kinds).neq("email", "").order("created_at").limit(5000);
-  if (audience.stages.length) q = q.in("stage", audience.stages);
-  const { data } = await q;
-  const people: Person[] = (data ?? []).map((p) => ({ id: p.id as string, email: String(p.email ?? ""), name: String(p.name ?? ""), company: String(p.company ?? "") }));
+  // Read in pages: the API returns at most 1,000 rows however many are asked for, and a cut-off list would silently email fewer people.
+  let data: Record<string, unknown>[];
+  try {
+    data = await fetchAll<Record<string, unknown>>((from, to) => {
+      let q = db().from("crm_people").select("id, email, name, company, kind, stage").eq("brand_id", brandId).in("kind", audience.kinds).neq("email", "").order("created_at").order("id");
+      if (audience.stages.length) q = q.in("stage", audience.stages);
+      return q.range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
+    });
+  } catch (e) {
+    console.error("[email] audience read failed:", e instanceof Error ? e.message : e);
+    throw new Error("Could not read your contacts. Try again.");
+  }
+  const people: Person[] = data.map((p) => ({ id: p.id as string, email: String(p.email ?? ""), name: String(p.name ?? ""), company: String(p.company ?? "") }));
   const emails = [...new Set(people.map((p) => p.email.trim().toLowerCase()).filter(Boolean))];
   const suppressed = new Set<string>();
   for (let i = 0; i < emails.length; i += 400) {

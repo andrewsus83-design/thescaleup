@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Alert, EmptyState, PageHeader } from "@/components/brand/primitives";
+import { EmptyState, PageHeader } from "@/components/brand/primitives";
 import { pillCls, tileCls } from "@/components/brand/styles";
 import { CrmNav, crmBase } from "@/components/hub/crm/parts";
 import { Stat } from "@/components/hub/products/parts";
 import { requireFunction } from "@/lib/hub/access";
-import { getStages, listPeople, listStageLog } from "@/lib/hub/crm/data";
+import { getStages, getSummary, listStageLog } from "@/lib/hub/crm/data";
 import { daysAgoIso, funnelStats, type Kind } from "@/lib/hub/crm/model";
+import { hubTz, todayIn } from "@/lib/hub/tasks/dates";
 import { fmtNum } from "@/lib/hub/products/model";
 import { canManageTeam } from "@/lib/hub/rules";
 import { BarChart3 } from "lucide-react";
@@ -29,8 +30,10 @@ export default async function CrmFunnelPage({ params, searchParams }: { params: 
   const kind: Kind = one(sp.kind) === "client" ? "client" : "lead";
   const period = PERIODS.find((p) => p.id === one(sp.period)) ?? PERIODS[1];
   const since = period.days ? daysAgoIso(period.days) : null;
-  const [stages, log, { items, total }] = await Promise.all([getStages(brand.id), listStageLog(brand.id, since), listPeople(brand.id, kind)]);
-  const stats = funnelStats(stages, kind, log, items);
+  const [stages, log, sum] = await Promise.all([getStages(brand.id), listStageLog(brand.id, since), getSummary(brand.id, kind, todayIn(hubTz()))]);
+  // Who is where now comes from the database's count per stage, so it covers everyone however long the list is.
+  const now = Object.entries(sum.byStage).flatMap(([stage, n]) => Array.from({ length: n }, () => ({ kind, stage })));
+  const stats = funnelStats(stages, kind, log, now);
   const max = Math.max(1, ...stats.rows.map((r) => r.entered));
   const noun = kind === "lead" ? "leads" : "clients";
   const href = (k: Kind, p: string) => `${crmBase(slug)}/funnel?kind=${k}&period=${p}`;
@@ -59,11 +62,6 @@ export default async function CrmFunnelPage({ params, searchParams }: { params: 
         <EmptyState icon={<BarChart3 className="size-6" aria-hidden />} title="Nothing to count yet" hint={`No ${noun} entered a stage in this period. Add people or move them between stages and the numbers appear here.`} />
       ) : (
         <>
-          {total > items.length && (
-            <Alert tone="warn" className="mb-4">
-              The count of people in each stage now covers only the {fmtNum(items.length)} most recently changed of {fmtNum(total)} {noun}.
-            </Alert>
-          )}
           <dl className={`${tileCls} mb-6 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3`}>
             <Stat label={kind === "lead" ? "Leads who came in" : "Clients who started"} value={fmtNum(stats.started)} />
             {kind === "lead" && <Stat label="Became clients" value={fmtNum(stats.converted)} />}

@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { FormState } from "./actions";
-import { getRules, getStages, countInStage } from "./crm/data";
+import { NO_FILTER, countInStage, findIds, getRules, getStages, type PeopleFilter } from "./crm/data";
 import { logStage, runRules } from "./crm/flow";
 import { cleanImportRows, type ImportChunkResult } from "./crm/import";
-import { firstStage, followUpIn, isKind, isStageFor, parseNote, parsePerson, parseRulesInput, parseStagesInput, pruneRules } from "./crm/model";
+import { BULK_OPS, type BulkInput, type BulkResult } from "./crm/bulk";
+import { firstStage, followUpIn, isKind, isStageFor, parseNote, parsePerson, parseRulesInput, parseStagesInput, parseTags, pruneRules } from "./crm/model";
+import { searchTerm } from "./mail/model";
 import { atLeast } from "./permissions";
 import { allow } from "./ratelimit";
 import { canManageTeam } from "./rules";
@@ -227,35 +229,149 @@ export async function saveRules(_prev: FormState, fd: FormData): Promise<FormSta
   return { message: parsed.rules.length ? "Automations saved." : "Saved. No stage does anything on its own." };
 }
 
-/**
- * One batch of an import from a spreadsheet. The rows are checked again here, then written in one go by the database, which leaves
- * out anyone already in the CRM. Stage automations are not run: a file of 2,000 leads would otherwise create 2,000 tasks.
- */
-export async function importPeopleChunk(input: { brandId: string; kind: string; rows: unknown }): Promise<ImportChunkResult> {
+const MISSING_SQL = "The CRM import needs a database update that has not been run yet.";
+const sqlMissing = (code: string | undefined) => code === "PGRST202" || code === "42883" || code === "42P01" || code === "42703";
+
+/** Starts an import: writes down the file and the tags it adds, and gives back the id its batches report to. */
+export async function startPeopleImport(input: { brandId: string; kind: string; fileName: string; tags: string }): Promise<{ ok: true; importId: string } | { ok: false; error: string }> {
   const c = await editContext(input?.brandId);
   if (!c.ok) return { ok: false, error: c.error };
   const { ctx } = c;
   if (!isKind(input.kind)) return { ok: false, error: "Pick lead or client." };
-  const kind = input.kind;
+  if (!allow(`crm-import-start:${ctx.user.id}`, 60)) return { ok: false, error: "That is a lot of importing in an hour. Try again a bit later." };
+  const fileName = typeof input.fileName === "string" ? input.fileName.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, 200) : "";
+  const { data, error } = await ctx.admin.from("crm_imports").insert({ brand_id: ctx.brandId, kind: input.kind, file_name: fileName, tags: parseTags(typeof input.tags === "string" ? input.tags : ""), created_by: ctx.user.id }).select("id").single();
+  if (error) {
+    console.error("[crm] import start failed:", error.code, error.message);
+    return { ok: false, error: sqlMissing(error.code) ? MISSING_SQL : "Could not start the import. Try again." };
+  }
+  return { ok: true, importId: data.id as string };
+}
+
+/**
+ * One batch of an import from a spreadsheet. The rows are checked again here, then written in one go by the database, which leaves
+ * out anyone already in the CRM. Stage automations are not run: a file of 2,000 leads would otherwise create 2,000 tasks.
+ */
+export async function importPeopleChunk(input: { brandId: string; importId: string; rows: unknown }): Promise<ImportChunkResult> {
+  const c = await editContext(input?.brandId);
+  if (!c.ok) return { ok: false, error: c.error };
+  const { ctx } = c;
+  if (typeof input.importId !== "string" || !UUID.test(input.importId)) return { ok: false, error: "This import was not started. Reload the page and try again." };
   const rows = cleanImportRows(input.rows);
   if (!rows) return { ok: false, error: "Some rows were not valid. Reload the page and try the file again." };
   if (!allow(`crm-import:${ctx.user.id}`, 300)) return { ok: false, error: "That is a lot of importing in an hour. Try again a bit later." };
+  const { data: imp } = await ctx.admin.from("crm_imports").select("kind, tags, undone_at").eq("brand_id", ctx.brandId).eq("id", input.importId).maybeSingle();
+  if (!imp || !isKind(imp.kind) || imp.undone_at) return { ok: false, error: "This import was not started or was already undone. Reload the page and try again." };
+  const kind = imp.kind;
   // A stage the brand no longer has falls back to where new people start.
   const stages = await getStages(ctx.brandId);
   const start = firstStage(stages, kind);
   const prepared = rows.map((r) => ({ ...r, stage: isStageFor(stages, kind, r.stage) ? r.stage : start }));
-  const { data, error } = await ctx.admin.rpc("crm_import_chunk", { p_brand: ctx.brandId, p_kind: kind, p_by: ctx.user.id, p_rows: prepared });
+  const tags = Array.isArray(imp.tags) ? (imp.tags as unknown[]).filter((t): t is string => typeof t === "string") : [];
+  const { data, error } = await ctx.admin.rpc("crm_import_chunk", { p_brand: ctx.brandId, p_kind: kind, p_by: ctx.user.id, p_rows: prepared, p_import: input.importId, p_tags: tags });
   if (error) {
     console.error("[crm] import chunk failed:", error.code, error.message);
-    const missing = error.code === "PGRST202" || error.code === "42883";
-    return { ok: false, error: missing ? "The CRM import needs a database update that has not been run yet." : "Could not save these rows. Nothing from this batch was kept; try again." };
+    return { ok: false, error: sqlMissing(error.code) ? MISSING_SQL : "Could not save these rows. Nothing from this batch was kept; try again." };
   }
   const row = Array.isArray(data) ? data[0] : data;
   const created = Number(row?.created ?? 0);
   const skipped = Number(row?.skipped ?? 0);
   if (created > 0) {
-    await audit({ actor: ctx.user, brandId: ctx.brandId, action: "crm.import", meta: { kind, created, skipped } });
+    await audit({ actor: ctx.user, brandId: ctx.brandId, action: "crm.import", target: input.importId, meta: { kind, created, skipped } });
     refresh(ctx.slug);
   }
   return { ok: true, created, skipped };
+}
+
+/** Takes an import back: removes the people it added whom nobody has touched since. Managers only. */
+export async function undoPeopleImport(_prev: FormState, fd: FormData): Promise<FormState> {
+  const c = await editContext(str(fd, "brandId"));
+  if (!c.ok) return { error: c.error };
+  const { ctx } = c;
+  if (!canManageTeam(ctx.actor)) return { error: "Only a manager can undo an import." };
+  const id = str(fd, "importId");
+  if (!UUID.test(id)) return { error: "That import no longer exists." };
+  const { data, error } = await ctx.admin.rpc("crm_undo_import", { p_brand: ctx.brandId, p_import: id });
+  if (error) {
+    console.error("[crm] undo import failed:", error.code, error.message);
+    return { error: error.code === "42501" ? "That import was already undone or no longer exists." : "Could not undo the import. Try again." };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  const removed = Number(row?.removed ?? 0);
+  const kept = Number(row?.kept ?? 0);
+  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "crm.import.undo", target: id, meta: { removed, kept } });
+  refresh(ctx.slug);
+  return { message: `Removed ${removed} ${removed === 1 ? "person" : "people"}.${kept > 0 ? ` ${kept} ${kept === 1 ? "was" : "were"} kept because someone has already worked on them.` : ""}` };
+}
+
+const BULK_PAGE = 2000;
+
+/**
+ * One change applied to many people: the ones ticked on the page (`ids`), or everyone who matches the list's search and filters
+ * (`all`). Stage moves are written to the funnel log, but stage automations are not run (a move of 500 people would create 500 tasks).
+ */
+export async function bulkPeople(input: BulkInput): Promise<BulkResult> {
+  const c = await editContext(input?.brandId);
+  if (!c.ok) return { ok: false, error: c.error };
+  const { ctx } = c;
+  if (!isKind(input.kind)) return { ok: false, error: "Pick lead or client." };
+  const kind = input.kind;
+  if (!BULK_OPS.includes(input.op)) return { ok: false, error: "That change is not available." };
+  const op = input.op;
+  if (op === "delete" && !canManageTeam(ctx.actor)) return { ok: false, error: "Only a manager can delete people." };
+  if (!allow(`crm-bulk:${ctx.user.id}`, 60)) return { ok: false, error: "That is a lot of changes in an hour. Try again a bit later." };
+
+  // What the change is.
+  let arg = "";
+  let tags: string[] = [];
+  if (op === "stage") {
+    if (!isStageFor(await getStages(ctx.brandId), kind, input.arg)) return { ok: false, error: "Pick a stage from the list." };
+    arg = input.arg;
+  } else if (op === "follow") {
+    if (input.arg === "clear") arg = "";
+    else {
+      const days = Number(input.arg);
+      if (!Number.isInteger(days) || days < 1 || days > 60) return { ok: false, error: "Pick a follow-up between 1 and 60 days." };
+      arg = followUpIn(todayIn(hubTz()), days);
+    }
+  } else if (op === "tag_add" || op === "tag_remove") {
+    tags = parseTags(typeof input.tags === "string" ? input.tags : "");
+    if (tags.length === 0) return { ok: false, error: "Type a tag first." };
+  }
+
+  // Who it applies to.
+  let ids: string[];
+  if (input.all) {
+    const f = readFilter(input.all);
+    if (!f.ok) return { ok: false, error: f.error };
+    ids = await findIds(ctx.brandId, kind, f.value, todayIn(hubTz()));
+  } else {
+    ids = Array.isArray(input.ids) ? input.ids : [];
+    if (ids.length > 500 || ids.some((i) => typeof i !== "string" || !UUID.test(i))) return { ok: false, error: "Select up to 500 people, or choose everyone who matches." };
+  }
+  if (ids.length === 0) return { ok: true, changed: 0 };
+
+  let changed = 0;
+  for (let i = 0; i < ids.length; i += BULK_PAGE) {
+    const { data, error } = await ctx.admin.rpc("crm_bulk", { p_brand: ctx.brandId, p_kind: kind, p_ids: ids.slice(i, i + BULK_PAGE), p_op: op, p_arg: arg, p_tags: tags, p_by: ctx.user.id });
+    if (error) {
+      console.error("[crm] bulk failed:", error.code, error.message);
+      refresh(ctx.slug);
+      return { ok: false, error: `${sqlMissing(error.code) ? "This needs a database update that has not been run yet." : "Could not finish the change."}${changed > 0 ? ` ${changed} people were changed before this.` : ""}` };
+    }
+    changed += Number(data) || 0;
+  }
+  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "crm.bulk", meta: { kind, op, selected: ids.length, changed } });
+  refresh(ctx.slug);
+  return { ok: true, changed };
+}
+
+/** The list's search and filters as the browser sent them, made safe. */
+function readFilter(raw: unknown): { ok: true; value: PeopleFilter } | { ok: false; error: string } {
+  if (typeof raw !== "object" || raw === null) return { ok: false, error: "The selection could not be read. Reload the page and try again." };
+  const o = raw as Record<string, unknown>;
+  const stage = typeof o.stage === "string" ? o.stage : "";
+  if (stage && stage !== "open" && !/^[a-z0-9][a-z0-9_-]{0,39}$/.test(stage)) return { ok: false, error: "The selection could not be read. Reload the page and try again." };
+  const importId = typeof o.importId === "string" && UUID.test(o.importId) ? o.importId : null;
+  return { ok: true, value: { ...NO_FILTER, q: searchTerm(o.q), stage, due: o.due === true, tag: typeof o.tag === "string" ? (parseTags(o.tag)[0] ?? "") : "", importId } };
 }

@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { BriefcaseBusiness, Search, Upload, X } from "lucide-react";
-import { Alert, EmptyState, PageHeader } from "@/components/brand/primitives";
+import { BriefcaseBusiness, Download, Search, Upload, X } from "lucide-react";
+import { EmptyState, PageHeader } from "@/components/brand/primitives";
 import { btnCls, iconBtnCls, pillCls, tileCls } from "@/components/brand/styles";
-import { CrmNav, FollowChip, StageChip, crmBase, listPath } from "@/components/hub/crm/parts";
+import { CrmNav, crmBase, listPath } from "@/components/hub/crm/parts";
+import { PeopleTable } from "@/components/hub/crm/people-table";
 import { Stat } from "@/components/hub/products/parts";
-import { getStages, listPeople } from "@/lib/hub/crm/data";
-import { filterPeople, followState, followUpsDue, isStageFor, stagesOf, summarize, type Kind } from "@/lib/hub/crm/model";
+import { findPeople, getStages, getSummary, listTags } from "@/lib/hub/crm/data";
+import { followState, isStageFor, parseTags, stagesOf, type Kind } from "@/lib/hub/crm/model";
 import { searchTerm } from "@/lib/hub/mail/model";
 import { fmtNum } from "@/lib/hub/products/model";
 import { hubTz, todayIn } from "@/lib/hub/tasks/dates";
@@ -13,37 +14,45 @@ import { hubTz, todayIn } from "@/lib/hub/tasks/dates";
 const PER_PAGE = 50;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-type F = { q?: string; stage?: string; due?: boolean; page?: number };
+type F = { q?: string; stage?: string; due?: boolean; tag?: string; page?: number };
 function href(base: string, f: F) {
   const p = new URLSearchParams();
   if (f.q) p.set("q", f.q);
   if (f.stage) p.set("stage", f.stage);
   if (f.due) p.set("due", "1");
+  if (f.tag) p.set("tag", f.tag);
   if (f.page && f.page > 1) p.set("page", String(f.page));
   const s = p.toString();
   return s ? `${base}?${s}` : base;
 }
 
-/** The Leads and Clients lists are one page with a different kind. */
+/** The Leads and Clients lists are one page with a different kind. Search, filters, counts and paging are done by the database, so a list of thousands is searched whole. */
 export async function CrmList({ slug, brandId, kind, canEdit, manager, sp }: { slug: string; brandId: string; kind: Kind; canEdit: boolean; manager: boolean; sp: Record<string, string | string[] | undefined> }) {
   const today = todayIn(hubTz());
   const base = listPath(slug, kind);
-  const [{ items, total }, stages] = await Promise.all([listPeople(brandId, kind), getStages(brandId)]);
   const noun = kind === "lead" ? "lead" : "client";
   const nouns = kind === "lead" ? "leads" : "clients";
 
+  const [stages, sum, tagList] = await Promise.all([getStages(brandId), getSummary(brandId, kind, today), listTags(brandId)]);
   const q = searchTerm(one(sp.q));
   const rawStage = one(sp.stage);
-  const stage: F["stage"] = rawStage === "open" ? "open" : isStageFor(stages, kind, rawStage) ? rawStage : undefined;
+  const stage = rawStage === "open" ? "open" : isStageFor(stages, kind, rawStage) ? rawStage! : "";
   const due = one(sp.due) === "1";
-  const filtered = Boolean(q || stage || due);
-  const rows = filterPeople(items, { q, stage, due }, today, stages);
-  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
-  const page = Math.min(pages, Math.max(1, Math.floor(Number(one(sp.page))) || 1));
-  const shown = rows.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-  const sum = summarize(items, stages);
-  const dueCount = followUpsDue(items, today, stages);
-  const cur: F = { q, stage, due };
+  const tag = parseTags(one(sp.tag) ?? "")[0] ?? "";
+  const filtered = Boolean(q || stage || due || tag);
+  const cur: F = { q, stage, due, tag };
+  const filter = { q, stage, due, tag, importId: null };
+
+  const wanted = Math.max(1, Math.floor(Number(one(sp.page))) || 1);
+  let { items, total } = await findPeople(brandId, kind, filter, today, wanted, PER_PAGE);
+  const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const page = Math.min(pages, wanted);
+  if (page !== wanted) ({ items, total } = await findPeople(brandId, kind, filter, today, page, PER_PAGE));
+  const rows = items.map((p) => {
+    const state = followState(p, today, stages);
+    return { id: p.id, name: p.name, company: p.company, source: p.source, stage: p.stage, value: p.value, follow: state, followDate: p.next_follow_up, tags: p.tags };
+  });
+  const exportHref = `${crmBase(slug)}/export?${new URLSearchParams({ kind, ...(q ? { q } : {}), ...(stage ? { stage } : {}), ...(due ? { due: "1" } : {}), ...(tag ? { tag } : {}) }).toString()}`;
 
   return (
     <>
@@ -66,7 +75,7 @@ export async function CrmList({ slug, brandId, kind, canEdit, manager, sp }: { s
       />
       <CrmNav slug={slug} active={kind === "lead" ? "leads" : "clients"} manager={manager} />
 
-      {items.length === 0 ? (
+      {sum.total === 0 ? (
         <EmptyState
           icon={<BriefcaseBusiness className="size-6" aria-hidden />}
           title={`No ${nouns} yet`}
@@ -86,20 +95,17 @@ export async function CrmList({ slug, brandId, kind, canEdit, manager, sp }: { s
         </EmptyState>
       ) : (
         <>
-          {total > items.length && (
-            <Alert tone="warn" className="mb-4">
-              Showing the {fmtNum(items.length)} most recently changed of {fmtNum(total)} {nouns}.
-            </Alert>
-          )}
-          <dl className={`${tileCls} mb-6 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3`}>
+          <dl className={`${tileCls} mb-6 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4`}>
+            <Stat label={kind === "lead" ? "Leads" : "Clients"} value={fmtNum(sum.total)} />
             <Stat label={kind === "lead" ? "Open leads" : "Clients with the brand"} value={fmtNum(sum.open)} />
             <Stat label={kind === "lead" ? "Open lead value" : "Client value"} value={fmtNum(sum.openValue)} />
-            <Stat label="Follow-ups due" value={fmtNum(dueCount)} />
+            <Stat label="Follow-ups due" value={fmtNum(sum.due)} />
           </dl>
 
           <form role="search" method="get" action={base} className="relative mb-4">
             {stage && <input type="hidden" name="stage" value={stage} />}
             {due && <input type="hidden" name="due" value="1" />}
+            {tag && <input type="hidden" name="tag" value={tag} />}
             <Search className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-ink-500" aria-hidden />
             <input
               type="search"
@@ -108,7 +114,7 @@ export async function CrmList({ slug, brandId, kind, canEdit, manager, sp }: { s
               maxLength={80}
               autoComplete="off"
               aria-label="Search by name, company, email, phone or source"
-              placeholder="Search by name, company or source"
+              placeholder="Search by name, company, email, phone or source"
               className="block h-14 w-full rounded-full border-control border-transparent bg-paper-0 pr-12 pl-12 text-body text-ink-800 outline-none placeholder:text-ink-500 focus-visible:border-ink-800 focus-visible:shadow-focus"
             />
             {filtered && (
@@ -118,13 +124,13 @@ export async function CrmList({ slug, brandId, kind, canEdit, manager, sp }: { s
             )}
           </form>
 
-          <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Filter">
+          <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Filter by stage">
             <Link href={href(base, { ...cur, stage: undefined, due: false })} aria-pressed={!stage && !due} className={pillCls(!stage && !due)}>
               All
             </Link>
             <Link href={href(base, { ...cur, due: !due })} aria-pressed={due} className={pillCls(due)}>
               Follow up now
-              <span className="font-mono text-micro opacity-70">{dueCount}</span>
+              <span className="font-mono text-micro opacity-70">{sum.due}</span>
             </Link>
             {stagesOf(stages, kind).map((s) => (
               <Link key={s.key} href={href(base, { ...cur, stage: stage === s.key ? undefined : s.key })} aria-pressed={stage === s.key} className={pillCls(stage === s.key)}>
@@ -133,31 +139,39 @@ export async function CrmList({ slug, brandId, kind, canEdit, manager, sp }: { s
               </Link>
             ))}
           </div>
+          {tagList.length > 0 && (
+            <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Filter by tag">
+              {tagList.slice(0, 12).map((t) => (
+                <Link key={t.tag} href={href(base, { ...cur, tag: tag === t.tag ? undefined : t.tag })} aria-pressed={tag === t.tag} className={pillCls(tag === t.tag)}>
+                  {t.tag}
+                  <span className="font-mono text-micro opacity-70">{t.n}</span>
+                </Link>
+              ))}
+              {tag && !tagList.slice(0, 12).some((t) => t.tag === tag) && (
+                <Link href={href(base, { ...cur, tag: undefined })} aria-pressed className={pillCls(true)}>
+                  {tag}
+                </Link>
+              )}
+            </div>
+          )}
 
-          {rows.length === 0 ? (
+          {total === 0 ? (
             <EmptyState icon={<Search className="size-6" aria-hidden />} title={`No ${nouns} match`} hint="Try fewer words, or clear the filters." />
           ) : (
             <>
-              <p className="mb-3 text-small text-ink-500">
-                {fmtNum(rows.length)} {rows.length === 1 ? noun : nouns}. People to follow up come first.
-              </p>
-              <ul className="divide-y divide-hairline rounded-bubble border border-hairline bg-paper-0">
-                {shown.map((p) => (
-                  <li key={p.id}>
-                    <Link href={`${crmBase(slug)}/${p.id}`} className="flex items-start gap-4 px-5 py-4 hover:bg-paper-100 focus-visible:shadow-focus focus-visible:outline-none">
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-body font-semibold text-ink-800">{p.name}</span>
-                        {(p.company || p.source) && <span className="mt-0.5 block truncate text-small text-ink-500">{[p.company, p.source].filter(Boolean).join(" · ")}</span>}
-                        <span className="mt-2 flex flex-wrap gap-1.5">
-                          <StageChip stages={stages} stage={p.stage} />
-                          <FollowChip state={followState(p, today, stages)} date={p.next_follow_up} />
-                        </span>
-                      </span>
-                      {p.value !== null && p.value > 0 && <span className="shrink-0 font-mono text-body font-medium text-ink-800">{fmtNum(p.value)}</span>}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-small text-ink-500">
+                  {fmtNum(total)} {total === 1 ? noun : nouns}
+                  {filtered ? " match" : ""}. People to follow up come first.
+                </p>
+                {manager && (
+                  <a href={exportHref} className={btnCls("secondary", "sm")}>
+                    <Download className="size-4" aria-hidden />
+                    Download CSV
+                  </a>
+                )}
+              </div>
+              <PeopleTable rows={rows} brandId={brandId} slug={slug} kind={kind} stages={stages} total={total} filter={{ q, stage, due, tag }} canEdit={canEdit} manager={manager} />
               {pages > 1 && (
                 <nav aria-label="Pages" className="mt-4 flex items-center justify-between gap-3">
                   {page > 1 ? (

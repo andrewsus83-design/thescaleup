@@ -7,7 +7,7 @@ import { Alert, Btn, Card } from "@/components/brand/primitives";
 import { labelCls, pillCls } from "@/components/brand/styles";
 import { listPath } from "@/components/hub/crm/parts";
 import { compactField } from "@/components/hub/tasks/parts";
-import { importPeopleChunk } from "@/lib/hub/crm-actions";
+import { importPeopleChunk, startPeopleImport } from "@/lib/hub/crm-actions";
 import { CHUNK, FIELDS, MAX_ROWS, detectHeader, guessMapping, mappingError, toPeople, type Mapping } from "@/lib/hub/crm/import";
 import { labelOf, stagesOf, type Kind, type StageDef } from "@/lib/hub/crm/model";
 import { fmtNum, fmtPrice } from "@/lib/hub/products/model";
@@ -25,6 +25,7 @@ const plural = (n: number, one: string, many: string) => `${fmtNum(n)} ${n === 1
 export function ImportWizard({ brandId, slug, initialKind, stages }: { brandId: string; slug: string; initialKind: Kind; stages: StageDef[] }) {
   const [kind, setKind] = useState<Kind>(initialKind);
   const [defaultSource, setDefaultSource] = useState("CSV import");
+  const [tagText, setTagText] = useState("");
   const [file, setFile] = useState<Loaded | null>(null);
   const [reading, setReading] = useState(false);
   const [error, setError] = useState("");
@@ -90,16 +91,27 @@ export function ImportWizard({ brandId, slug, initialKind, stages }: { brandId: 
     let created = 0;
     let skipped = 0;
     setProgress({ done: 0, total: rows.length });
+    let started: Awaited<ReturnType<typeof startPeopleImport>>;
+    try {
+      started = await startPeopleImport({ brandId, kind, fileName: file?.name ?? "", tags: tagText });
+    } catch {
+      started = { ok: false, error: "The connection dropped." };
+    }
+    if (!started.ok) {
+      setError(started.error);
+      setProgress(null);
+      return;
+    }
     for (let i = 0; i < rows.length; i += CHUNK) {
       const part = rows.slice(i, i + CHUNK);
       let r: Awaited<ReturnType<typeof importPeopleChunk>>;
       try {
-        r = await importPeopleChunk({ brandId, kind, rows: part });
+        r = await importPeopleChunk({ brandId, importId: started.importId, rows: part });
       } catch {
         r = { ok: false, error: "The connection dropped." };
       }
       if (!r.ok) {
-        setError(`${r.error} ${i > 0 ? `${fmtNum(created)} ${created === 1 ? "person was" : "people were"} added before this. ` : ""}Importing the same file again is safe: people who were added are left alone.`);
+        setError(`${r.error} ${i > 0 ? `${fmtNum(created)} ${created === 1 ? "person was" : "people were"} added before this. ` : ""}Importing the same file again is safe: people who were added are left alone. You can also undo this import from the list below.`);
         setProgress(null);
         return;
       }
@@ -156,6 +168,11 @@ export function ImportWizard({ brandId, slug, initialKind, stages }: { brandId: 
           Source for people whose row has none
         </label>
         <input id="imp-source" value={defaultSource} onChange={(e) => setDefaultSource(e.target.value)} maxLength={60} disabled={busy} className={`${compactField} h-14 w-full rounded-field sm:max-w-sm`} />
+        <label htmlFor="imp-tags" className={`${labelCls} mt-4`}>
+          Tags for everyone in this file (optional)
+        </label>
+        <input id="imp-tags" value={tagText} onChange={(e) => setTagText(e.target.value)} maxLength={200} placeholder="e.g. webinar nov, jakarta" disabled={busy} className={`${compactField} h-14 w-full rounded-field sm:max-w-sm`} />
+        <p className="mt-1 text-caption text-ink-500">Separate tags with commas. Tags let you find this group later and email only them.</p>
       </Card>
 
       <Card small>
