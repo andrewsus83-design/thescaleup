@@ -6,13 +6,14 @@ import { labelOf, stageDef, stagesOf, type FollowState, type Kind, type StageDef
 export const crmBase = (slug: string) => `/hub/b/${slug}/crm`;
 export const listPath = (slug: string, kind: Kind) => (kind === "lead" ? crmBase(slug) : `${crmBase(slug)}/clients`);
 
-export type Section = "leads" | "clients" | "board" | "funnel" | "setup" | "automations";
+export type Section = "leads" | "clients" | "board" | "funnel" | "forms" | "setup" | "automations";
 
 const SECTIONS: { id: Section; label: string; path: string; manager?: boolean }[] = [
   { id: "leads", label: "Leads", path: "" },
   { id: "clients", label: "Clients", path: "/clients" },
   { id: "board", label: "Board", path: "/board" },
   { id: "funnel", label: "Funnel", path: "/funnel" },
+  { id: "forms", label: "Forms", path: "/forms", manager: true },
   { id: "setup", label: "Setup", path: "/setup", manager: true },
   { id: "automations", label: "Automations", path: "/automations", manager: true },
 ];

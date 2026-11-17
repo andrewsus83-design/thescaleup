@@ -7,15 +7,18 @@ import { CampaignBuilder } from "@/components/hub/email/builder";
 import { MailShell } from "@/components/hub/mail/shell";
 import { requireFunction } from "@/lib/hub/access";
 import { builderData } from "@/lib/hub/email/builder-data";
-import { emptyDoc } from "@/lib/hub/email/model";
+import { emptyDoc, parseAudience } from "@/lib/hub/email/model";
 import { countUnread } from "@/lib/hub/mail/data";
 import { canManageTeam } from "@/lib/hub/rules";
 
 export const metadata: Metadata = { title: "New campaign" };
 export const dynamic = "force-dynamic";
 
-export default async function NewCampaignPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export default async function NewCampaignPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const [{ slug }, sp] = await Promise.all([params, searchParams]);
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  // From the CRM list: "Email these people" arrives with the tag and the kind that were on screen.
+  const start = parseAudience({ kinds: [one(sp.kind) === "lead" ? "lead" : "client"], stages: [], tags: [one(sp.tag) ?? ""] });
   const { brand, actor } = await requireFunction(slug, "mail", "edit");
   const [data, unread] = await Promise.all([builderData(brand.id), countUnread(brand.id)]);
   return (
@@ -34,10 +37,11 @@ export default async function NewCampaignPage({ params }: { params: Promise<{ sl
           brandId={brand.id}
           slug={slug}
           brandName={brand.name}
-          initial={{ name: "", doc: emptyDoc(), addressId: data.addresses.length === 1 ? data.addresses[0].id : "", audience: { kinds: ["client"], stages: [] } }}
+          initial={{ name: "", doc: emptyDoc(), addressId: data.addresses.length === 1 ? data.addresses[0].id : "", audience: start }}
           addresses={data.addresses}
           templates={data.templates}
           stages={data.stages}
+          tags={data.tags}
           blocker={data.blocker}
         />
       )}

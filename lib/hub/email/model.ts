@@ -2,6 +2,7 @@
 // phones (tables, inline styles, no scripts), the merge tags, safe links, the unsubscribe token and the starting designs. No I/O.
 // The browser uses the same code for the live preview that the server uses to send, so what you see is what is sent.
 
+import { parseTags } from "../crm/model";
 import { isEmail } from "../mail/model";
 
 export const EMAIL_LIMITS = { blocks: 60, text: 5000, heading: 200, label: 60, alt: 200, url: 2000, subject: 200, preheader: 150, footer: 400, name: 120, recipients: 1000, batch: 50 } as const;
@@ -193,13 +194,15 @@ export function renderEmail(doc: Doc, vars: Vars, unsubscribe: string | null): R
 // ---------------------------------------------------------------------------------------------- audience
 export const AUDIENCE_KINDS = ["lead", "client"] as const;
 export type AudienceKind = (typeof AUDIENCE_KINDS)[number];
-export type Audience = { kinds: AudienceKind[]; stages: string[] };
+/** `tags`: only people who have at least one of these. Empty means everyone of the chosen kinds and stages. */
+export type Audience = { kinds: AudienceKind[]; stages: string[]; tags: string[] };
 
 export function parseAudience(raw: unknown): Audience {
   const o = isObj(raw) ? raw : {};
   const kinds = (Array.isArray(o.kinds) ? o.kinds : []).filter((k): k is AudienceKind => k === "lead" || k === "client");
   const stages = (Array.isArray(o.stages) ? o.stages : []).filter((s): s is string => typeof s === "string" && /^[a-z0-9_-]{1,40}$/i.test(s));
-  return { kinds: [...new Set(kinds)], stages: [...new Set(stages)].slice(0, 40) };
+  const tags = parseTags(Array.isArray(o.tags) ? o.tags.filter((t): t is string => typeof t === "string").join(",") : "").slice(0, 10);
+  return { kinds: [...new Set(kinds)], stages: [...new Set(stages)].slice(0, 40), tags };
 }
 
 export type Person = { id: string; email: string; name: string; company: string };
