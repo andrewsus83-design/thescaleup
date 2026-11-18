@@ -70,7 +70,8 @@ export const TEMPLATES: Template[] = [
 
 export const findTemplate = (id: unknown): Template | undefined => TEMPLATES.find((t) => t.id === id);
 
-const NOTE_KEYS = ["brand", "who", "what", "why", "where", "when"] as const;
+// Order matters: the notes are cut at a size limit, so what a writer needs most comes first.
+const NOTE_KEYS = ["brand", "what", "who", "buyers", "where", "why", "avoid", "language", "lead", "sale", "when"] as const;
 
 /** The brand's own notes (the profile), as short lines for the prompt. Only plain text is used, and each line is capped. */
 export function brandNotes(profile: unknown): string {
@@ -80,10 +81,10 @@ export function brandNotes(profile: unknown): string {
   for (const k of NOTE_KEYS) {
     const v = p[k];
     const text = typeof v === "string" ? v : Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").join(", ") : "";
-    const clean = text.replace(/\s+/g, " ").trim().slice(0, 400);
+    const clean = text.replace(/\s+/g, " ").trim().slice(0, 500);
     if (clean) lines.push(`- ${k}: ${clean}`);
   }
-  return lines.join("\n").slice(0, 1_800);
+  return lines.join("\n").slice(0, 2_600);
 }
 
 /** The system prompt for writing a piece. The brief is data: the model is told it cannot change these rules. */

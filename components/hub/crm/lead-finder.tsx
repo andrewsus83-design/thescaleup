@@ -12,7 +12,7 @@ import { AI_TAG, FIND, SITE_LABEL, preTicked, type Candidate } from "@/lib/hub/l
 import { cn } from "@/lib/utils";
 
 /** Describe the kind of business to find. The search takes up to a minute. */
-export function FinderForm({ brandId }: { brandId: string }) {
+export function FinderForm({ brandId, defaults }: { brandId: string; defaults?: { what: string; where: string; offer: string } }) {
   const [state, action, pending] = useActionState<FormState, FormData>(findLeads, {});
   return (
     <form action={action} className="space-y-6">
@@ -26,14 +26,14 @@ export function FinderForm({ brandId }: { brandId: string }) {
         <label htmlFor="lf-what" className={labelCls}>
           What kind of business?
         </label>
-        <textarea id="lf-what" name="what" rows={3} required minLength={8} maxLength={FIND.what} placeholder="Cafes and coffee shops that sell beans online, with a working website" className={textareaCls} />
+        <textarea id="lf-what" name="what" rows={3} required minLength={8} maxLength={FIND.what} defaultValue={defaults?.what ?? ""} placeholder="Cafes and coffee shops that sell beans online, with a working website" className={textareaCls} />
       </div>
       <div className="grid gap-6 sm:grid-cols-[1fr_auto]">
         <div>
           <label htmlFor="lf-where" className={labelCls}>
             Where (optional)
           </label>
-          <input id="lf-where" name="where" maxLength={FIND.where} autoComplete="off" placeholder="Surabaya and nearby" className={cn(compactField, "h-12 w-full")} />
+          <input id="lf-where" name="where" maxLength={FIND.where} autoComplete="off" defaultValue={defaults?.where ?? ""} placeholder="Surabaya and nearby" className={cn(compactField, "h-12 w-full")} />
         </div>
         <div>
           <label htmlFor="lf-count" className={labelCls}>
@@ -52,7 +52,7 @@ export function FinderForm({ brandId }: { brandId: string }) {
         <label htmlFor="lf-offer" className={labelCls}>
           What do you offer them? (optional)
         </label>
-        <textarea id="lf-offer" name="offer" rows={2} maxLength={FIND.offer} placeholder="Packaging and delivery for small roasters. Skip chains with more than 10 outlets." className={textareaCls} />
+        <textarea id="lf-offer" name="offer" rows={2} maxLength={FIND.offer} defaultValue={defaults?.offer ?? ""} placeholder="Packaging and delivery for small roasters. Skip chains with more than 10 outlets." className={textareaCls} />
         <p className="mt-2 text-caption text-ink-500">Helps the AI pick businesses that fit, and skip the ones you do not want.</p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
