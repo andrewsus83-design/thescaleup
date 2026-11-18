@@ -15,7 +15,7 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
   const profile = await getProfile(brand.id);
   const answered = profile ? filledCount(profile.value) : 0;
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div>
       <PageHeader title={brand.name} description="Where the brand stands and what to do next." />
       <SectionList
         items={[

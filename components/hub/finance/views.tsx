@@ -60,7 +60,7 @@ export function IconBubble({ icon: Icon, quiet, className }: { icon: LucideIcon;
 /** A white raised card with a title row: the title, an optional line under it and an optional link on the right. */
 export function Panel({ id, title, hint, action, className, children }: { id: string; title: string; hint?: React.ReactNode; action?: React.ReactNode; className?: string; children: React.ReactNode }) {
   return (
-    <section aria-labelledby={id} className={cn(cardCls(true), "flex flex-col", className)}>
+    <section aria-labelledby={id} className={cn(cardCls(true), "@container flex flex-col", className)}>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
           <h2 id={id} className={groupTitleCls}>

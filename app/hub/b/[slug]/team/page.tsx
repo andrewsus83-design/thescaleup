@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CalendarCheck, CalendarDays, CalendarOff, CheckSquare, Clock, Target, Users } from "lucide-react";
 import { PageHeader } from "@/components/brand/primitives";
+import { Split, SplitMain, SplitSide } from "@/components/hub/panels";
 import { SectionList, type SectionItem } from "@/components/hub/section-list";
 import { ClockCard } from "@/components/hub/tasks/clock-card";
 import { requireFunction } from "@/lib/hub/access";
@@ -30,12 +31,17 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
   items.push({ key: "attendance", title: "Attendance", hint: "Days present, late and on leave, month by month", icon: CalendarCheck, href: `${base}/team/attendance` });
   // Salary and payroll is not built yet, so it is not shown.
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div>
       <PageHeader title="Team" description="Tasks, hours, people and leave in one place." />
-      <div className="mb-8">
-        <ClockCard brandId={brand.id} sinceLabel={open ? fmtStamp(open.clock_in, tz, todayIn(tz)) : null} />
-      </div>
-      <SectionList items={items} />
+      <Split>
+        {/* Clocking in is what most people open this page for, so on a phone it comes first. */}
+        <SplitSide first>
+          <ClockCard brandId={brand.id} sinceLabel={open ? fmtStamp(open.clock_in, tz, todayIn(tz)) : null} ink />
+        </SplitSide>
+        <SplitMain>
+          <SectionList items={items} twoAtMost />
+        </SplitMain>
+      </Split>
     </div>
   );
 }

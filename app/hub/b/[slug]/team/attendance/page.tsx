@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarCheck } from "lucide-react";
-import { Alert, Card, EmptyState, PageHeader } from "@/components/brand/primitives";
+import { Alert, EmptyState, PageHeader } from "@/components/brand/primitives";
 import { btnCls, rowHeadCls, tableCls, tableWrapCls, tbodyCls, tdCls, thCls, theadCls } from "@/components/brand/styles";
 import { BackLink } from "@/components/hub/back-link";
 import { WorkSettingsForm } from "@/components/hub/hr/forms";
+import { Panel, Split, SplitMain, SplitSide, StatTiles } from "@/components/hub/panels";
 import { requireFunction } from "@/lib/hub/access";
 import { getSettings, listClockIns, listLeave, listPeople, personForUser } from "@/lib/hub/hr/data";
 import { attendanceFor, lastDayOf, WORKDAYS_LABEL } from "@/lib/hub/hr/model";
@@ -53,90 +54,106 @@ export default async function AttendancePage({ params, searchParams }: { params:
   }));
   const href = (m: string) => `/hub/b/${slug}/team/attendance?m=${m}`;
 
-  return (
-    <div className="mx-auto w-full max-w-3xl">
-      <BackLink href={`/hub/b/${slug}/team`}>Team</BackLink>
-      <PageHeader title="Attendance" description={manages ? "The team's month, counted from their clock-ins." : "Your month, counted from your clock-ins."} />
-
-      <nav aria-label="Month" className="mb-6 flex flex-wrap items-center gap-3">
-        <Link href={href(shiftMonth(month, -1))} className={btnCls("secondary", "sm")}>
-          Earlier
+  const sumOf = (k: "present" | "late" | "onLeave" | "noClockIn") => rows.reduce((n, r) => n + r.a[k], 0);
+  const monthNav = (
+    <nav aria-label="Month" className="flex flex-wrap items-center gap-3">
+      <Link href={href(shiftMonth(month, -1))} className={btnCls("secondary", "sm")}>
+        Earlier
+      </Link>
+      <p className="font-title text-h4 text-ink-800" aria-live="polite">
+        {monthLabel(month)}
+      </p>
+      {month < thisMonth && (
+        <Link href={href(shiftMonth(month, 1))} className={btnCls("secondary", "sm")}>
+          Later
         </Link>
-        <p className="font-title text-h4 text-ink-800" aria-live="polite">
-          {monthLabel(month)}
-        </p>
-        {month < thisMonth && (
-          <Link href={href(shiftMonth(month, 1))} className={btnCls("secondary", "sm")}>
-            Later
-          </Link>
-        )}
-      </nav>
-
-      {rows.length === 0 ? (
-        <EmptyState
-          icon={<CalendarCheck className="size-6" aria-hidden />}
-          title={manages ? "No one to count yet" : "No attendance for you yet"}
-          hint={manages ? "Attendance is counted for people whose record is linked to a sign-in. Add people under Team, People and link their sign-in." : "Ask whoever manages the team to add your people record and link it to your sign-in."}
-        />
-      ) : (
-        <div className={tableWrapCls}>
-          <table className={cn(tableCls, "min-w-xl")}>
-            <caption className="sr-only">Attendance in {monthLabel(month)}</caption>
-            <thead className={theadCls}>
-              <tr>
-                {["Person", "Days present", "Late", "On leave", "No clock-in", "Hours"].map((h, i) => (
-                  <th key={h} scope="col" className={thCls(i > 0)}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className={tbodyCls}>
-              {rows.map(({ p, a }) => (
-                <tr key={p.id}>
-                  <th scope="row" className={rowHeadCls}>
-                    {manages ? (
-                      <Link href={`/hub/b/${slug}/team/people/${p.id}`} className="underline underline-offset-4">
-                        {p.name}
-                      </Link>
-                    ) : (
-                      p.name
-                    )}
-                  </th>
-                  <td className={tdCls(true)}>{a.present}</td>
-                  <td className={tdCls(true)}>{a.late}</td>
-                  <td className={tdCls(true)}>{a.onLeave}</td>
-                  <td className={tdCls(true)}>{a.noClockIn}</td>
-                  <td className={tdCls(true)}>{fmtDuration(a.minutes)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       )}
+    </nav>
+  );
+  return (
+    <div>
+      <BackLink href={`/hub/b/${slug}/team`}>Team</BackLink>
+      <PageHeader title="Attendance" description={manages ? "The team's month, counted from their clock-ins." : "Your month, counted from your clock-ins."} action={monthNav} />
 
-      <div className="mt-6 space-y-3">
-        <p className="text-small text-ink-500">
-          Late means the first clock-in of the day came more than {settings.lateAfterMin} minutes after {settings.workStart}. Working days are {WORKDAYS_LABEL[settings.workdays].toLowerCase()}.
-        </p>
-        <p className="text-small text-ink-500">No clock-in counts working days before today with no clock-in and no approved leave. The hub does not know public holidays, and people forget to clock in, so treat it as a reason to ask, not as an absence.</p>
-        {unlinked > 0 && (
-          <Alert tone="info">
-            {unlinked === 1 ? "One active person has" : `${unlinked} active people have`} no sign-in linked, so they are not counted here.
-          </Alert>
-        )}
-      </div>
+      <Split>
+        <SplitMain>
+          {rows.length === 0 ? (
+            <EmptyState
+              icon={<CalendarCheck className="size-6" aria-hidden />}
+              title={manages ? "No one to count yet" : "No attendance for you yet"}
+              hint={manages ? "Attendance is counted for people whose record is linked to a sign-in. Add people under Team, People and link their sign-in." : "Ask whoever manages the team to add your people record and link it to your sign-in."}
+            />
+          ) : (
+            <>
+              <StatTiles
+                items={[
+                  { label: "Days present", value: sumOf("present") },
+                  { label: "Late", value: sumOf("late") },
+                  { label: "On leave", value: sumOf("onLeave") },
+                  { label: "No clock-in", value: sumOf("noClockIn"), warn: sumOf("noClockIn") > 0 },
+                ]}
+              />
+              <Panel id="att-table" title={monthLabel(month)} hint={manages ? `${rows.length} ${rows.length === 1 ? "person" : "people"}, in alphabetical order` : undefined}>
+                <div className={tableWrapCls}>
+                  <table className={cn(tableCls, "min-w-xl")}>
+                    <caption className="sr-only">Attendance in {monthLabel(month)}</caption>
+                    <thead className={theadCls}>
+                      <tr>
+                        {["Person", "Days present", "Late", "On leave", "No clock-in", "Hours"].map((h, i) => (
+                          <th key={h} scope="col" className={thCls(i > 0)}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className={tbodyCls}>
+                      {rows.map(({ p, a }) => (
+                        <tr key={p.id}>
+                          <th scope="row" className={rowHeadCls}>
+                            {manages ? (
+                              <Link href={`/hub/b/${slug}/team/people/${p.id}`} className="underline underline-offset-4">
+                                {p.name}
+                              </Link>
+                            ) : (
+                              p.name
+                            )}
+                          </th>
+                          <td className={tdCls(true)}>{a.present}</td>
+                          <td className={tdCls(true)}>{a.late}</td>
+                          <td className={tdCls(true)}>{a.onLeave}</td>
+                          <td className={tdCls(true)}>{a.noClockIn}</td>
+                          <td className={tdCls(true)}>{fmtDuration(a.minutes)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Panel>
+            </>
+          )}
+          {unlinked > 0 && (
+            <Alert tone="info">
+              {unlinked === 1 ? "One active person has" : `${unlinked} active people have`} no sign-in linked, so they are not counted here.
+            </Alert>
+          )}
+        </SplitMain>
 
-      {manages && (
-        <section aria-labelledby="att-set" className="mt-10">
-          <h2 id="att-set" className="mb-3 font-title text-h3 text-ink-800">
-            Working hours
-          </h2>
-          <Card>
-            <WorkSettingsForm brandId={brand.id} settings={settings} />
-          </Card>
-        </section>
-      )}
+        <SplitSide>
+          <Panel id="att-how" title="How this is counted">
+            <div className="space-y-3 text-small font-normal text-ink-600">
+              <p>
+                Late means the first clock-in of the day came more than {settings.lateAfterMin} minutes after {settings.workStart}. Working days are {WORKDAYS_LABEL[settings.workdays].toLowerCase()}.
+              </p>
+              <p>No clock-in counts working days before today with no clock-in and no approved leave. The hub does not know public holidays, and people forget to clock in, so treat it as a reason to ask, not as an absence.</p>
+            </div>
+          </Panel>
+          {manages && (
+            <Panel id="att-set" title="Working hours">
+              <WorkSettingsForm brandId={brand.id} settings={settings} />
+            </Panel>
+          )}
+        </SplitSide>
+      </Split>
     </div>
   );
 }

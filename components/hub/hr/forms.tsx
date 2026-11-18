@@ -48,7 +48,7 @@ export function PersonForm({ brandId, person, emergency, members }: { brandId: s
       <input type="hidden" name="brandId" value={brandId} />
       {person && <input type="hidden" name="personId" value={person.id} />}
       <Notes state={state} />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
         <div>
           <label htmlFor={`p-name-${id}`} className={labelCls}>
             Full name
@@ -152,7 +152,7 @@ export function WorkSettingsForm({ brandId, settings }: { brandId: string; setti
     <form action={action} className="space-y-4">
       <input type="hidden" name="brandId" value={brandId} />
       <Notes state={state} />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
         <div>
           <label htmlFor="ws-start" className={labelCls}>
             Work starts at
@@ -206,7 +206,7 @@ export function LeaveForm({ brandId, people, ownId, today }: { brandId: string; 
     <form action={action} className="space-y-4">
       <input type="hidden" name="brandId" value={brandId} />
       <Notes state={state} />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
         {people ? (
           <div>
             <label htmlFor="lv-person" className={labelCls}>
