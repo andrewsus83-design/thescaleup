@@ -137,6 +137,8 @@
   --text-caption--line-height: 1.5;
   --text-micro: 0.6875rem; /* 11 Mono tag, table header, label caps */
   --text-micro--line-height: 1.4;
+  --text-date: 1.125rem; /* 18 the value in a date or time field: digits read small at 16 */
+  --text-date--line-height: 1.2;
 
   /* ---- Radius (BRAND §6). 8/12/16/24 are Tailwind's rounded-lg/xl/2xl/3xl; pill is rounded-full. ---- */
   --radius-nav: 0.75rem; /* 12 nav item, menu item */
@@ -504,6 +506,31 @@ body {
   :is(.room-app, .brand-app) :where(a, button, summary, select, input[type="checkbox"], [role="tab"], [role="tabpanel"], [role="radio"], [role="checkbox"], [role="switch"], [role="option"]):focus-visible {
     outline: 2px solid var(--color-brand-600);
     outline-offset: 2px;
+  }
+}
+
+/* A date or time field: the value is a size larger than other fields (digits read small at 16) and its digits line up.
+   Unlayered on purpose, so it wins over the size utility every field carries. */
+:is(.room-app, .brand-app) input:is([type="date"], [type="time"], [type="month"], [type="datetime-local"]) {
+  font-size: var(--text-date);
+  line-height: var(--text-date--line-height);
+  font-variant-numeric: tabular-nums;
+}
+/* Safari only (Mac and iPhone; the font test is one only Safari passes). There a date field shows its value at the top of the box
+   unless the field is a flex box, and an iPhone centres the value sideways. Other browsers already centre it and are left alone:
+   in Chrome a flex box would pull the calendar icon away from the right edge. */
+@supports (font: -apple-system-body) and (-webkit-appearance: none) {
+  :is(.room-app, .brand-app) input:is([type="date"], [type="time"], [type="month"], [type="datetime-local"]) {
+    display: flex;
+    align-items: center;
+  }
+  :is(.room-app, .brand-app) input::-webkit-datetime-edit {
+    padding: 0;
+    line-height: var(--text-date--line-height);
+  }
+  :is(.room-app, .brand-app) input::-webkit-date-and-time-value {
+    margin: 0;
+    text-align: left;
   }
 }
 

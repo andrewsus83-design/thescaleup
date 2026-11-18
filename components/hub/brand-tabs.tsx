@@ -54,8 +54,8 @@ const activeCls = "bg-brand-100 text-brand-900";
 
 const itemCls = (active: boolean) =>
   cn(
-    "relative flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1 text-micro leading-none transition-colors duration-150 ease-out focus-visible:shadow-focus focus-visible:outline-none",
-    // Every label is the small 11px size. The open menu is the light orange pill in semibold. The others step back: a medium-weight
+    "relative flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-panel px-2 text-micro leading-none transition-colors duration-150 ease-out focus-visible:shadow-focus focus-visible:outline-none",
+    // A tab is a rounded tile, not a circle: a circle cuts into the corners where the label sits. Every label is the small 11px size. The open menu is the light orange pill in semibold. The others step back: a medium-weight
     // label in the lightest grey that still reads on white (4.5:1) and a lighter icon (3.4:1, enough for a graphic).
     active ? cn(activeCls, "font-semibold") : "font-medium text-ink-450 hover:bg-paper-100 hover:text-ink-800 [&>svg]:text-ink-400 hover:[&>svg]:text-ink-800",
   );
@@ -107,7 +107,7 @@ export function BrandTabs({ slug, tabs, bar, more }: { slug: string; tabs: TabKe
         hidden && "translate-y-[calc(100%+1rem)]",
       )}
     >
-      <div className="pointer-events-auto relative w-full max-w-md rounded-full border border-hairline bg-paper-0 p-2 shadow-overlay md:max-w-6xl">
+      <div className="pointer-events-auto relative w-full max-w-md rounded-card border border-hairline bg-paper-0 p-2 shadow-overlay md:max-w-6xl">
         {/* Tablet and up: every menu */}
         <ul className="hidden gap-1 md:flex">{tabs.map((k) => tab(k, true))}</ul>
 
