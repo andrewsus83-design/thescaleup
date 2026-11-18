@@ -15,6 +15,20 @@ export async function askClaude(apiKey: string, system: string, user: string, ma
   return { text, tokens: { in: resp.usage?.input_tokens ?? 0, out: resp.usage?.output_tokens ?? 0 } };
 }
 
+/**
+ * A short back-and-forth with no tools. The caller sends the whole conversation each time and nothing is kept here, so a chat is
+ * only ever as long as the page that holds it. `truncated` is true when the reply hit the token cap and was cut off.
+ */
+export async function askClaudeChat(apiKey: string, system: string, messages: { role: "user" | "assistant"; content: string }[], maxTokens: number, timeoutMs = 90_000) {
+  const client = new Anthropic({ apiKey });
+  const resp = await client.messages.create({ model: aiModel(), max_tokens: maxTokens, system, messages }, { timeout: timeoutMs });
+  const text = resp.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("\n");
+  return { text, truncated: resp.stop_reason === "max_tokens", tokens: { in: resp.usage?.input_tokens ?? 0, out: resp.usage?.output_tokens ?? 0 } };
+}
+
 /** The Anthropic account behind the key cannot use web search (it is switched off for the organisation, or the key may not use it). */
 export class SearchUnavailable extends Error {}
 

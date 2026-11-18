@@ -4,10 +4,12 @@ import { Btn, Card } from "@/components/brand/primitives";
 import { BackLink } from "@/components/hub/back-link";
 import { Checklist } from "@/components/hub/tasks/checklist";
 import { Comments } from "@/components/hub/tasks/comments";
+import { DoWithAi } from "@/components/hub/tasks/do-with-ai";
 import { Avatar, DueLabel, PriorityMark, SourceTag, StatusLabel, TagList } from "@/components/hub/tasks/parts";
 import { CommentComposer, DecisionPanel, SummarizeButton, TaskForm } from "@/components/hub/tasks/task-detail";
 import { requireFunction } from "@/lib/hub/access";
 import { deleteTask } from "@/lib/hub/task-actions";
+import { pickJob } from "@/lib/hub/tasks/do-ai";
 import { getTask, getWorkflow, hasAiKey, listComments, listItems, listMembers } from "@/lib/hub/tasks/data";
 import { fmtDay, hubTz, todayIn } from "@/lib/hub/tasks/dates";
 import { shortName } from "@/lib/hub/tasks/model";
@@ -16,6 +18,8 @@ import { atLeast } from "@/lib/hub/permissions";
 
 export const metadata: Metadata = { title: "Task" };
 export const dynamic = "force-dynamic";
+// "Do with AI" is a server action called from this page: it runs under this limit.
+export const maxDuration = 120;
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -43,6 +47,7 @@ export default async function TaskPage({ params }: { params: Promise<{ slug: str
   const editable = editFields || statuses.length > 1;
   const canTick = editFields || (actor === "ops" && atLeast(access.tasks, "edit") && task.assignee_id === user.id);
   const aiReady = canComment(who) && (await hasAiKey(brand.id));
+  const doAi = canComment(who) && task.stage !== "rejected";
 
   return (
     <div className="w-full">
@@ -112,6 +117,26 @@ export default async function TaskPage({ params }: { params: Promise<{ slug: str
               Checklist
             </h2>
             <Checklist brandId={brand.id} taskId={task.id} initial={items} canEdit={editFields} canTick={canTick} />
+          </section>
+        )}
+
+        {doAi && (
+          <section aria-labelledby="do-ai">
+            <h2 id="do-ai" className="mb-4 font-title text-h3 text-ink-800">
+              Do with AI
+            </h2>
+            {aiReady ? (
+              <DoWithAi
+                brandId={brand.id}
+                taskId={task.id}
+                taskTitle={task.title}
+                slug={slug}
+                startJob={pickJob(task.title, [task.description ?? "", ...items.map((i) => i.body)])}
+                canWiki={atLeast(access.wiki, "edit")}
+              />
+            ) : (
+              <p className="text-small text-ink-500">Add an Anthropic key in Settings → Integrations to use AI on tasks.</p>
+            )}
           </section>
         )}
 
