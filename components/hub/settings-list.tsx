@@ -5,7 +5,7 @@ const SECTIONS: (Omit<SectionItem, "href"> & { manage: boolean })[] = [
   { key: "security", title: "Password and security", hint: "Set or change the password you sign in with", icon: ShieldCheck, manage: false },
   { key: "menu", title: "Phone menu", hint: "Choose the four menus on your phone's bottom bar", icon: Smartphone, manage: false },
   { key: "integrations", title: "Integrations and API keys", hint: "AI models, search, scraping, cost control and Google", icon: KeyRound, manage: true },
-  { key: "social", title: "Social media connections", hint: "Connect this brand's social accounts and WhatsApp", icon: Share2, manage: true },
+  { key: "social", title: "Social media connections", hint: "Connect this brand's social accounts", icon: Share2, manage: true },
   { key: "telegram", title: "Telegram", hint: "Connect a Telegram bot, with a step-by-step guide", icon: Send, manage: false },
   { key: "import", title: "Import", hint: "Bring work over from ClickUp and other tools, or ask for a new source", icon: DatabaseZap, manage: true },
   { key: "workflow", title: "Workflow", hint: "The steps a task goes through, and whether new tasks need approval", icon: ListChecks, manage: true },

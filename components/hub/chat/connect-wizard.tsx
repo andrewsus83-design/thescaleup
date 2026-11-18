@@ -115,11 +115,11 @@ export function ConnectWizard({ brandId, slug, hasKey, hasZernio, today }: { bra
       {!hasKey && <Alert tone="warn">Add an Anthropic key in Settings → Integrations first. The audit uses Claude Sonnet 5.5 to read the conversations.</Alert>}
       {!hasZernio && (
         <Alert tone="warn">
-          This brand has no Zernio key yet. Add it in{" "}
+          No social accounts are connected yet. Connect them in{" "}
           <Link href={`/hub/b/${slug}/settings/social`} className="font-semibold underline">
             Settings, Social media connections
           </Link>
-          , and make sure the Inbox add-on is on in your Zernio account.
+          , then come back here.
         </Alert>
       )}
       {error && (

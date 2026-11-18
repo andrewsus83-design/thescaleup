@@ -187,7 +187,7 @@ export function AdList({ ads, tz }: { ads: AdRow[]; tz: string }) {
 export function ProblemNotice({ slug, problem, canSetup }: { slug: string; problem: Problem; canSetup: boolean }) {
   const setup = problem.kind === "no-key" || problem.kind === "auth";
   return (
-    <EmptyState icon={<Megaphone className="size-6" aria-hidden />} title={problem.kind === "no-key" ? "Connect Zernio to see ads" : "Ads could not be loaded"} hint={problem.kind === "no-key" ? (canSetup ? "Add this brand's Zernio key, then connect its ad accounts in Zernio. Ads shows up here." : "The founder adds the brand's Zernio key. Ask them to.") : problem.message}>
+    <EmptyState icon={<Megaphone className="size-6" aria-hidden />} title={problem.kind === "no-key" ? "Connect a social account to see ads" : "Ads could not be loaded"} hint={problem.kind === "no-key" ? (canSetup ? `${problem.message} Ads shows up here.` : "The founder connects the brand's accounts. Ask them to.") : problem.message}>
       {setup && canSetup && (
         <Link href={`/hub/b/${slug}/settings/social`} className={btnCls("primary", "md")}>
           Open Social media connections

@@ -1,10 +1,10 @@
 import "server-only";
 import type { Problem } from "../ads/zernio";
 import { parsePost, type PostRow } from "../ads/model";
-import { getBrandKey } from "../secrets";
+import { brandScope } from "../zernio/api";
 import { parseDaily, previousWindow, type Daily, type Window } from "./model";
 
-// Reads from Zernio for the Social Media page, with the brand's own Zernio key (never the agency's). Read-only.
+// Reads from Zernio for the Social Media page: the agency's one key, always limited to this brand's own profile. Read-only.
 // Docs: docs.zernio.com (Posting Analytics: GET /v1/analytics/daily-metrics and GET /v1/analytics).
 
 const base = () => ((process.env.ZERNIO_BASE_URL ?? "").trim() || "https://zernio.com/api").replace(/\/$/, "");
@@ -14,7 +14,7 @@ export type SocialResult = { ok: true; cur: Daily; prev: Daily | null; posts: Po
 const cache = new Map<string, { at: number; value: SocialResult }>();
 
 function problemFor(status: number, body: string): Problem {
-  if (status === 401) return { kind: "auth", message: "Zernio did not accept this brand's key. Paste it again in Settings, Social media connections." };
+  if (status === 401) return { kind: "auth", message: "Zernio did not accept the agency's key. The agency owner can check it in the workspace settings." };
   if (status === 402 || status === 403) return { kind: "plan", message: "Zernio says this key has no analytics access. Plans before usage-based pricing need the Analytics add-on in Zernio." };
   if (status === 429) {
     const wait = Number(/"retryAfterSeconds"\s*:\s*(\d+)/.exec(body)?.[1]);
@@ -36,7 +36,7 @@ async function get(key: string, path: string, qs: URLSearchParams): Promise<Fetc
   }
 }
 
-const daily = (key: string, w: Window, platform?: string) => get(key, "/v1/analytics/daily-metrics", new URLSearchParams({ fromDate: w.from, toDate: w.to, ...(platform ? { platform } : {}) }));
+const daily = (key: string, profileId: string, w: Window, platform?: string) => get(key, "/v1/analytics/daily-metrics", new URLSearchParams({ profileId, fromDate: w.from, toDate: w.to, ...(platform ? { platform } : {}) }));
 
 /**
  * The days and platforms of the window, the same length before it for comparison, and the posts of the window (for the best ones).
@@ -46,13 +46,14 @@ export async function loadSocial(brandId: string, w: Window, platform?: string):
   const ck = `${brandId}|${w.from}|${w.to}|${platform ?? ""}`;
   const hit = cache.get(ck);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
-  const key = await getBrandKey(brandId, "zernio", false);
-  if (!key) return { ok: false, problem: { kind: "no-key", message: "This brand has no Zernio key yet." } };
+  const scope = await brandScope(brandId);
+  if (!scope.ok) return { ok: false, problem: scope.problem };
+  const { key, profileId } = scope;
 
   const [cur, prev, posts] = await Promise.all([
-    daily(key, w, platform),
-    daily(key, previousWindow(w), platform),
-    get(key, "/v1/analytics", new URLSearchParams({ fromDate: w.from, toDate: w.to, limit: "100", page: "1", ...(platform ? { platform } : {}) })),
+    daily(key, profileId, w, platform),
+    daily(key, profileId, previousWindow(w), platform),
+    get(key, "/v1/analytics", new URLSearchParams({ profileId, fromDate: w.from, toDate: w.to, limit: "100", page: "1", ...(platform ? { platform } : {}) })),
   ]);
   if (!cur.ok) {
     if (cur.status) console.error("[social] zernio daily-metrics", cur.status, cur.body.replace(/\s+/g, " "));

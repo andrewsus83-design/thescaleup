@@ -221,7 +221,7 @@ export function TopPosts({ posts, tz }: { posts: PostRow[]; tz: string }) {
 export function ProblemNotice({ slug, problem, canSetup }: { slug: string; problem: Problem; canSetup: boolean }) {
   const setup = problem.kind === "no-key" || problem.kind === "auth";
   return (
-    <EmptyState icon={<Share2 className="size-6" aria-hidden />} title={problem.kind === "no-key" ? "Connect Zernio to see social media numbers" : "Social media numbers could not be loaded"} hint={problem.kind === "no-key" ? (canSetup ? "Add this brand's Zernio key and connect its accounts in Zernio. Reach, posts and interactions show up here." : "The founder adds the brand's Zernio key. Ask them to.") : problem.message}>
+    <EmptyState icon={<Share2 className="size-6" aria-hidden />} title={problem.kind === "no-key" ? "Connect a social account to see the numbers" : "Social media numbers could not be loaded"} hint={problem.kind === "no-key" ? (canSetup ? `${problem.message} Reach, posts and interactions show up here.` : "The founder connects the brand's social accounts. Ask them to.") : problem.message}>
       {setup && canSetup && (
         <Link href={`/hub/b/${slug}/settings/social`} className={btnCls("primary", "md")}>
           Open Social media connections

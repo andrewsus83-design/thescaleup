@@ -13,7 +13,7 @@ export const GROUPS: { id: GroupId; label: string; hint: string }[] = [
   { id: "research", label: "Search and research", hint: "Rankings, AI answers with citations, competitor data" },
   { id: "media", label: "Image and video generation", hint: "Images and video made from a prompt or a photo" },
   { id: "pages", label: "Pages and scraping", hint: "Reading websites and pulling data where no API exists" },
-  { id: "social", label: "Social and messaging", hint: "Connected social accounts and WhatsApp" },
+  { id: "social", label: "Social and messaging", hint: "Social accounts and scheduling tools" },
   { id: "ads", label: "Ads", hint: "Campaigns and ad spend across Google, Meta, LinkedIn and TikTok" },
   { id: "cost", label: "Cost control", hint: "See what every AI call costs, per brand" },
   { id: "google", label: "Google", hint: "Drive files and Calendar events" },
@@ -37,7 +37,7 @@ export const PROVIDERS: ProviderDef[] = [
   { key: "firecrawl", label: "Firecrawl", use: "Clean page text for checks and brand extraction", hint: "fc-...", group: "pages", scope: "both", wired: true },
   { key: "apify", label: "Apify", use: "Scrapers where no API exists (fallback only)", hint: "apify_api_...", group: "pages", scope: "both", wired: true },
 
-  { key: "zernio", label: "Zernio", use: "Connects the brand's social accounts and WhatsApp (one key for both). The Ads menu reads its ad accounts and posts through it", hint: "Zernio API key", group: "social", scope: "brand", wired: true },
+  { key: "zernio", label: "Zernio", use: "The agency's one Zernio key. Each brand gets its own profile inside it, clients connect their social accounts from the hub, and Social media, Inbox and Ads read only that brand's profile", hint: "Zernio API key", group: "social", scope: "workspace", wired: true },
 
   { key: "metricool", label: "Metricool API token", use: "Posts, scheduling and analytics from the brand's Metricool account", hint: "Account settings, API, copy the token", group: "social", scope: "both", wired: false },
   { key: "metricool_user_id", label: "Metricool user ID", use: "Pairs with the token: your Metricool account number", hint: "The number after userId= in the Metricool address bar", group: "social", scope: "both", wired: false },
