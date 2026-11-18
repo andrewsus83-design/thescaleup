@@ -9,9 +9,9 @@ import { allow } from "./ratelimit";
 import { getBrandKey } from "./secrets";
 import { audit } from "./session";
 import { UUID, str, taskContext, type Ctx } from "./tasks/context";
-import { fetchText } from "./web";
-import { PAGE_SYSTEM, PLAN_SYSTEM, QUESTIONS_SYSTEM, SOCIALS, answersText, buildDigest, gapsDraft, htmlToText, pageUser, parseAnswers, parseDraft, parsePlan, parseQuestions, parseSources, pickLinks, planUser, sourcesUser, type Draft, type ReadPart } from "./wiki/build";
-import { getBuild, type ReadNote } from "./wiki/builds";
+import { PAGE_SYSTEM, PLAN_SYSTEM, QUESTIONS_SYSTEM, answersText, gapsDraft, pageUser, parseAnswers, parseDraft, parsePlan, parseQuestions, parseSources, planUser, sourcesUser, type Draft } from "./wiki/build";
+import { getBuild } from "./wiki/builds";
+import { readSources } from "./wiki/read";
 import { aiDefault, pageSlug, parsePage, uniqueSlug } from "./wiki/model";
 
 // The Wiki AI Page Builder. Three steps, each started by a person: read the sources and ask questions; take the answers and
@@ -28,24 +28,6 @@ async function editContext(brandId: unknown): Promise<{ ok: true; ctx: Ctx } | {
   if (!c.ok) return c;
   if (!atLeast(c.ctx.level, "edit")) return { ok: false, error: "You can read the Wiki here but not change it." };
   return c;
-}
-
-const pathOf = (u: string) => {
-  try {
-    return new URL(u).pathname.replace(/\/$/, "") || "/";
-  } catch {
-    return "/";
-  }
-};
-
-/** Reads one address into a part for the digest and a note for the person. `thin` keeps only the title and description (social sites show little else). */
-async function readOne(label: string, url: string, thin: boolean): Promise<{ part: ReadPart | null; note: ReadNote; links: string[] }> {
-  const r = await fetchText(url);
-  if (!r.ok) return { part: null, note: { label, url, ok: false, chars: 0, note: r.error }, links: [] };
-  const t = htmlToText(r.body, thin ? 1500 : undefined);
-  const text = [t.title && `Title: ${t.title}`, t.description && `Description: ${t.description}`, t.text].filter(Boolean).join("\n");
-  if (text.length < 80) return { part: null, note: { label, url, ok: false, chars: text.length, note: "It loaded but has almost no text (the page may build itself in the browser, or hide behind a login)." }, links: t.links };
-  return { part: { label, url: r.finalUrl, text }, note: { label, url: r.finalUrl, ok: true, chars: text.length, note: "" }, links: t.links };
 }
 
 /** Step 1: read the website and social pages, ask the questions that are still open, save the run and open it. */
@@ -66,40 +48,7 @@ export async function startBuild(_prev: FormState, fd: FormData): Promise<FormSt
     return { error: "The Wiki builder needs its database step first (20261117260000_wiki_builds.sql). Ask the person who runs the database updates." };
   }
 
-  const read: ReadNote[] = [];
-  const parts: ReadPart[] = [];
-  const jobs: Promise<void>[] = [];
-  if (src.website) {
-    const site = src.website;
-    jobs.push(
-      (async () => {
-        const home = await readOne("Website", site, false);
-        read.push(home.note);
-        if (home.part) parts.push(home.part);
-        const more = pickLinks(home.part?.url ?? site, home.links);
-        const pages = await Promise.all(more.map((u) => readOne(`Website ${pathOf(u)}`, u, false)));
-        for (const p of pages) {
-          read.push(p.note);
-          if (p.part) parts.push(p.part);
-        }
-      })(),
-    );
-  }
-  for (const s of src.social) {
-    const label = SOCIALS.find((x) => x.id === s.id)!.label;
-    jobs.push(
-      readOne(label, s.url, true).then((r) => {
-        read.push(r.note);
-        if (r.part) parts.push(r.part);
-      }),
-    );
-  }
-  await Promise.all(jobs);
-  const order = (l: string) => (l === "Website" ? 0 : l.startsWith("Website") ? 1 : 2);
-  parts.sort((a, b) => order(a.label) - order(b.label));
-  read.sort((a, b) => order(a.label) - order(b.label));
-
-  const digest = buildDigest(parts, src.notes);
+  const { read, digest } = await readSources(src);
   if (digest.length < 150) {
     const why = read.filter((r) => !r.ok).map((r) => `${r.label}: ${r.note}`).join(" ");
     return { error: `Not enough could be read to start. ${why} Add a few lines about the brand in the notes box, or check the addresses.`.trim() };

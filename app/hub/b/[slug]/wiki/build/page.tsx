@@ -5,6 +5,8 @@ import { cardCls } from "@/components/brand/styles";
 import { StartForm } from "@/components/hub/wiki/build-forms";
 import { wikiBase } from "@/components/hub/wiki/parts";
 import { requireFunction } from "@/lib/hub/access";
+import { getProfile } from "@/lib/hub/brand-profile/data";
+import { atLeast } from "@/lib/hub/permissions";
 import { hasAiKey } from "@/lib/hub/tasks/data";
 import { listBuilds } from "@/lib/hub/wiki/builds";
 
@@ -15,8 +17,11 @@ export const maxDuration = 120;
 
 export default async function WikiBuildStartPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { brand } = await requireFunction(slug, "wiki", "edit");
-  const [hasKey, builds] = await Promise.all([hasAiKey(brand.id), listBuilds(brand.id)]);
+  const { brand, access } = await requireFunction(slug, "wiki", "edit");
+  const [hasKey, builds, profile] = await Promise.all([hasAiKey(brand.id), listBuilds(brand.id), getProfile(brand.id)]);
+  const saved = profile?.value;
+  const hasLinks = !!saved && (!!saved.website || Object.keys(saved.handles).length > 0);
+  const canSeeBrand = atLeast(access.brand, "view");
   return (
     <div className="mx-auto w-full max-w-3xl space-y-8">
       <PageHeader
@@ -34,7 +39,19 @@ export default async function WikiBuildStartPage({ params }: { params: Promise<{
         </Alert>
       )}
       <div className={cardCls()}>
-        <StartForm brandId={brand.id} />
+        {hasLinks && (
+          <p className="mb-6 text-small text-ink-500">
+            Started from the website and accounts saved in the brand profile.{canSeeBrand && (
+              <>
+                {" "}
+                <Link href={`/hub/b/${slug}/brand/profile`} className="font-semibold text-brand-700 underline underline-offset-4">
+                  Open the profile
+                </Link>
+              </>
+            )}
+          </p>
+        )}
+        <StartForm brandId={brand.id} website={saved?.website ?? undefined} handles={saved?.handles} />
       </div>
       {builds.length > 0 && (
         <section aria-labelledby="earlier" className="space-y-3">

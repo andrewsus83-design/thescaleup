@@ -11,7 +11,7 @@ import { BUILD_LIMITS, SOCIALS, type Question } from "@/lib/hub/wiki/build";
 import { cn } from "@/lib/utils";
 
 /** Step 1: where to read about the brand. */
-export function StartForm({ brandId }: { brandId: string }) {
+export function StartForm({ brandId, website, handles }: { brandId: string; website?: string; handles?: Partial<Record<string, string>> }) {
   const [state, action, pending] = useActionState<FormState, FormData>(startBuild, {});
   return (
     <form action={action} className="space-y-6">
@@ -25,7 +25,7 @@ export function StartForm({ brandId }: { brandId: string }) {
         <label htmlFor="wb-website" className={labelCls}>
           Website
         </label>
-        <input id="wb-website" name="website" inputMode="url" autoComplete="off" placeholder="brand.com" className={cn(compactField, "h-12 w-full")} />
+        <input id="wb-website" name="website" inputMode="url" autoComplete="off" defaultValue={website ?? ""} placeholder="brand.com" className={cn(compactField, "h-12 w-full")} />
         <p className="mt-2 text-caption text-ink-500">The home page, plus up to {BUILD_LIMITS.perPage} pages such as About, Products, Prices and FAQ.</p>
       </div>
       <fieldset>
@@ -36,7 +36,7 @@ export function StartForm({ brandId }: { brandId: string }) {
               <label htmlFor={`wb-${s.id}`} className="mb-1 block text-small text-ink-500">
                 {s.label}
               </label>
-              <input id={`wb-${s.id}`} name={s.id} autoComplete="off" placeholder="@brand or the link" className={cn(compactField, "w-full")} />
+              <input id={`wb-${s.id}`} name={s.id} autoComplete="off" defaultValue={handles?.[s.id] ?? ""} placeholder="@brand or the link" className={cn(compactField, "w-full")} />
             </div>
           ))}
         </div>

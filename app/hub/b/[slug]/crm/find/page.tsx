@@ -6,6 +6,9 @@ import { btnCls, cardCls } from "@/components/brand/styles";
 import { FinderForm } from "@/components/hub/crm/lead-finder";
 import { CrmNav, crmBase, stamp } from "@/components/hub/crm/parts";
 import { requireFunction } from "@/lib/hub/access";
+import { getProfile } from "@/lib/hub/brand-profile/data";
+import { finderDefaults, sellsToIndividuals } from "@/lib/hub/brand-profile/model";
+import { FIND } from "@/lib/hub/leads/consts";
 import { listSearches } from "@/lib/hub/leads/data";
 import { fmtNum } from "@/lib/hub/products/model";
 import { canManageTeam } from "@/lib/hub/rules";
@@ -19,7 +22,9 @@ export const maxDuration = 120;
 export default async function FindLeadsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { brand, actor } = await requireFunction(slug, "crm", "edit");
-  const { ready, rows } = await listSearches(brand.id);
+  const [{ ready, rows }, profile] = await Promise.all([listSearches(brand.id), getProfile(brand.id)]);
+  const defaults = profile ? finderDefaults(profile.value, FIND) : undefined;
+  const individuals = !!profile && sellsToIndividuals(profile.value);
   const tz = hubTz();
   return (
     <>
@@ -43,7 +48,14 @@ export default async function FindLeadsPage({ params }: { params: Promise<{ slug
       )}
       <div className="space-y-8">
         <div className={cardCls()}>
-          <FinderForm brandId={brand.id} />
+          {individuals && (
+            <div className="mb-6">
+              <Alert tone="info" title="Your profile says individuals buy from you.">
+                This finder lists businesses, not people. Use it to find partners and referrers, such as brokers, employers, communities and venues. Buyers come in through your forms, ads and messages.
+              </Alert>
+            </div>
+          )}
+          <FinderForm brandId={brand.id} defaults={defaults} />
           <p className="mt-6 text-caption text-ink-500">
             It does not read LinkedIn, Instagram, Facebook, TikTok or X. Businesses found this way have not agreed to get your email: reach out one to one, and confirm consent before adding them to a campaign or sequence. Each search uses up to 5 web searches on your Anthropic account.
           </p>
