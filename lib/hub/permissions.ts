@@ -24,7 +24,7 @@ export const FUNCTION_INFO: Record<Fn, { label: string; hint: string }> = {
   assets: { label: "Assets", hint: "Graphics, logos and the design system" },
   team: { label: "Team", hint: "Team tasks, clock in and out, KPI, calendar" },
   payroll: { label: "Salary and payroll", hint: "Sensitive: pay and payslips" },
-  finance: { label: "Finance", hint: "Accounting and management" },
+  finance: { label: "Finance", hint: "Simple books: money in and out, invoices and the monthly report. Can edit adds and changes them" },
   products: { label: "Products", hint: "What the brand sells: SKU, price, stock" },
   contacts: { label: "Contact details", hint: "Full email and phone of leads and clients. Without it they show hidden, and the CRM search ignores them" },
 };
