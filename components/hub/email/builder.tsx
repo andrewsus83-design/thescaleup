@@ -4,7 +4,7 @@ import { useId, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Eye, Loader2, Plus, Send, Trash2, Users } from "lucide-react";
 import { Alert, Btn, Card } from "@/components/brand/primitives";
-import { inputCls, labelCls, pillCls, segItem, segWrap, textareaCls } from "@/components/brand/styles";
+import { inputCls, labelCls, pillCls, previewFrameCls, segItem, segWrap, textareaCls } from "@/components/brand/styles";
 import { compactField } from "@/components/hub/tasks/parts";
 import { loadTemplateDoc, previewAudience, saveAsTemplate, saveCampaign, sendTest, startCampaign } from "@/lib/hub/email-actions";
 import { AUDIENCE_KINDS, BLOCK_LABEL, BLOCK_TYPES, EMAIL_LIMITS, MERGE_TAGS, STARTERS, docProblems, merge, newBlock, renderEmail, type Audience, type Block, type BlockType, type Doc } from "@/lib/hub/email/model";
@@ -447,7 +447,7 @@ export function CampaignBuilder({ brandId, slug, brandName, id: id0, initial, ad
           <p className="mb-3 truncate rounded-field bg-paper-100 px-4 py-3 text-small text-ink-800">
             <span className="font-semibold">{subjectPreview || "No subject yet"}</span>
           </p>
-          <iframe title="Preview of the email" sandbox="" srcDoc={preview} className="h-[640px] w-full rounded-bubble border border-hairline bg-paper-0" />
+          <iframe title="Preview of the email" sandbox="" srcDoc={preview} className={previewFrameCls} />
         </aside>
       </div>
     </div>

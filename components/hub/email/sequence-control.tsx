@@ -249,7 +249,7 @@ export function SequenceControl({ brandId, slug, id, brandName, status, canWrite
         <Card small>
           <h2 className="mb-3 text-small font-semibold text-ink-800">How each email did</h2>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[28rem] text-left text-small">
+            <table className="w-full min-w-md text-left text-small">
               <thead>
                 <tr className="text-caption text-ink-500">
                   <th scope="col" className="pb-2 pr-3 font-semibold">Email</th>
@@ -262,7 +262,7 @@ export function SequenceControl({ brandId, slug, id, brandName, status, canWrite
               <tbody>
                 {lines.map((l, i) => (
                   <tr key={i} className="border-t border-hairline text-ink-800">
-                    <td className="max-w-[16rem] truncate py-2 pr-3">{i + 1}. {l.subject || "No subject"}</td>
+                    <td className="max-w-64 truncate py-2 pr-3">{i + 1}. {l.subject || "No subject"}</td>
                     <td className="py-2 pr-3 text-ink-500">Day {l.day}</td>
                     <td className="py-2 pr-3 text-right">{l.sent}</td>
                     <td className="py-2 pr-3 text-right">{l.bounced}</td>

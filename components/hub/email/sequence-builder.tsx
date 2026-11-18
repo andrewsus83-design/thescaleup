@@ -4,7 +4,7 @@ import { useId, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Eye, Loader2, Plus, Trash2 } from "lucide-react";
 import { Alert, Btn } from "@/components/brand/primitives";
-import { inputCls, labelCls, pillCls, segItem, segWrap, textareaCls } from "@/components/brand/styles";
+import { inputCls, labelCls, pillCls, previewFrameCls, segItem, segWrap, textareaCls } from "@/components/brand/styles";
 import { sendSequenceTest, saveSequence } from "@/lib/hub/sequence-actions";
 import { DEFAULT_ACCENT, EMAIL_LIMITS, emptyDoc, merge, renderEmail, type Audience } from "@/lib/hub/email/model";
 import { clampDelay, scheduleText, sequenceProblems, SEQ_LIMITS, SEQ_STARTERS, type Step } from "@/lib/hub/email/sequence-model";
@@ -343,7 +343,7 @@ export function SequenceBuilder({ brandId, slug, brandName, id: id0, hasPeople, 
               <p className="mb-3 truncate rounded-field bg-paper-100 px-4 py-3 text-small text-ink-800">
                 <span className="font-semibold">{subjectPreview || "No subject yet"}</span>
               </p>
-              <iframe title="Preview of the email" sandbox="" srcDoc={preview} className="h-[640px] w-full rounded-bubble border border-hairline bg-paper-0" />
+              <iframe title="Preview of the email" sandbox="" srcDoc={preview} className={previewFrameCls} />
             </>
           ) : (
             <p className="rounded-field bg-paper-100 p-4 text-small text-ink-500">Add an email to see it here.</p>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Users } from "lucide-react";
 import { Card, Chip, EmptyState, PageHeader } from "@/components/brand/primitives";
+import { listCls } from "@/components/brand/styles";
 import { BackLink } from "@/components/hub/back-link";
 import { PersonForm } from "@/components/hub/hr/forms";
 import { requireFunction } from "@/lib/hub/access";
@@ -63,7 +64,7 @@ export default async function PeoplePage({ params }: { params: Promise<{ slug: s
       ) : (
         <div className="space-y-8">
           {active.length > 0 && (
-            <ul className="divide-y divide-ink-100 overflow-hidden rounded-field border-control border-ink-200" aria-label="Active people">
+            <ul className={listCls} aria-label="Active people">
               {active.map((p) => (
                 <Row key={p.id} p={p} />
               ))}
@@ -74,7 +75,7 @@ export default async function PeoplePage({ params }: { params: Promise<{ slug: s
               <h2 id="ppl-left" className="mb-3 font-title text-h4 text-ink-800">
                 Left the company
               </h2>
-              <ul className="divide-y divide-ink-100 overflow-hidden rounded-field border-control border-ink-200">
+              <ul className={listCls}>
                 {left.map((p) => (
                   <Row key={p.id} p={p} />
                 ))}

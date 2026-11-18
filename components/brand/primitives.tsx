@@ -6,7 +6,7 @@
 
 import { cn } from "@/lib/utils";
 import { MenuBadge } from "@/components/hub/menu-badge";
-import { btnCls, cardCls, iconBtnCls, tagCls, type BtnSize, type BtnVariant } from "./styles";
+import { btnCls, cardCls, iconBtnCls, sectionTitleCls, tagCls, type BtnSize, type BtnVariant } from "./styles";
 
 // ---------------------------------------------------------------------------------------------- Buttons
 type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; size?: BtnSize };
@@ -164,6 +164,43 @@ export function BudgetPanel({
       </p>
       {children && <div className="mt-4">{children}</div>}
     </div>
+  );
+}
+
+/**
+ * A figure with its label: "Days left 9". Use a few side by side in a `StatGrid` at the top of a page or card.
+ * `tone` colours the figure only when the number itself is the news (a shortfall, an overdue amount).
+ */
+export function Stat({ label, value, hint, tone }: { label: string; value: React.ReactNode; hint?: string; tone?: "bad" | "ok" }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-small text-ink-500">{label}</dt>
+      <dd className={cn("mt-1 break-words font-title text-h3", tone === "bad" ? "text-danger-ink" : tone === "ok" ? "text-success-ink" : "text-ink-800")}>{value}</dd>
+      {hint && <dd className="mt-1 text-caption text-ink-500">{hint}</dd>}
+    </div>
+  );
+}
+
+/** Two to four `Stat`s in a row; they stack on a phone. */
+export function StatGrid({ cols = 3, className, children }: { cols?: 2 | 3 | 4; className?: string; children: React.ReactNode }) {
+  return <dl className={cn("grid gap-x-6 gap-y-5", cols === 2 ? "sm:grid-cols-2" : cols === 3 ? "sm:grid-cols-3" : "grid-cols-2 lg:grid-cols-4", className)}>{children}</dl>;
+}
+
+/** A section of a page: an h2, an optional line under it and an optional action on the right, then the content. */
+export function Section({ id, title, description, action, className, children }: { id: string; title: string; description?: React.ReactNode; action?: React.ReactNode; className?: string; children: React.ReactNode }) {
+  return (
+    <section aria-labelledby={id} className={className}>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <h2 id={id} className={sectionTitleCls}>
+            {title}
+          </h2>
+          {description && <p className="mt-1 text-small text-ink-600">{description}</p>}
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
+      {children}
+    </section>
   );
 }
 

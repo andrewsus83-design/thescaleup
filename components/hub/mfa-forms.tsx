@@ -3,13 +3,12 @@
 import { useActionState } from "react";
 import { Loader2 } from "lucide-react";
 import { Alert, Btn } from "@/components/brand/primitives";
-import { inputCls, labelCls } from "@/components/brand/styles";
+import { codeInputCls, labelCls } from "@/components/brand/styles";
 import { CopyButton } from "@/components/hub/mail/forms";
 import { confirmEnrollment, startEnrollment, verifyAuthenticator, type MfaState } from "@/lib/hub/mfa-actions";
 import type { FormState } from "@/lib/hub/actions";
-import { cn } from "@/lib/utils";
 
-const codeCls = cn(inputCls, "font-mono text-[20px] tracking-[0.3em]");
+const codeCls = codeInputCls;
 
 function Err({ text }: { text?: string }) {
   if (!text) return null;

@@ -32,7 +32,7 @@ export default async function InvitePage({ searchParams }: { searchParams: Promi
 
   const user = invite ? await getHubUser() : null;
   const shell = (children: React.ReactNode) => (
-    <div className="mx-auto flex min-h-full w-full max-w-[30rem] flex-col justify-center px-5 py-12">
+    <div className="mx-auto flex min-h-full w-full max-w-auth flex-col justify-center px-5 py-12">
       <div className="mb-10 flex flex-col items-center text-center">
         <Logo variant="lockup" size={32} />
       </div>

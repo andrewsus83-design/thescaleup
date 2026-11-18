@@ -139,7 +139,7 @@ export function PlatformTable({ cur }: { cur: Daily }) {
     <section aria-label="By platform" className="mb-6">
       <h2 className="mb-3 text-small font-semibold text-ink-800">By platform</h2>
       <div className="overflow-x-auto rounded-bubble border border-hairline bg-paper-0">
-        <table className="w-full min-w-[34rem] text-left text-small">
+        <table className="w-full min-w-xl text-left text-small">
           <thead className="text-caption text-ink-500">
             <tr>
               <th scope="col" className="px-4 py-3 font-semibold">Platform</th>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { FileText } from "lucide-react";
 import { Card, Chip, EmptyState, PageHeader } from "@/components/brand/primitives";
+import { listCls } from "@/components/brand/styles";
 import { BackLink } from "@/components/hub/back-link";
 import { InvoiceActions, InvoiceForm } from "@/components/hub/finance/forms";
 import { requireFunction } from "@/lib/hub/access";
@@ -45,8 +46,7 @@ export default async function InvoicesPage({ params }: { params: Promise<{ slug:
       </li>
     );
   };
-  const listCls = "divide-y divide-ink-100 overflow-hidden rounded-field border-control border-ink-200";
-
+  
   return (
     <div className="mx-auto w-full max-w-2xl">
       <BackLink href={`/hub/b/${slug}/finance`}>Finance</BackLink>

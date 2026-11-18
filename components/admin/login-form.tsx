@@ -10,7 +10,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { adminLanding } from "@/lib/admin/landing";
 import { Logo } from "@/components/brand/logo";
 import { Alert, Btn, Card, inputCls, labelCls } from "@/components/room/ui";
-import { cn } from "@/lib/utils";
+import { codeInputCls } from "@/components/brand/styles";
 
 export function AdminLoginForm({ codeFallback = false, initialError }: { codeFallback?: boolean; initialError?: string }) {
   const [step, setStep] = useState<"email" | "otp">("email");
@@ -68,7 +68,7 @@ export function AdminLoginForm({ codeFallback = false, initialError }: { codeFal
 
   return (
     <div className="room-app fixed inset-0 z-10 overflow-y-auto bg-paper-100 font-text text-body text-ink-800 antialiased">
-      <div className="mx-auto flex min-h-full w-full max-w-[30rem] flex-col justify-center px-5 py-12">
+      <div className="mx-auto flex min-h-full w-full max-w-auth flex-col justify-center px-5 py-12">
         <div className="mb-10 flex flex-col items-center text-center">
           <Logo variant="lockup" size={32} />
           <h1 className="mt-10 font-title text-balance text-h2 text-ink-800">Masuk ke Chat Room</h1>
@@ -136,7 +136,7 @@ export function AdminLoginForm({ codeFallback = false, initialError }: { codeFal
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="123456"
-                  className={cn(inputCls, "font-mono text-[20px] tracking-[0.3em]")}
+                  className={codeInputCls}
                   aria-invalid={otpFailed}
                   aria-describedby={otpFailed ? "login-error" : undefined}
                 />
@@ -200,7 +200,7 @@ export function AdminLoginForm({ codeFallback = false, initialError }: { codeFal
           )}
         </Card>
 
-        <p className="mt-6 text-center text-[13px] text-ink-500">Hanya email admin terdaftar yang dapat masuk.</p>
+        <p className="mt-6 text-center text-caption text-ink-500">Hanya email admin terdaftar yang dapat masuk.</p>
       </div>
     </div>
   );

@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarCheck } from "lucide-react";
 import { Alert, Card, EmptyState, PageHeader } from "@/components/brand/primitives";
-import { btnCls } from "@/components/brand/styles";
+import { btnCls, rowHeadCls, tableCls, tableWrapCls, tbodyCls, tdCls, thCls, theadCls } from "@/components/brand/styles";
 import { BackLink } from "@/components/hub/back-link";
 import { WorkSettingsForm } from "@/components/hub/hr/forms";
 import { requireFunction } from "@/lib/hub/access";
 import { getSettings, listClockIns, listLeave, listPeople, personForUser } from "@/lib/hub/hr/data";
 import { attendanceFor, lastDayOf, WORKDAYS_LABEL } from "@/lib/hub/hr/model";
 import { atLeast } from "@/lib/hub/permissions";
+import { cn } from "@/lib/utils";
 import { addDays, fmtDuration, hubTz, isMonthKey, monthKey, monthLabel, shiftMonth, todayIn } from "@/lib/hub/tasks/dates";
 
 export const metadata: Metadata = { title: "Attendance" };
@@ -78,22 +79,22 @@ export default async function AttendancePage({ params, searchParams }: { params:
           hint={manages ? "Attendance is counted for people whose record is linked to a sign-in. Add people under Team, People and link their sign-in." : "Ask whoever manages the team to add your people record and link it to your sign-in."}
         />
       ) : (
-        <div className="overflow-x-auto rounded-field border-control border-ink-200">
-          <table className="w-full min-w-[34rem] text-left text-small">
+        <div className={tableWrapCls}>
+          <table className={cn(tableCls, "min-w-xl")}>
             <caption className="sr-only">Attendance in {monthLabel(month)}</caption>
-            <thead className="bg-paper-100 text-ink-600">
+            <thead className={theadCls}>
               <tr>
                 {["Person", "Days present", "Late", "On leave", "No clock-in", "Hours"].map((h, i) => (
-                  <th key={h} scope="col" className={`px-4 py-3 font-semibold ${i === 0 ? "" : "text-right"}`}>
+                  <th key={h} scope="col" className={thCls(i > 0)}>
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-ink-100">
+            <tbody className={tbodyCls}>
               {rows.map(({ p, a }) => (
                 <tr key={p.id}>
-                  <th scope="row" className="px-4 py-3 font-semibold text-ink-800">
+                  <th scope="row" className={rowHeadCls}>
                     {manages ? (
                       <Link href={`/hub/b/${slug}/team/people/${p.id}`} className="underline underline-offset-4">
                         {p.name}
@@ -102,11 +103,11 @@ export default async function AttendancePage({ params, searchParams }: { params:
                       p.name
                     )}
                   </th>
-                  <td className="px-4 py-3 text-right font-mono text-ink-800">{a.present}</td>
-                  <td className="px-4 py-3 text-right font-mono text-ink-800">{a.late}</td>
-                  <td className="px-4 py-3 text-right font-mono text-ink-800">{a.onLeave}</td>
-                  <td className="px-4 py-3 text-right font-mono text-ink-800">{a.noClockIn}</td>
-                  <td className="px-4 py-3 text-right font-mono text-ink-800">{fmtDuration(a.minutes)}</td>
+                  <td className={tdCls(true)}>{a.present}</td>
+                  <td className={tdCls(true)}>{a.late}</td>
+                  <td className={tdCls(true)}>{a.onLeave}</td>
+                  <td className={tdCls(true)}>{a.noClockIn}</td>
+                  <td className={tdCls(true)}>{fmtDuration(a.minutes)}</td>
                 </tr>
               ))}
             </tbody>

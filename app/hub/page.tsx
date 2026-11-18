@@ -15,7 +15,7 @@ export default async function HubHome() {
   return (
     <>
       <HubBar email={user.email} isOwner={user.isOwner} />
-      <main className="mx-auto w-full px-5 py-10 sm:w-[90%] sm:px-0">
+      <main className="mx-auto w-full px-5 py-10 sm:w-9/10 sm:px-0">
         <PageHeader
           title="Choose a brand"
           description={user.isOwner ? "Every brand has its own team, tasks, keys and connections." : "Pick the brand you want to work on."}
