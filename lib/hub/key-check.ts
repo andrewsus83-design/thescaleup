@@ -1,6 +1,8 @@
 import "server-only";
 import { interpret, result, unreachable, checkSpec, type CheckResult } from "./key-check-model";
 import { isToken } from "./telegram/model";
+import { basicAuth } from "./xendit/api";
+import { isTestKey, looksLikeKey, XENDIT_BASE } from "./xendit/model";
 
 // Asks each provider one cheap question with the saved key. Every host is fixed in this file (Zernio's can be moved by the
 // server's own ZERNIO_BASE_URL), redirects are refused, and the key goes in a header (SerpApi alone takes it in the address).
@@ -95,6 +97,21 @@ async function telegram(label: string, token: string): Promise<CheckResult> {
   return result("ok", name ? `${label} accepted this token. The bot is @${name}.` : `${label} accepted this token.`);
 }
 
+/**
+ * Xendit: asks for one transaction, which is exactly what Finance will ask for later. 403 is not a bad key: it is a key without the
+ * Transaction Read permission, and the message says how to fix that. A test-mode key is accepted, and named as one.
+ */
+async function xendit(label: string, key: string): Promise<CheckResult> {
+  if (!looksLikeKey(key)) return result("rejected", "That does not look like a Xendit secret key. It starts with xnd_production_ (or xnd_development_ for test mode).");
+  const res = await send("xendit", { url: `${XENDIT_BASE}/transactions?limit=1`, headers: { Authorization: basicAuth(key) } });
+  if (!res) return unreachable(label);
+  drop(res);
+  if (res.status === 403) return result("rejected", "Xendit knows this key, but it is not allowed to read transactions. In Xendit, edit the key and set Transaction to Read, then check again.");
+  const out = interpret(label, res.status);
+  if (out.status !== "ok") return out;
+  return result("ok", isTestKey(key) ? "Xendit accepted this key. It is a TEST mode key: it only sees test payments, not real money." : "Xendit accepted this key and it can read transactions.");
+}
+
 /** Checks one provider with the values given (decrypted by the caller). Never throws. */
 export async function runCheck(provider: string, keys: Record<string, string>): Promise<CheckResult> {
   const spec = checkSpec(provider);
@@ -111,6 +128,7 @@ export async function runCheck(provider: string, keys: Record<string, string>): 
     const key = keys[provider];
     if (!key) return result("missing", "The saved key could not be read. Save it again.");
     if (provider === "telegram") return await telegram(label, key);
+    if (provider === "xendit") return await xendit(label, key);
     if (!HEADER_SAFE.test(key)) return result("rejected", `This key has characters a ${label} key does not have. Copy it again from ${label} and save it.`);
     const build = BUILD[provider];
     if (!build) return result("unsure", "This key cannot be checked yet.");
