@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { Alert, Btn } from "@/components/brand/primitives";
 import { inputCls, labelCls, pillCls } from "@/components/brand/styles";
 import type { FormState } from "@/lib/hub/actions";
-import { addEntry, addInvoice, deleteEntry, saveCurrency, setInvoiceStatus } from "@/lib/hub/finance-actions";
+import { addEntry, addInvoice, deleteEntry, deleteInvoice, saveCurrency, setInvoiceStatus } from "@/lib/hub/finance-actions";
 import { CATEGORIES, KIND_LABEL, LIMITS, type EntryKind, type InvoiceStatus } from "@/lib/hub/finance/model";
 import { CURRENCIES } from "@/lib/hub/money";
 
@@ -187,7 +187,9 @@ export function InvoiceForm({ brandId, today, currency, suggestedNumber }: { bra
 /** What can be done with one invoice, by its status. Marking it paid asks for the payment date first. */
 export function InvoiceActions({ brandId, invoiceId, status, issued, today }: { brandId: string; invoiceId: string; status: InvoiceStatus; issued: string; today: string }) {
   const [paying, setPaying] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [paidOn, setPaidOn] = useState(today);
+  const [removed, remove, removing] = useActionState<FormState, FormData>(deleteInvoice, {});
   const [state, action, pending] = useActionState<FormState, FormData>(async (prev, fd) => {
     const r = await setInvoiceStatus(prev, fd);
     if (r.message) setPaying(false);
@@ -238,14 +240,35 @@ export function InvoiceActions({ brandId, invoiceId, status, issued, today }: { 
             </Btn>
           )}
           {status === "void" && (
-            <Btn type="submit" name="to" value="unpaid" variant="ghost" size="sm" disabled={pending}>
-              Open again
-            </Btn>
+            <>
+              <Btn type="submit" name="to" value="unpaid" variant="ghost" size="sm" disabled={pending}>
+                Open again
+              </Btn>
+              {!deleting && (
+                <Btn type="button" variant="ghost" size="sm" onClick={() => setDeleting(true)}>
+                  Delete
+                </Btn>
+              )}
+            </>
           )}
         </form>
       )}
-      <p aria-live="polite" className={`mt-2 text-caption ${state.error ? "text-danger" : "text-success-ink"}`}>
-        {state.error ?? state.message}
+      {/* Deleting asks once more, in place: a deleted invoice cannot be brought back. */}
+      {status === "void" && deleting && (
+        <form action={remove} className="mt-3 flex flex-wrap items-center gap-2 rounded-field bg-danger-bg px-4 py-3">
+          {hidden}
+          <p className="min-w-0 flex-1 basis-48 text-small text-ink-800">Delete this void invoice for good? It cannot be brought back.</p>
+          <Btn type="submit" variant="danger" size="sm" disabled={removing} className="bg-paper-0">
+            <Spin on={removing} />
+            Delete for good
+          </Btn>
+          <Btn type="button" variant="secondary" size="sm" className="bg-paper-0" onClick={() => setDeleting(false)}>
+            Keep it
+          </Btn>
+        </form>
+      )}
+      <p aria-live="polite" className={`mt-2 text-caption ${(state.error ?? removed.error) ? "text-danger-ink" : "text-success-ink"}`}>
+        {state.error ?? removed.error ?? state.message}
       </p>
     </div>
   );

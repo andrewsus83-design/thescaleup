@@ -4,7 +4,8 @@ import { groupTitleCls } from "@/components/brand/styles";
 import { CurrencyForm } from "@/components/hub/finance/forms";
 import { FinanceHomeView } from "@/components/hub/finance/home-view";
 import { requireFunction } from "@/lib/hub/access";
-import { getCurrency, getPlan, listEntries, listInvoices, monthTotals } from "@/lib/hub/finance/data";
+import { countIncoming, getCurrency, getPlan, listEntries, listInvoices, monthTotals } from "@/lib/hub/finance/data";
+import { secretStatus } from "@/lib/hub/secrets";
 import { lastDayOfMonth } from "@/lib/hub/finance/dates";
 import { monthProgress, monthSeries, owed, planTotals, planVsActual } from "@/lib/hub/finance/model";
 import { atLeast } from "@/lib/hub/permissions";
@@ -20,12 +21,14 @@ export default async function FinancePage({ params }: { params: Promise<{ slug: 
   const today = todayIn(hubTz());
   const month = monthKey(today);
   const first = shiftMonth(month, -5);
-  const [currency, totals, invoices, plan, list] = await Promise.all([
+  const [currency, totals, invoices, plan, list, waiting, keys] = await Promise.all([
     getCurrency(brand.id),
     monthTotals(brand.id, `${first}-01`, lastDayOfMonth(month)),
     listInvoices(brand.id),
     getPlan(brand.id),
     listEntries(brand.id, `${month}-01`, lastDayOfMonth(month)),
+    countIncoming(brand.id),
+    secretStatus(brand.id),
   ]);
   const series = totals ? monthSeries(totals, first, month) : [];
 
@@ -44,6 +47,7 @@ export default async function FinancePage({ params }: { params: Promise<{ slug: 
         owedMore: invoices.openMore,
         recent: list.entries.slice(0, 6),
         canEdit,
+        incoming: { waiting, connected: Boolean(keys.xendit) },
       }}
     >
       {canEdit && (

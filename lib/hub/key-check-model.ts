@@ -27,6 +27,7 @@ export const CHECKS: Record<string, CheckSpec> = {
   zernio: { label: "Zernio", cost: "free" },
   telegram: { label: "Telegram", cost: "free" },
   clickup: { label: "ClickUp", cost: "free" },
+  xendit: { label: "Xendit", cost: "free" },
 };
 
 export const checkSpec = (provider: string): CheckSpec | null => (Object.hasOwn(CHECKS, provider) ? CHECKS[provider] : null);
