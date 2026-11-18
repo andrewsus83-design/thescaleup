@@ -7,7 +7,7 @@ const SECTIONS: (Omit<SectionItem, "href"> & { manage: boolean })[] = [
   { key: "integrations", title: "Integrations and API keys", hint: "AI models, search, scraping, cost control and Google", icon: KeyRound, manage: true },
   { key: "social", title: "Social media connections", hint: "Connect this brand's social accounts and WhatsApp", icon: Share2, manage: true },
   { key: "telegram", title: "Telegram", hint: "Connect a Telegram bot, with a step-by-step guide", icon: Send, manage: false },
-  { key: "payments", title: "Payments", hint: "Connect Xendit so Finance can read the payments you received, with a step-by-step guide", icon: CreditCard, manage: true },
+  { key: "payments", title: "Payment gateways", hint: "Connect the brand's payment gateway so Finance can read the payments it received. Xendit is ready, others are added on request", icon: CreditCard, manage: true },
   { key: "import", title: "Import", hint: "Bring work over from ClickUp and other tools, or ask for a new source", icon: DatabaseZap, manage: true },
   { key: "workflow", title: "Workflow", hint: "The steps a task goes through, and whether new tasks need approval", icon: ListChecks, manage: true },
   { key: "team", title: "Team", hint: "People, roles and what each role can open and change", icon: Users, manage: true },

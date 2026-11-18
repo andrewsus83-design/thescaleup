@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isCurrency, type Currency } from "../money";
+import type { GatewayId } from "../payments/model";
 import { isEntryKind, isInvoiceStatus, LIMITS, readPlan, readTotals, type Entry, type Invoice, type PlanLine, type TotalRow } from "./model";
 
 // Reads for Finance. Service role only: every caller has already checked the Finance access.
@@ -109,7 +110,7 @@ export async function countIncoming(brandId: string): Promise<number> {
 }
 
 export type SourceState = { lastSyncedAt: string | null; pendingUntil: string | null; pendingStarted: string | null };
-export async function getSourceState(brandId: string, source: "xendit"): Promise<SourceState> {
+export async function getSourceState(brandId: string, source: GatewayId): Promise<SourceState> {
   const { data } = await db().from("fin_source_state").select("last_synced_at, pending_until, pending_started").eq("brand_id", brandId).eq("source", source).maybeSingle();
   return { lastSyncedAt: (data?.last_synced_at as string | null) ?? null, pendingUntil: (data?.pending_until as string | null) ?? null, pendingStarted: (data?.pending_started as string | null) ?? null };
 }

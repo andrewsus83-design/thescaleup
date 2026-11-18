@@ -10,10 +10,10 @@ import { getBrandKey } from "./secrets";
 import { audit } from "./session";
 import { str, taskContext, UUID, type Ctx } from "./tasks/context";
 import { hubTz } from "./tasks/dates";
-import { FETCH_PROBLEM, listPayments } from "./xendit/api";
-import { DEFAULT_CATEGORY, matchesFor, nextState, syncWindow, type Incoming } from "./xendit/model";
+import { DEFAULT_CATEGORY, fetchProblem, gatewayOf, matchesFor, nextState, syncWindow, type Incoming } from "./payments/model";
+import { readPayments } from "./payments/read";
 
-// Payments read from a brand's own Xendit account. Reading is all the hub does at Xendit. What a payment becomes in the books is
+// Payments read from a brand's own payment gateway. Reading is all the hub does at a gateway. What a payment becomes in the books is
 // decided by a person with "Can edit" on Finance, one payment at a time or all the unmatched ones at once.
 
 async function financeEdit(brandId: unknown): Promise<{ ok: true; ctx: Ctx } | { ok: false; error: string }> {
@@ -25,42 +25,45 @@ async function financeEdit(brandId: unknown): Promise<{ ok: true; ctx: Ctx } | {
 const fresh = (ctx: Ctx) => revalidatePath(`/hub/b/${ctx.slug}/finance`, "layout");
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-/** Reads new payments from Xendit into the waiting list. Stores each payment once, however often it is read. */
-export async function syncXendit(_prev: FormState, fd: FormData): Promise<FormState> {
+/** Reads new payments from one gateway into the waiting list. Stores each payment once, however often it is read. */
+export async function syncGateway(_prev: FormState, fd: FormData): Promise<FormState> {
   const c = await financeEdit(str(fd, "brandId"));
   if (!c.ok) return { error: c.error };
   const { ctx } = c;
-  if (!allow(`xendit-sync:${ctx.brandId}`, 30)) return { error: "That is a lot of reads in one hour. Try again later." };
-  const key = await getBrandKey(ctx.brandId, "xendit", false);
-  if (!key) return { error: "Xendit is not connected for this brand yet. Connect it in Settings, Payments." };
+  // The gateway comes from the form, so it is checked against the list of gateways this build can read.
+  const gateway = gatewayOf(str(fd, "source"));
+  if (!gateway) return { error: "Unknown payment gateway. Reload the page." };
+  if (!allow(`gateway-sync:${gateway.id}:${ctx.brandId}`, 30)) return { error: "That is a lot of reads in one hour. Try again later." };
+  const key = await getBrandKey(ctx.brandId, gateway.keyProvider, false);
+  if (!key) return { error: `${gateway.label} is not connected for this brand yet. Connect it in Settings, Payment gateways.` };
 
-  const [currency, state] = await Promise.all([getCurrency(ctx.brandId), getSourceState(ctx.brandId, "xendit")]);
+  const [currency, state] = await Promise.all([getCurrency(ctx.brandId), getSourceState(ctx.brandId, gateway.id)]);
   const w = syncWindow(state, new Date());
-  const got = await listPayments(key, w.since, w.until, hubTz());
+  const got = await readPayments(gateway.id, key, w.since, w.until, hubTz());
 
   // The books are kept in one currency: a payment in another one is left out, and counted so the person knows.
   const mine = got.payments.filter((p) => p.currency === currency);
   const other = got.payments.length - mine.length;
   let added = 0;
   for (let i = 0; i < mine.length; i += 200) {
-    const rows = mine.slice(i, i + 200).map((p: Incoming) => ({ brand_id: ctx.brandId, source: "xendit", external_id: p.externalId, occurred_at: p.occurredAt, day: p.day, amount_cents: p.amount, fee_cents: p.fee, currency: p.currency, channel: p.channel, reference: p.reference }));
+    const rows = mine.slice(i, i + 200).map((p: Incoming) => ({ brand_id: ctx.brandId, source: gateway.id, external_id: p.externalId, occurred_at: p.occurredAt, day: p.day, amount_cents: p.amount, fee_cents: p.fee, currency: p.currency, channel: p.channel, reference: p.reference }));
     const { data, error } = await ctx.admin.from("fin_incoming").upsert(rows, { onConflict: "brand_id,source,external_id", ignoreDuplicates: true }).select("id");
     if (error) {
-      console.error("[finance] xendit store failed:", error.message);
+      console.error("[finance] gateway store failed:", gateway.id, error.message);
       return { error: "The payments were read but could not be saved. Nothing was changed. Try again." };
     }
     added += data?.length ?? 0;
   }
 
   const next = nextState(state, w, got.ok && got.finished, got.oldest);
-  const save = await ctx.admin.from("fin_source_state").upsert({ brand_id: ctx.brandId, source: "xendit", last_synced_at: next.lastSyncedAt, pending_until: next.pendingUntil, pending_started: next.pendingStarted, updated_at: new Date().toISOString() }, { onConflict: "brand_id,source" });
-  if (save.error) console.error("[finance] xendit state failed:", save.error.message);
-  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "finance.xendit.sync", meta: { added, ok: got.ok } });
+  const save = await ctx.admin.from("fin_source_state").upsert({ brand_id: ctx.brandId, source: gateway.id, last_synced_at: next.lastSyncedAt, pending_until: next.pendingUntil, pending_started: next.pendingStarted, updated_at: new Date().toISOString() }, { onConflict: "brand_id,source" });
+  if (save.error) console.error("[finance] gateway state failed:", gateway.id, save.error.message);
+  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "finance.gateway.sync", meta: { source: gateway.id, added, ok: got.ok } });
   fresh(ctx);
 
   const found = added === 0 ? "No new payments." : `${plural(added, "new payment", "new payments")} to review.`;
   const skipped = other > 0 ? ` ${plural(other, "payment was", "payments were")} left out because ${other === 1 ? "it is" : "they are"} not in ${currency}.` : "";
-  if (!got.ok) return { error: `${FETCH_PROBLEM[got.reason]}${added > 0 ? ` Before that, ${plural(added, "payment was", "payments were")} brought in.` : ""}` };
+  if (!got.ok) return { error: `${fetchProblem(got.reason, gateway.label)}${added > 0 ? ` Before that, ${plural(added, "payment was", "payments were")} brought in.` : ""}` };
   return { message: `${found}${skipped}${got.finished ? "" : " There are more, older ones to read: press the button again."}` };
 }
 

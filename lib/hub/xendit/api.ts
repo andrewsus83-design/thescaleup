@@ -1,12 +1,9 @@
 import "server-only";
-import { MAX_PAGES, pageQuery, parsePage, XENDIT_BASE, type Incoming } from "./model";
+import type { Fetched, Incoming } from "../payments/model";
+import { MAX_PAGES, pageQuery, parsePage, XENDIT_BASE } from "./model";
 
 // Reads a brand's payments from Xendit with the brand's own key. Read only: the single call made is "list transactions".
 // The host is fixed, redirects are refused, and nothing here logs an address, a key or what Xendit sent back.
-
-export type Fetched =
-  | { ok: true; payments: Incoming[]; seen: number; finished: boolean; oldest: string | null }
-  | { ok: false; reason: "key" | "permission" | "busy" | "unreachable" | "shape"; payments: Incoming[]; oldest: string | null };
 
 /** Xendit takes the key as the user name of Basic auth, with an empty password. */
 export const basicAuth = (key: string) => `Basic ${Buffer.from(`${key}:`).toString("base64")}`;
@@ -51,11 +48,3 @@ export async function listPayments(key: string, since: string, until: string, tz
   }
   return { ok: true, payments, seen, finished: false, oldest };
 }
-
-export const FETCH_PROBLEM: Record<Exclude<Fetched, { ok: true }>["reason"], string> = {
-  key: "Xendit did not accept the saved key. Copy it again from Xendit and save it in Settings, Payments.",
-  permission: "The saved Xendit key is not allowed to read transactions. In Xendit, give the key the Transaction Read permission, or make a new key that has it.",
-  busy: "Xendit is limiting requests right now. Try again in a minute.",
-  unreachable: "Could not reach Xendit. Try again in a moment.",
-  shape: "Xendit answered in a way this page does not understand. Nothing was changed. Tell the agency.",
-};

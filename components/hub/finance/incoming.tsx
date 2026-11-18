@@ -5,7 +5,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { Alert, Btn, Chip } from "@/components/brand/primitives";
 import { hintCls, inputCls } from "@/components/brand/styles";
 import type { FormState } from "@/lib/hub/actions";
-import { recordAllIncoming, recordIncoming, setIncomingAside, syncXendit } from "@/lib/hub/finance-incoming-actions";
+import { recordAllIncoming, recordIncoming, setIncomingAside, syncGateway } from "@/lib/hub/finance-incoming-actions";
 import { CATEGORIES, LIMITS } from "@/lib/hub/finance/model";
 
 const selectCls = `${inputCls} appearance-auto`;
@@ -20,15 +20,16 @@ function Notes({ state }: { state: FormState }) {
   );
 }
 
-/** Reads new payments from Xendit. Nothing reaches the books here: the payments only join the list to review. */
-export function SyncForm({ brandId, more }: { brandId: string; more: boolean }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(syncXendit, {});
+/** Reads new payments from one gateway. Nothing reaches the books here: the payments only join the list to review. */
+export function SyncForm({ brandId, source, label, more }: { brandId: string; source: string; label: string; more: boolean }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(syncGateway, {});
   return (
     <form action={action} className="space-y-3">
       <input type="hidden" name="brandId" value={brandId} />
+      <input type="hidden" name="source" value={source} />
       <Btn type="submit" variant="primary" size="md" disabled={pending} className="w-full">
         {pending ? <Spin on /> : <RefreshCw className="size-4" aria-hidden />}
-        {pending ? "Reading from Xendit" : more ? "Read the older payments" : "Get new payments"}
+        {pending ? `Reading from ${label}` : more ? "Read the older payments" : "Get new payments"}
       </Btn>
       <div aria-live="polite">
         <Notes state={state} />
@@ -151,7 +152,7 @@ export function RecordAllForm({ brandId, count }: { brandId: string; count: numb
         <form action={action} className="space-y-3 rounded-field bg-paper-100 p-4">
           <input type="hidden" name="brandId" value={brandId} />
           <p className="text-small text-ink-800">
-            Every waiting payment that has <strong className="font-semibold">no unpaid invoice of the same amount</strong> becomes money in, with its Xendit fee as money out. Payments that could be an invoice&apos;s stay in the list for you to decide.
+            Every waiting payment that has <strong className="font-semibold">no unpaid invoice of the same amount</strong> becomes money in, with the gateway&apos;s fee as money out. Payments that could be an invoice&apos;s stay in the list for you to decide.
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-0 flex-1 basis-40">
