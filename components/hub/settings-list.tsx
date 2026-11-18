@@ -17,5 +17,5 @@ const SECTIONS: (Omit<SectionItem, "href"> & { manage: boolean })[] = [
 /** The sections of a brand's Settings. Anyone sees Security; the rest is for the founder and the agency. */
 export function SettingsList({ slug, manage }: { slug: string; manage: boolean }) {
   const items: SectionItem[] = SECTIONS.filter((s) => manage || !s.manage).map((s) => ({ key: s.key, title: s.title, hint: s.hint, icon: s.icon, soon: s.soon, href: `/hub/b/${slug}/settings/${s.key}` }));
-  return <SectionList items={items} />;
+  return <SectionList items={items} twoAtMost />;
 }

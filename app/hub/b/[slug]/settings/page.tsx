@@ -4,6 +4,7 @@ import { BrandNameForm } from "@/components/hub/brand-name-form";
 import { SettingsList } from "@/components/hub/settings-list";
 import { canManageTeam, ROLE_LABEL } from "@/lib/hub/rules";
 import { requireBrand } from "@/lib/hub/session";
+import { Split, SplitMain, SplitSide } from "@/components/hub/panels";
 
 export const metadata: Metadata = { title: "Settings" };
 export const dynamic = "force-dynamic";
@@ -13,10 +14,12 @@ export default async function SettingsHome({ params }: { params: Promise<{ slug:
   const { brand, actor } = await requireBrand(slug);
   const manage = canManageTeam(actor);
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div>
       <PageHeader title="Settings" />
-      <Card className="mb-6">
-        <dl className="grid gap-x-8 gap-y-3 text-body sm:grid-cols-[8rem_1fr]">
+      <Split>
+        <SplitSide first>
+      <Card>
+        <dl className="grid grid-cols-1 gap-x-8 gap-y-3 text-body sm:grid-cols-[8rem_1fr] lg:grid-cols-1 xl:grid-cols-[6rem_1fr]">
           <dt className="text-ink-500">Brand</dt>
           <dd className="text-ink-800">{manage ? <BrandNameForm key={brand.name} brandId={brand.id} name={brand.name} /> : brand.name}</dd>
           <dt className="text-ink-500">Address</dt>
@@ -29,8 +32,12 @@ export default async function SettingsHome({ params }: { params: Promise<{ slug:
           </dd>
         </dl>
       </Card>
-      <SettingsList slug={slug} manage={manage} />
-      {!manage && <p className="mt-6 text-small text-ink-500">Team, keys and connections are managed by the founder.</p>}
+      {!manage && <p className="px-2 text-small text-ink-500">Team, keys and connections are managed by the founder.</p>}
+        </SplitSide>
+        <SplitMain>
+          <SettingsList slug={slug} manage={manage} />
+        </SplitMain>
+      </Split>
     </div>
   );
 }

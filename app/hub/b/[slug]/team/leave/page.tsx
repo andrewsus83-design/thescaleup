@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { CalendarOff } from "lucide-react";
-import { Alert, Card, Chip, EmptyState, PageHeader, Stat, StatGrid, type Tone } from "@/components/brand/primitives";
-import { listCls } from "@/components/brand/styles";
+import { Alert, Chip, EmptyState, PageHeader, type Tone } from "@/components/brand/primitives";
 import { BackLink } from "@/components/hub/back-link";
 import { LeaveButtons, LeaveForm } from "@/components/hub/hr/forms";
+import { InkFigure, InkPanel, InkStats, Panel, panelRowsCls, Split, SplitMain, SplitSide } from "@/components/hub/panels";
 import { requireFunction } from "@/lib/hub/access";
 import { getSettings, listLeave, listPeople, personForUser } from "@/lib/hub/hr/data";
 import { LEAVE_LABEL, leaveBalance, type Leave, type LeaveStatus } from "@/lib/hub/hr/model";
@@ -40,7 +40,7 @@ export default async function LeavePage({ params }: { params: Promise<{ slug: st
     const isOwn = l.personId === mine?.id;
     const left = showName ? leaveBalance(leave, l.personId, l.start.slice(0, 4), allowanceOf.get(l.personId) ?? settings.leaveDays).left : null;
     return (
-      <li className="px-4 py-4">
+      <li className="py-4">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
           <p className="text-body font-semibold text-ink-800">{showName ? (nameOf.get(l.personId) ?? "Former person") : LEAVE_LABEL[l.kind]}</p>
           <Chip tone={STATUS_TONE[l.status]}>{STATUS_WORD[l.status]}</Chip>
@@ -65,85 +65,75 @@ export default async function LeavePage({ params }: { params: Promise<{ slug: st
     );
   };
   
+  const workdays = settings.workdays === 5 ? "Monday to Friday" : settings.workdays === 6 ? "Monday to Saturday" : "every day";
+
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div>
       <BackLink href={`/hub/b/${slug}/team`}>Team</BackLink>
       <PageHeader title="Leave" description={manages ? "Ask for time off, and decide the team's requests." : "Ask for time off and see what was decided."} />
 
-      <div className="space-y-10">
-        {balance && (
-          <section aria-labelledby="lv-bal">
-            <h2 id="lv-bal" className="mb-3 font-title text-h3 text-ink-800">
-              Your annual leave in {year}
-            </h2>
-            <Card>
-              <StatGrid>
-                <Stat label="Days left" value={balance.left} tone={balance.left < 0 ? "bad" : undefined} />
-                <Stat label="Taken or approved" value={balance.used} />
-                <Stat label="Waiting" value={balance.pending} />
-              </StatGrid>
-              <p className="mt-4 text-small text-ink-500">Out of {balance.allowance} days a year. Sick, unpaid and other leave do not use these days.</p>
-            </Card>
-          </section>
-        )}
-
-        {waiting.length > 0 && (
-          <section aria-labelledby="lv-wait">
-            <h2 id="lv-wait" className="mb-3 font-title text-h3 text-ink-800">
-              Waiting for a decision
-            </h2>
-            <ul className={listCls}>
-              {waiting.map((l) => (
-                <Item key={l.id} l={l} showName />
-              ))}
-            </ul>
-          </section>
-        )}
-
-        <section aria-labelledby="lv-ask">
-          <h2 id="lv-ask" className="mb-3 font-title text-h3 text-ink-800">
-            Ask for leave
-          </h2>
+      <Split>
+        {/* The balance and the form are what a person comes for, so on a phone they come first. */}
+        <SplitSide first>
+          {balance && (
+            <InkPanel label={`Your annual leave in ${year}`}>
+              <InkFigure label={balance.left === 1 ? "day left" : "days left"} value={balance.left} warn={balance.left < 0} />
+              <InkStats
+                items={[
+                  { label: "Taken or approved", value: balance.used },
+                  { label: "Waiting", value: balance.pending },
+                ]}
+              />
+              <p className="mt-4 text-caption font-normal text-ink-300">Out of {balance.allowance} days a year. Sick, unpaid and other leave do not use these days.</p>
+            </InkPanel>
+          )}
           {mine || (manages && active.length > 0) ? (
-            <Card>
+            <Panel id="lv-ask" title="Ask for leave" hint={`Working days are counted ${workdays}. The hub does not know public holidays, so they count as working days.`}>
               <LeaveForm brandId={brand.id} people={manages ? active : null} ownId={mine?.status === "active" ? mine.id : null} today={today} />
-              <p className="mt-4 text-small text-ink-500">Working days are counted {settings.workdays === 5 ? "Monday to Friday" : settings.workdays === 6 ? "Monday to Saturday" : "every day"}. The hub does not know public holidays, so they count as working days.</p>
-            </Card>
+            </Panel>
           ) : (
             <Alert tone="info">{manages ? "Add people under Team, People first. Leave is asked for a person's record." : "You have no people record in this brand yet. Ask whoever manages the team to add you, then you can ask for leave here."}</Alert>
           )}
-        </section>
+        </SplitSide>
 
-        {mine && (
-          <section aria-labelledby="lv-mine">
-            <h2 id="lv-mine" className="mb-3 font-title text-h3 text-ink-800">
-              Your requests
-            </h2>
-            {own.length === 0 ? (
-              <EmptyState icon={<CalendarOff className="size-6" aria-hidden />} title="No leave asked for yet" hint="Your requests and what was decided show up here." />
-            ) : (
-              <ul className={listCls}>
-                {own.map((l) => (
-                  <Item key={l.id} l={l} showName={false} />
+        <SplitMain>
+          {waiting.length > 0 && (
+            <Panel id="lv-wait" title="Waiting for a decision" hint={`${waiting.length} request${waiting.length === 1 ? "" : "s"}`}>
+              <ul className={panelRowsCls}>
+                {waiting.map((l) => (
+                  <Item key={l.id} l={l} showName />
                 ))}
               </ul>
-            )}
-          </section>
-        )}
+            </Panel>
+          )}
 
-        {others.length > 0 && (
-          <section aria-labelledby="lv-team">
-            <h2 id="lv-team" className="mb-3 font-title text-h3 text-ink-800">
-              The team&apos;s leave
-            </h2>
-            <ul className={listCls}>
-              {others.map((l) => (
-                <Item key={l.id} l={l} showName />
-              ))}
-            </ul>
-          </section>
-        )}
-      </div>
+          {mine && (
+            <Panel id="lv-mine" title="Your requests">
+              {own.length === 0 ? (
+                <EmptyState icon={<CalendarOff className="size-6" aria-hidden />} title="No leave asked for yet" hint="Your requests and what was decided show up here." />
+              ) : (
+                <ul className={panelRowsCls}>
+                  {own.map((l) => (
+                    <Item key={l.id} l={l} showName={false} />
+                  ))}
+                </ul>
+              )}
+            </Panel>
+          )}
+
+          {others.length > 0 && (
+            <Panel id="lv-team" title="The team's leave">
+              <ul className={panelRowsCls}>
+                {others.map((l) => (
+                  <Item key={l.id} l={l} showName />
+                ))}
+              </ul>
+            </Panel>
+          )}
+
+          {waiting.length === 0 && !mine && others.length === 0 && manages && <EmptyState icon={<CalendarOff className="size-6" aria-hidden />} title="No leave yet" hint="Requests from the team show up here for you to decide." />}
+        </SplitMain>
+      </Split>
     </div>
   );
 }
