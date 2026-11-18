@@ -231,7 +231,7 @@ export function ImportWizard({ brandId, slug, initialKind, stages }: { brandId: 
           {parsed && (
             <>
               <div className="mt-5 overflow-x-auto rounded-field border border-hairline">
-                <table className="w-full min-w-[34rem] text-left text-caption">
+                <table className="w-full min-w-xl text-left text-caption">
                   <thead className="bg-paper-100 text-ink-500">
                     <tr>
                       <th className="px-3 py-2 font-semibold">Name</th>
@@ -245,9 +245,9 @@ export function ImportWizard({ brandId, slug, initialKind, stages }: { brandId: 
                   <tbody className="divide-y divide-hairline">
                     {parsed.rows.slice(0, 5).map((r, i) => (
                       <tr key={i}>
-                        <td className="max-w-[12rem] truncate px-3 py-2 font-semibold">{r.name}</td>
-                        <td className="max-w-[10rem] truncate px-3 py-2">{r.company || "—"}</td>
-                        <td className="max-w-[12rem] truncate px-3 py-2">{r.email || "—"}</td>
+                        <td className="max-w-48 truncate px-3 py-2 font-semibold">{r.name}</td>
+                        <td className="max-w-40 truncate px-3 py-2">{r.company || "—"}</td>
+                        <td className="max-w-48 truncate px-3 py-2">{r.email || "—"}</td>
                         <td className="px-3 py-2 font-mono">{r.phone || "—"}</td>
                         <td className="px-3 py-2 text-right font-mono">{fmtPrice(r.value)}</td>
                         <td className="px-3 py-2">{labelOf(stages, r.stage)}</td>

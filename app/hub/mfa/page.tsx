@@ -20,7 +20,7 @@ export default async function MfaPage({ searchParams }: { searchParams: Promise<
   const { data } = await supabase.auth.mfa.listFactors();
   const enrolled = Boolean(data?.all.some((f) => f.factor_type === "totp" && f.status === "verified"));
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-[30rem] flex-col justify-center px-5 py-12">
+    <div className="mx-auto flex min-h-full w-full max-w-auth flex-col justify-center px-5 py-12">
       <div className="mb-10 flex flex-col items-center text-center">
         <Logo variant="lockup" size={32} />
         <h1 className="mt-10 font-title text-balance text-h2 text-ink-800">{enrolled ? "Enter your code" : "Protect Mail with an authenticator"}</h1>

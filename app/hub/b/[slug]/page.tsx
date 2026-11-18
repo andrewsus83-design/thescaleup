@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: "Home" };
 export const dynamic = "force-dynamic";
 
 // Secondary text on a coloured tint: Ink-500 is a little too light on some tints, so it is a shade darker here.
-const SUB = "text-[#4d4a45]";
+const SUB = "text-ink-600";
 
 /** Home: a greeting, what needs the person today, and every menu they can open. Only counts they are allowed to see are looked up. */
 export default async function BrandHome({ params }: { params: Promise<{ slug: string }> }) {

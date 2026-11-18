@@ -76,7 +76,7 @@ export const segItem = (active: boolean, size: "md" | "sm" = "md") =>
     motion,
     size === "md" ? "hit-44 h-11 px-5 text-button" : "hit-44 h-9 px-4 text-caption",
     // Inside a brand menu the active item takes that menu's colour (see `[data-acc]`); elsewhere it is Ink.
-    active ? "bg-[var(--acc-ink,#262626)] text-paper-0" : "text-ink-500 hover:text-ink-800",
+    active ? "bg-[var(--acc-ink,var(--color-ink-800))] text-paper-0" : "text-ink-500 hover:text-ink-800",
   );
 
 // ---------------------------------------------------------------------------------------------- Page frame
@@ -94,6 +94,28 @@ export const tileCls = "rounded-bubble bg-paper-100 p-6";
 /** Section label above a group: Mono 500 / 11 caps. */
 export const capsCls = "label-caps text-ink-500";
 
+/** The title of a section on a page (h2), and of a group inside a section (h3). */
+export const sectionTitleCls = "font-title text-h3 text-ink-800";
+export const groupTitleCls = "font-title text-h4 text-ink-800";
+
+/** A list of rows in one outlined box, a hairline between rows. Put `px-4 py-3` (or a whole-row link) on each `<li>`. */
+export const listCls = "divide-y divide-ink-100 overflow-hidden rounded-field border-control border-ink-200";
+
+// ---------------------------------------------------------------------------------------------- Tables
+/** A data table that scrolls sideways inside its own box on a phone, so it can never widen the page. */
+export const tableWrapCls = "relative overflow-x-auto rounded-field border-control border-ink-200";
+export const tableCls = "w-full min-w-lg text-left text-small";
+export const theadCls = "bg-paper-100 text-ink-500";
+export const tbodyCls = "divide-y divide-ink-100";
+/** Header and body cells. Numbers are right-aligned in Mono so digits line up. */
+export const thCls = (numeric?: boolean) => cn("px-4 py-3 font-semibold", numeric && "text-right");
+export const tdCls = (numeric?: boolean) => cn("px-4 py-3 text-ink-800", numeric && "text-right font-mono");
+/** The first cell of a row, which names the row. */
+export const rowHeadCls = "px-4 py-3 text-left font-semibold text-ink-800";
+
+/** The preview of an email or a page inside the app: a fixed 640px window. */
+export const previewFrameCls = "h-160 w-full rounded-bubble border border-hairline bg-paper-0";
+
 // ---------------------------------------------------------------------------------------------- Fields
 /** Label above the field: Body 600 / 14, 8px gap. */
 export const labelCls = "mb-2 block text-small font-semibold text-ink-800";
@@ -110,5 +132,9 @@ export const inputCls = cn(
 );
 /** Same field for multi-line text: at least 56px, grows with its rows. */
 export const textareaCls = cn(inputCls, "h-auto min-h-14 resize-y py-4");
+/** A field for a one-time code: Mono 20 with wide tracking, so six digits read one by one. */
+export const codeInputCls = cn(inputCls, "font-mono text-body-lg tracking-code");
+/** Helper text under a field: 13px Ink-500, 8px below. */
+export const hintCls = "mt-2 text-caption text-ink-500";
 /** Error text under a field: 13px Danger, 8px below. */
 export const errorCls = "mt-2 text-caption text-danger";

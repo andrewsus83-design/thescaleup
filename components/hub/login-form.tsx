@@ -4,8 +4,7 @@ import { useActionState, useState } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Alert, Btn, Card } from "@/components/brand/primitives";
-import { inputCls, labelCls, pillCls } from "@/components/brand/styles";
-import { cn } from "@/lib/utils";
+import { codeInputCls, inputCls, labelCls, pillCls } from "@/components/brand/styles";
 import { requestLoginCode, signInWithPassword, verifyLoginCode, type FormState } from "@/lib/hub/actions";
 
 export function HubLoginForm({ next, presetEmail }: { next: string; presetEmail?: string }) {
@@ -19,7 +18,7 @@ export function HubLoginForm({ next, presetEmail }: { next: string; presetEmail?
   const email = sent.email ?? presetEmail ?? "";
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-[30rem] flex-col justify-center px-5 py-12">
+    <div className="mx-auto flex min-h-full w-full max-w-auth flex-col justify-center px-5 py-12">
       <div className="mb-10 flex flex-col items-center text-center">
         <Logo variant="lockup" size={32} />
         <h1 className="mt-10 font-title text-balance text-h2 text-ink-800">Sign in</h1>
@@ -103,7 +102,7 @@ export function HubLoginForm({ next, presetEmail }: { next: string; presetEmail?
                 autoFocus
                 placeholder="123456"
                 aria-invalid={Boolean(checked.error)}
-                className={cn(inputCls, "font-mono text-[20px] tracking-[0.3em]")}
+                className={codeInputCls}
               />
             </div>
             <Btn type="submit" variant="primary" size="lg" className="w-full" disabled={verifying}>

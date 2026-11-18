@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Card, Chip, PageHeader } from "@/components/brand/primitives";
+import { Card, Chip, PageHeader, Stat, StatGrid } from "@/components/brand/primitives";
 import { btnCls } from "@/components/brand/styles";
 import { BackLink } from "@/components/hub/back-link";
 import { PersonForm, StatusForm } from "@/components/hub/hr/forms";
@@ -60,18 +60,11 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
           Annual leave in {year}
         </h2>
         <Card>
-          <dl className="grid grid-cols-3 gap-4 text-center">
-            {[
-              ["Days left", balance.left],
-              ["Taken or approved", balance.used],
-              ["Waiting", balance.pending],
-            ].map(([label, n]) => (
-              <div key={label}>
-                <dd className="font-title text-h2 text-ink-800">{n}</dd>
-                <dt className="text-small text-ink-500">{label}</dt>
-              </div>
-            ))}
-          </dl>
+          <StatGrid>
+            <Stat label="Days left" value={balance.left} tone={balance.left < 0 ? "bad" : undefined} />
+            <Stat label="Taken or approved" value={balance.used} />
+            <Stat label="Waiting" value={balance.pending} />
+          </StatGrid>
           <p className="mt-4 text-small text-ink-500">Out of {balance.allowance} days a year.</p>
           <Link href={`${base}/leave`} className={btnCls("secondary", "sm", "mt-4")}>
             Open leave

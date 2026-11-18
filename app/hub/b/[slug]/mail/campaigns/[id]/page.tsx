@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Alert, Card, Chip } from "@/components/brand/primitives";
+import { previewFrameCls } from "@/components/brand/styles";
 import { CampaignBuilder } from "@/components/hub/email/builder";
 import { CampaignActions } from "@/components/hub/email/campaign-actions";
 import { SendRunner } from "@/components/hub/email/runner";
@@ -112,7 +113,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ slug:
           {canWrite && <CampaignActions brandId={brand.id} slug={slug} id={camp.id} canDelete={camp.status === "sent"} />}
         </div>
         <aside aria-label="What was sent">
-          <iframe title="The email that was sent" sandbox="" srcDoc={preview} className="h-[640px] w-full rounded-bubble border border-hairline bg-paper-0" />
+          <iframe title="The email that was sent" sandbox="" srcDoc={preview} className={previewFrameCls} />
         </aside>
       </div>
     </MailShell>

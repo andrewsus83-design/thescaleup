@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ArrowLeftRight, BarChart3, FileText } from "lucide-react";
-import { Alert, Card, PageHeader } from "@/components/brand/primitives";
+import { Alert, Card, PageHeader, Stat, StatGrid } from "@/components/brand/primitives";
 import { CurrencyForm } from "@/components/hub/finance/forms";
 import { SectionList } from "@/components/hub/section-list";
 import { requireFunction } from "@/lib/hub/access";
@@ -24,13 +24,6 @@ export default async function FinancePage({ params }: { params: Promise<{ slug: 
   const now = totals ? monthSeries(totals, month, month)[0] : null;
   const o = owed(invoices.open, today);
   const base = `/hub/b/${slug}/finance`;
-  const tiles: [string, string][] = now
-    ? [
-        ["Money in", fmtMoney(now.in, currency)],
-        ["Money out", fmtMoney(now.out, currency)],
-        [now.net >= 0 ? "Left over" : "Short by", fmtMoney(Math.abs(now.net), currency)],
-      ]
-    : [];
 
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -42,14 +35,11 @@ export default async function FinancePage({ params }: { params: Promise<{ slug: 
         </h2>
         {now ? (
           <Card>
-            <dl className="grid gap-4 sm:grid-cols-3">
-              {tiles.map(([label, value]) => (
-                <div key={label}>
-                  <dt className="text-small text-ink-500">{label}</dt>
-                  <dd className="font-title text-h3 text-ink-800">{value}</dd>
-                </div>
-              ))}
-            </dl>
+            <StatGrid>
+              <Stat label="Money in" value={fmtMoney(now.in, currency)} />
+              <Stat label="Money out" value={fmtMoney(now.out, currency)} />
+              <Stat label={now.net >= 0 ? "Left over" : "Short by"} value={fmtMoney(Math.abs(now.net), currency)} tone={now.net < 0 ? "bad" : undefined} />
+            </StatGrid>
             <p className="mt-4 text-small text-ink-600">
               {o.unpaidCount === 0
                 ? "No invoices are waiting to be paid."

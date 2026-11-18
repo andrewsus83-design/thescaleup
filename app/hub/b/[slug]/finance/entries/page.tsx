@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeftRight } from "lucide-react";
 import { Alert, Card, Chip, EmptyState, PageHeader } from "@/components/brand/primitives";
-import { btnCls } from "@/components/brand/styles";
+import { btnCls, listCls } from "@/components/brand/styles";
 import { BackLink } from "@/components/hub/back-link";
 import { DeleteEntry, EntryForm } from "@/components/hub/finance/forms";
 import { requireFunction } from "@/lib/hub/access";
@@ -64,7 +64,7 @@ export default async function EntriesPage({ params, searchParams }: { params: Pr
       {list.entries.length === 0 ? (
         <EmptyState icon={<ArrowLeftRight className="size-6" aria-hidden />} title={`Nothing in ${monthLabel(month)}`} hint={canEdit ? "Add the first amount with the form above." : "Nobody has added an amount for this month yet."} />
       ) : (
-        <ul className="divide-y divide-ink-100 overflow-hidden rounded-field border-control border-ink-200">
+        <ul className={listCls}>
           {list.entries.map((e) => (
             <li key={e.id} className="px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">

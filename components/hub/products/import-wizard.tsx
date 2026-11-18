@@ -204,7 +204,7 @@ export function ImportWizard({ brandId, slug, stores, initialStore }: { brandId:
           ) : (
             <>
               <div className="mt-5 overflow-x-auto rounded-field border border-hairline">
-                <table className="w-full min-w-[28rem] text-left text-caption">
+                <table className="w-full min-w-md text-left text-caption">
                   <thead className="bg-paper-100 text-ink-500">
                     <tr>
                       <th className="px-3 py-2 font-semibold">SKU</th>
@@ -217,7 +217,7 @@ export function ImportWizard({ brandId, slug, stores, initialStore }: { brandId:
                     {parsed.rows.slice(0, 5).map((r) => (
                       <tr key={r.sku}>
                         <td className="px-3 py-2 font-mono">{r.sku}</td>
-                        <td className="max-w-[14rem] truncate px-3 py-2">{r.name || "—"}</td>
+                        <td className="max-w-56 truncate px-3 py-2">{r.name || "—"}</td>
                         <td className="px-3 py-2 text-right font-mono">{fmtNum(r.stock)}</td>
                         <td className="px-3 py-2 text-right font-mono">{fmtPrice(r.price)}</td>
                       </tr>

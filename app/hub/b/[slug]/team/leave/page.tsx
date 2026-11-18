@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CalendarOff } from "lucide-react";
-import { Alert, Card, Chip, EmptyState, PageHeader, type Tone } from "@/components/brand/primitives";
+import { Alert, Card, Chip, EmptyState, PageHeader, Stat, StatGrid, type Tone } from "@/components/brand/primitives";
+import { listCls } from "@/components/brand/styles";
 import { BackLink } from "@/components/hub/back-link";
 import { LeaveButtons, LeaveForm } from "@/components/hub/hr/forms";
 import { requireFunction } from "@/lib/hub/access";
@@ -63,8 +64,7 @@ export default async function LeavePage({ params }: { params: Promise<{ slug: st
       </li>
     );
   };
-  const listCls = "divide-y divide-ink-100 overflow-hidden rounded-field border-control border-ink-200";
-
+  
   return (
     <div className="mx-auto w-full max-w-2xl">
       <BackLink href={`/hub/b/${slug}/team`}>Team</BackLink>
@@ -77,18 +77,11 @@ export default async function LeavePage({ params }: { params: Promise<{ slug: st
               Your annual leave in {year}
             </h2>
             <Card>
-              <dl className="grid grid-cols-3 gap-4 text-center">
-                {[
-                  ["Days left", balance.left],
-                  ["Taken or approved", balance.used],
-                  ["Waiting", balance.pending],
-                ].map(([label, n]) => (
-                  <div key={label}>
-                    <dd className="font-title text-h2 text-ink-800">{n}</dd>
-                    <dt className="text-small text-ink-500">{label}</dt>
-                  </div>
-                ))}
-              </dl>
+              <StatGrid>
+                <Stat label="Days left" value={balance.left} tone={balance.left < 0 ? "bad" : undefined} />
+                <Stat label="Taken or approved" value={balance.used} />
+                <Stat label="Waiting" value={balance.pending} />
+              </StatGrid>
               <p className="mt-4 text-small text-ink-500">Out of {balance.allowance} days a year. Sick, unpaid and other leave do not use these days.</p>
             </Card>
           </section>

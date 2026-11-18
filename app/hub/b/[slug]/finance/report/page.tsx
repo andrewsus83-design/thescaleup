@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Alert, PageHeader } from "@/components/brand/primitives";
+import { groupTitleCls, listCls, rowHeadCls, tableCls, tableWrapCls, tbodyCls, tdCls, thCls, theadCls } from "@/components/brand/styles";
+import { cn } from "@/lib/utils";
 import { BackLink } from "@/components/hub/back-link";
 import { requireFunction } from "@/lib/hub/access";
 import { getCurrency, monthTotals } from "@/lib/hub/finance/data";
@@ -15,11 +17,11 @@ export const dynamic = "force-dynamic";
 function Cats({ title, rows, currency }: { title: string; rows: CategorySum[]; currency: string }) {
   return (
     <section aria-label={title}>
-      <h3 className="mb-2 font-title text-h4 text-ink-800">{title}</h3>
+      <h3 className={cn(groupTitleCls, "mb-2")}>{title}</h3>
       {rows.length === 0 ? (
         <p className="text-small text-ink-500">Nothing this month.</p>
       ) : (
-        <ul className="divide-y divide-ink-100 overflow-hidden rounded-field border-control border-ink-200">
+        <ul className={listCls}>
           {rows.map((r) => (
             <li key={r.category} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 text-small">
               <span className="text-ink-800">{r.category}</span>
@@ -63,29 +65,29 @@ export default async function ReportPage({ params, searchParams }: { params: Pro
       <BackLink href={base}>Finance</BackLink>
       <PageHeader title="Monthly report" description="The last twelve months: what came in, what went out, and what was left." />
 
-      <div className="overflow-x-auto rounded-field border-control border-ink-200">
-        <table className="w-full min-w-[32rem] text-left text-small">
+      <div className={tableWrapCls}>
+        <table className={tableCls}>
           <caption className="sr-only">Money in, out and left over for the last twelve months</caption>
-          <thead className="bg-paper-100 text-ink-600">
+          <thead className={theadCls}>
             <tr>
               {["Month", "Money in", "Money out", "Left over"].map((h, i) => (
-                <th key={h} scope="col" className={`px-4 py-3 font-semibold ${i === 0 ? "" : "text-right"}`}>
+                <th key={h} scope="col" className={thCls(i > 0)}>
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-ink-100">
+          <tbody className={tbodyCls}>
             {[...series].reverse().map((s) => (
               <tr key={s.month} className={s.month === month ? "bg-paper-100" : undefined}>
-                <th scope="row" className="px-4 py-3 font-semibold text-ink-800">
+                <th scope="row" className={rowHeadCls}>
                   <Link href={`${base}/report?m=${s.month}`} aria-current={s.month === month ? "true" : undefined} className="underline underline-offset-4">
                     {monthLabel(s.month)}
                   </Link>
                 </th>
-                <td className="px-4 py-3 text-right font-mono text-ink-800">{money(s.in)}</td>
-                <td className="px-4 py-3 text-right font-mono text-ink-800">{money(s.out)}</td>
-                <td className={`px-4 py-3 text-right font-mono font-medium ${s.net < 0 ? "text-danger" : "text-ink-800"}`}>
+                <td className={tdCls(true)}>{money(s.in)}</td>
+                <td className={tdCls(true)}>{money(s.out)}</td>
+                <td className={cn(tdCls(true), "font-medium", s.net < 0 && "text-danger-ink")}>
                   {s.net < 0 ? "−" : ""}
                   {money(Math.abs(s.net))}
                 </td>
@@ -94,12 +96,12 @@ export default async function ReportPage({ params, searchParams }: { params: Pro
           </tbody>
           <tfoot className="border-t-control border-ink-200 bg-paper-100">
             <tr>
-              <th scope="row" className="px-4 py-3 font-semibold text-ink-800">
+              <th scope="row" className={rowHeadCls}>
                 Twelve months
               </th>
-              <td className="px-4 py-3 text-right font-mono font-medium text-ink-800">{money(year.in)}</td>
-              <td className="px-4 py-3 text-right font-mono font-medium text-ink-800">{money(year.out)}</td>
-              <td className={`px-4 py-3 text-right font-mono font-medium ${year.net < 0 ? "text-danger" : "text-ink-800"}`}>
+              <td className={cn(tdCls(true), "font-medium")}>{money(year.in)}</td>
+              <td className={cn(tdCls(true), "font-medium")}>{money(year.out)}</td>
+              <td className={cn(tdCls(true), "font-medium", year.net < 0 && "text-danger-ink")}>
                 {year.net < 0 ? "−" : ""}
                 {money(Math.abs(year.net))}
               </td>

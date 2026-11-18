@@ -54,7 +54,7 @@ const itemCls = (active: boolean) =>
     "relative flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1 font-semibold leading-none transition-colors duration-150 ease-out focus-visible:shadow-focus focus-visible:outline-none",
     // Active: Scale Orange with Ink (5.3:1; white on orange is never used). Inactive: a smaller, lighter grey label and an even lighter icon, so the open menu stands out. The label is the lightest grey
     // that still reads on white (4.5:1); the icon may go lighter (3:1 is enough for a graphic).
-    active ? "bg-brand-500 text-caption text-ink-800" : "text-micro text-[#7a766f] hover:bg-paper-100 hover:text-ink-800 [&>svg]:text-[#8f8b84] hover:[&>svg]:text-ink-800",
+    active ? "bg-brand-500 text-caption text-ink-800" : "text-micro text-ink-500 hover:bg-paper-100 hover:text-ink-800 [&>svg]:text-ink-400 hover:[&>svg]:text-ink-800",
   );
 
 /**

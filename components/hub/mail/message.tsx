@@ -44,7 +44,7 @@ export function Message({ m, slug, tz, today, open, forwardHref }: { m: MessageR
           </p>
         </div>
       </summary>
-      <div className="space-y-3 px-4 pb-4 sm:pl-[4.25rem]">
+      <div className="space-y-3 px-4 pb-4 sm:pl-17">
         {st && <Chip tone={st.tone}>{st.label}</Chip>}
         {m.error && <p className="text-small text-danger">{m.error}</p>}
         {/* Plain text only: React escapes it. The sender's own formatting is behind a button, in a sandbox. */}
