@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Card, Chip, PageHeader } from "@/components/brand/primitives";
+import { BrandNameForm } from "@/components/hub/brand-name-form";
 import { SettingsList } from "@/components/hub/settings-list";
 import { canManageTeam, ROLE_LABEL } from "@/lib/hub/rules";
 import { requireBrand } from "@/lib/hub/session";
@@ -17,7 +18,7 @@ export default async function SettingsHome({ params }: { params: Promise<{ slug:
       <Card className="mb-6">
         <dl className="grid gap-x-8 gap-y-3 text-body sm:grid-cols-[8rem_1fr]">
           <dt className="text-ink-500">Brand</dt>
-          <dd className="text-ink-800">{brand.name}</dd>
+          <dd className="text-ink-800">{manage ? <BrandNameForm key={brand.name} brandId={brand.id} name={brand.name} /> : brand.name}</dd>
           <dt className="text-ink-500">Address</dt>
           <dd className="font-mono text-small text-ink-800">{brand.slug}</dd>
           <dt className="text-ink-500">Website</dt>

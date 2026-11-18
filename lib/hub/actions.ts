@@ -216,6 +216,34 @@ export async function createBrand(_prev: FormState, fd: FormData): Promise<FormS
   redirect(`/hub/b/${slug}/settings`);
 }
 
+/**
+ * Changes a brand's name. The address (slug) stays the same on purpose, so every link, bookmark and connected account keeps working.
+ * The agency owner and the brand's founder can do it.
+ */
+export async function renameBrand(_prev: FormState, fd: FormData): Promise<FormState> {
+  const user = await getHubUser();
+  if (!user) return { error: "Your session ended. Sign in again." };
+  const brandId = str(fd, "brandId");
+  if (!UUID.test(brandId)) return { error: "Unknown brand." };
+  const actor = await actorFor(user, brandId);
+  if (actor !== "owner" && actor !== "founder") return { error: "Only the founder or the agency owner can change the brand name." };
+  const name = str(fd, "name").replace(/\s+/g, " ").trim();
+  if (!name || name.length > 80) return { error: "Enter the brand name (up to 80 characters)." };
+
+  const admin = createSupabaseAdminClient();
+  const { data: brand } = await admin.from("brands").select("slug, name").eq("id", brandId).maybeSingle();
+  if (!brand) return { error: "Unknown brand." };
+  if (brand.name === name) return { message: "That is already the name." };
+  const { error } = await admin.from("brands").update({ name }).eq("id", brandId);
+  if (error) {
+    console.error("[hub] renameBrand failed:", error.message);
+    return { error: "Could not change the name. Try again." };
+  }
+  await audit({ actor: user, brandId, action: "brand.rename", target: brand.slug as string, meta: { from: brand.name, to: name } });
+  revalidatePath("/hub", "layout");
+  return { message: "Name changed." };
+}
+
 // ------------------------------------------------------------------ team
 export async function createInvite(_prev: FormState, fd: FormData): Promise<FormState> {
   const user = await getHubUser();
