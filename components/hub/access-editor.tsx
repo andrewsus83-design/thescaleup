@@ -29,8 +29,10 @@ export function RoleAccessForm({ brandId, role, current, defaults }: { brandId: 
           {state.message}
         </Alert>
       )}
+      {/* Salary and payroll is not built yet, so its row is hidden. Its stored level is sent back unchanged. */}
+      <input type="hidden" name="fn:payroll" value={current.payroll} />
       <ul className="divide-y divide-ink-100">
-        {FUNCTIONS.map((f) => {
+        {FUNCTIONS.filter((f) => f !== "payroll").map((f) => {
           const id = `acc-${role}-${f}`;
           return (
             <li key={f} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">

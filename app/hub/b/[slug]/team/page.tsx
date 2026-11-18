@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CalendarDays, CheckSquare, Clock, Landmark, Target } from "lucide-react";
+import { CalendarCheck, CalendarDays, CalendarOff, CheckSquare, Clock, Target, Users } from "lucide-react";
 import { PageHeader } from "@/components/brand/primitives";
 import { SectionList, type SectionItem } from "@/components/hub/section-list";
 import { ClockCard } from "@/components/hub/tasks/clock-card";
@@ -25,11 +25,13 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
     items.push({ key: "kpi", title: "KPI and deliverables", hint: "Tasks done on time, late and missed", icon: Target, href: `${base}/team/kpi` });
     items.push({ key: "calendar", title: "Calendar", hint: "Task deadlines by day", icon: CalendarDays, href: `${base}/tasks?v=calendar` });
   }
-  // Pay is sensitive: the row only shows to roles that were given access to it.
-  if (access.payroll !== "none") items.push({ key: "payroll", title: "Salary and payroll", hint: "Pay, payslips and payroll runs", icon: Landmark, soon: true });
+  items.push({ key: "people", title: "People", hint: "Who works here: job, employment and dates", icon: Users, href: `${base}/team/people` });
+  items.push({ key: "leave", title: "Leave", hint: "Ask for time off, see what was decided", icon: CalendarOff, href: `${base}/team/leave` });
+  items.push({ key: "attendance", title: "Attendance", hint: "Days present, late and on leave, month by month", icon: CalendarCheck, href: `${base}/team/attendance` });
+  // Salary and payroll is not built yet, so it is not shown.
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <PageHeader title="Team" description="Tasks, hours and results in one place." />
+      <PageHeader title="Team" description="Tasks, hours, people and leave in one place." />
       <div className="mb-8">
         <ClockCard brandId={brand.id} sinceLabel={open ? fmtStamp(open.clock_in, tz, todayIn(tz)) : null} />
       </div>
