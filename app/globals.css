@@ -71,6 +71,7 @@
   --color-ink-700: #3a3a3a; /* hover of an Ink button */
   --color-ink-600: #4d4a45; /* body text one step softer than Ink 800: 8.8:1 on white */
   --color-ink-500: #6b6862; /* secondary text, labels on light surfaces */
+  --color-ink-450: #7a766f; /* the lightest grey a small label may be on white (4.5:1): an inactive tab */
   --color-ink-400: #8f8b84; /* icons and chevrons only (3.4:1): never for text */
   --color-ink-300: #b8b3aa; /* labels on Ink panels, disabled text */
   --color-ink-200: #ddd8ce; /* control borders */

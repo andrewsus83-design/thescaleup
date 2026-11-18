@@ -49,12 +49,15 @@ function useHideOnScroll(ref: React.RefObject<HTMLElement | null>, path: string)
   return state.hidden && state.path === path;
 }
 
+/** The open menu: a light orange pill with dark orange text and icon (8.5:1). Shared by the bar and the "More" list. */
+const activeCls = "bg-brand-100 text-brand-900";
+
 const itemCls = (active: boolean) =>
   cn(
-    "relative flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1 font-semibold leading-none transition-colors duration-150 ease-out focus-visible:shadow-focus focus-visible:outline-none",
-    // Active: Scale Orange with Ink (5.3:1; white on orange is never used). Inactive: a smaller, lighter grey label and an even lighter icon, so the open menu stands out. The label is the lightest grey
-    // that still reads on white (4.5:1); the icon may go lighter (3:1 is enough for a graphic).
-    active ? "bg-brand-500 text-caption text-ink-800" : "text-micro text-ink-500 hover:bg-paper-100 hover:text-ink-800 [&>svg]:text-ink-400 hover:[&>svg]:text-ink-800",
+    "relative flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1 text-micro leading-none transition-colors duration-150 ease-out focus-visible:shadow-focus focus-visible:outline-none",
+    // Every label is the small 11px size. The open menu is the light orange pill in semibold. The others step back: a medium-weight
+    // label in the lightest grey that still reads on white (4.5:1) and a lighter icon (3.4:1, enough for a graphic).
+    active ? cn(activeCls, "font-semibold") : "font-medium text-ink-450 hover:bg-paper-100 hover:text-ink-800 [&>svg]:text-ink-400 hover:[&>svg]:text-ink-800",
   );
 
 /**
@@ -128,7 +131,7 @@ export function BrandTabs({ slug, tabs, bar, more }: { slug: string; tabs: TabKe
                 const active = isActive(k);
                 return (
                   <li key={k} data-acc={k}>
-                    <Link href={hrefOf(k)} aria-current={active ? "page" : undefined} onClick={() => setOpen(false)} className={cn("flex min-h-12 items-center gap-3 rounded-full px-2 pr-4 text-body font-semibold focus-visible:shadow-focus focus-visible:outline-none", active ? "bg-brand-500 text-ink-800" : "text-ink-800 hover:bg-paper-100")}>
+                    <Link href={hrefOf(k)} aria-current={active ? "page" : undefined} onClick={() => setOpen(false)} className={cn("flex min-h-12 items-center gap-3 rounded-full px-2 pr-4 text-body font-semibold focus-visible:shadow-focus focus-visible:outline-none", active ? activeCls : "text-ink-800 hover:bg-paper-100")}>
                       <span className="inline-flex size-9 items-center justify-center rounded-full bg-(--acc-tint) text-(--acc-ink)">
                         <Icon className="size-5" aria-hidden />
                       </span>
