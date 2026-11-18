@@ -80,3 +80,36 @@ export async function getPlan(brandId: string): Promise<PlanLine[]> {
   }
   return readPlan(data);
 }
+
+// ---------------------------------------------------------------------------------------------- payments read from a gateway
+export type IncomingRow = { id: string; source: string; day: string; occurredAt: string; amount: number; fee: number; channel: string; reference: string; status: "new" | "recorded" | "ignored"; invoiceId: string | null };
+const INCOMING_COLS = "id, source, day, occurred_at, amount_cents, fee_cents, channel, reference, status, invoice_id";
+type IncomingDb = { id: string; source: string; day: string; occurred_at: string; amount_cents: number | string; fee_cents: number | string; channel: string; reference: string; status: string; invoice_id: string | null };
+const toIncoming = (r: IncomingDb): IncomingRow => ({ id: r.id, source: r.source, day: r.day, occurredAt: r.occurred_at, amount: num(r.amount_cents), fee: num(r.fee_cents), channel: r.channel, reference: r.reference, status: r.status === "recorded" ? "recorded" : r.status === "ignored" ? "ignored" : "new", invoiceId: r.invoice_id });
+
+export const INCOMING_PAGE = 100;
+
+/** Payments waiting for a decision (newest first, at most INCOMING_PAGE, with the full count) and the latest ones already decided. null when the table could not be read. */
+export async function listIncoming(brandId: string): Promise<{ waiting: IncomingRow[]; waitingCount: number; decided: IncomingRow[] } | null> {
+  const [waiting, decided] = await Promise.all([
+    db().from("fin_incoming").select(INCOMING_COLS, { count: "exact" }).eq("brand_id", brandId).eq("status", "new").order("occurred_at", { ascending: false }).limit(INCOMING_PAGE),
+    db().from("fin_incoming").select(INCOMING_COLS).eq("brand_id", brandId).neq("status", "new").order("decided_at", { ascending: false }).limit(20),
+  ]);
+  if (waiting.error || decided.error) {
+    console.error("[finance] incoming failed:", (waiting.error ?? decided.error)?.message);
+    return null;
+  }
+  return { waiting: ((waiting.data ?? []) as IncomingDb[]).map(toIncoming), waitingCount: waiting.count ?? 0, decided: ((decided.data ?? []) as IncomingDb[]).map(toIncoming) };
+}
+
+/** How many payments wait for a decision. 0 when there are none or the table is not there yet. */
+export async function countIncoming(brandId: string): Promise<number> {
+  const { count, error } = await db().from("fin_incoming").select("id", { count: "exact", head: true }).eq("brand_id", brandId).eq("status", "new");
+  return error ? 0 : (count ?? 0);
+}
+
+export type SourceState = { lastSyncedAt: string | null; pendingUntil: string | null; pendingStarted: string | null };
+export async function getSourceState(brandId: string, source: "xendit"): Promise<SourceState> {
+  const { data } = await db().from("fin_source_state").select("last_synced_at, pending_until, pending_started").eq("brand_id", brandId).eq("source", source).maybeSingle();
+  return { lastSyncedAt: (data?.last_synced_at as string | null) ?? null, pendingUntil: (data?.pending_until as string | null) ?? null, pendingStarted: (data?.pending_started as string | null) ?? null };
+}

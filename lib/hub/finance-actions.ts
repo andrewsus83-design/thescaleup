@@ -147,3 +147,20 @@ export async function savePlan(_prev: FormState, fd: FormData): Promise<FormStat
   fresh(ctx);
   return { message: rows.length === 0 ? "Plan cleared." : `Plan saved with ${rows.length} line${rows.length === 1 ? "" : "s"}.` };
 }
+
+/** Deletes an invoice for good. Only a void one: an unpaid invoice is money owed and a paid one is money in the books. */
+export async function deleteInvoice(_prev: FormState, fd: FormData): Promise<FormState> {
+  const c = await financeContext(str(fd, "brandId"));
+  if (!c.ok) return { error: c.error };
+  const { ctx } = c;
+  const id = str(fd, "invoiceId");
+  const inv = UUID.test(id) ? await getInvoice(ctx.brandId, id) : null;
+  if (!inv) return { error: "Unknown invoice." };
+  if (inv.status !== "void") return { error: inv.status === "paid" ? "A paid invoice cannot be deleted. Mark it as not paid, void it, then delete it." : "Void this invoice first. Then it can be deleted." };
+  const { data, error } = await ctx.admin.from("fin_invoices").delete().eq("brand_id", ctx.brandId).eq("id", inv.id).eq("status", "void").select("id");
+  if (error) return fail("deleteInvoice", error.message);
+  if (!data?.length) return { error: "This invoice changed in the meantime. Reload and try again." };
+  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "finance.invoice.delete", target: inv.number });
+  fresh(ctx);
+  return { message: `Invoice ${inv.number} deleted.` };
+}

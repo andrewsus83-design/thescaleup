@@ -21,11 +21,13 @@ export type FinanceHome = {
   owedMore: boolean;
   recent: Entry[];
   canEdit: boolean;
+  /** Payments read from a gateway: how many wait for a decision, and whether a gateway is connected. */
+  incoming: { waiting: number; connected: boolean };
 };
 
 /** The Finance home: the month on an Ink panel, what clients owe, shortcuts, spending against the plan, six months as bars, the latest entries. */
 export function FinanceHomeView({ data, children }: { data: FinanceHome; children?: React.ReactNode }) {
-  const { base, month, currency, sum, series, plan, spending, progress, owed, owedMore, recent, canEdit } = data;
+  const { base, month, currency, sum, series, plan, spending, progress, owed, owedMore, recent, canEdit, incoming } = data;
   const shortcuts: Shortcut[] = [
     ...(canEdit
       ? [
@@ -58,7 +60,22 @@ export function FinanceHomeView({ data, children }: { data: FinanceHome; childre
         </Alert>
       )}
 
+      {incoming.waiting > 0 && (
+        <Alert tone="info" title={`${incoming.waiting} payment${incoming.waiting === 1 ? "" : "s"} from Xendit ${incoming.waiting === 1 ? "waits" : "wait"} for your decision.`}>
+          {incoming.waiting === 1 ? "It is" : "They are"} not in the books yet.{" "}
+          <Link href={`${base}/incoming`} className="font-semibold text-brand-700 underline underline-offset-4">
+            Review {incoming.waiting === 1 ? "it" : "them"}
+          </Link>
+        </Alert>
+      )}
+
       <Shortcuts items={shortcuts} />
+      <p className="px-1 text-small text-ink-500">
+        {incoming.connected ? "Xendit is connected. " : "Payments can come in by themselves. "}
+        <Link href={`${base}/incoming`} className="font-semibold text-brand-700 underline underline-offset-4">
+          {incoming.connected ? "Payments to review" : "Connect Xendit"}
+        </Link>
+      </p>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel
