@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Alert, PageHeader } from "@/components/brand/primitives";
-import { groupTitleCls, listCls, rowHeadCls, tableCls, tableWrapCls, tbodyCls, tdCls, thCls, theadCls } from "@/components/brand/styles";
+import { Alert, Bar, PageHeader } from "@/components/brand/primitives";
+import { rowHeadCls, tableCls, tableWrapCls, tbodyCls, tdCls, thCls, theadCls } from "@/components/brand/styles";
 import { cn } from "@/lib/utils";
 import { BackLink } from "@/components/hub/back-link";
 import { requireFunction } from "@/lib/hub/access";
 import { getCurrency, monthTotals } from "@/lib/hub/finance/data";
 import { lastDayOfMonth } from "@/lib/hub/finance/dates";
+import { MonthBars, MoreLink, Panel } from "@/components/hub/finance/views";
 import { byCategory, monthSeries, type CategorySum } from "@/lib/hub/finance/model";
 import { fmtMoney } from "@/lib/hub/money";
 import { hubTz, isMonthKey, monthKey, monthLabel, shiftMonth, todayIn } from "@/lib/hub/tasks/dates";
@@ -17,17 +18,20 @@ export const dynamic = "force-dynamic";
 function Cats({ title, rows, currency }: { title: string; rows: CategorySum[]; currency: string }) {
   return (
     <section aria-label={title}>
-      <h3 className={cn(groupTitleCls, "mb-2")}>{title}</h3>
+      <h3 className="label-caps mb-3 text-ink-500">{title}</h3>
       {rows.length === 0 ? (
-        <p className="text-small text-ink-500">Nothing this month.</p>
+        <p className="text-small font-normal text-ink-500">Nothing this month.</p>
       ) : (
-        <ul className={listCls}>
+        <ul className="space-y-4">
           {rows.map((r) => (
-            <li key={r.category} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 text-small">
-              <span className="text-ink-800">{r.category}</span>
-              <span className="font-mono text-ink-800">
-                {fmtMoney(r.total, currency)} <span className="text-ink-500">({r.share}%)</span>
-              </span>
+            <li key={r.category}>
+              <div className="mb-2 flex items-baseline justify-between gap-4 text-small">
+                <span className="min-w-0 truncate font-semibold text-ink-800">{r.category}</span>
+                <span className="shrink-0 whitespace-nowrap font-mono text-ink-800">
+                  {fmtMoney(r.total, currency)} <span className="text-ink-500">{r.share}%</span>
+                </span>
+              </div>
+              <Bar value={r.share} tone={title === "Money in" ? "ok" : "neutral"} label={`${r.category}: ${r.share}% of ${title.toLowerCase()}`} />
             </li>
           ))}
         </ul>
@@ -48,7 +52,7 @@ export default async function ReportPage({ params, searchParams }: { params: Pro
 
   if (!totals)
     return (
-      <div className="mx-auto w-full max-w-3xl">
+      <div>
         <BackLink href={base}>Finance</BackLink>
         <PageHeader title="Monthly report" />
         <Alert tone="warn" role="alert">
@@ -61,9 +65,16 @@ export default async function ReportPage({ params, searchParams }: { params: Pro
   const year = series.reduce((a, s) => ({ in: a.in + s.in, out: a.out + s.out, net: a.net + s.net }), { in: 0, out: 0, net: 0 });
   const money = (n: number) => fmtMoney(n, currency);
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div>
       <BackLink href={base}>Finance</BackLink>
       <PageHeader title="Monthly report" description="The last twelve months: what came in, what went out, and what was left." />
+
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          <Panel id="rep-bars" title="Twelve months at a glance">
+            <MonthBars series={series} currency={currency} />
+          </Panel>
+          <Panel id="rep-table" title="Month by month" hint="Choose a month to see its categories.">
 
       <div className={tableWrapCls}>
         <table className={tableCls}>
@@ -109,22 +120,17 @@ export default async function ReportPage({ params, searchParams }: { params: Pro
           </tfoot>
         </table>
       </div>
-      <p className="mt-3 text-small text-ink-500">Left over is money in minus money out by the date each amount was entered for. An invoice counts on the day it was paid, not the day it was sent.</p>
+            <p className="mt-4 text-caption text-ink-500">Left over is money in minus money out by the date each amount was entered for. An invoice counts on the day it was paid, not the day it was sent.</p>
+          </Panel>
+        </div>
 
-      <section aria-labelledby="rep-month" className="mt-10">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 id="rep-month" className="font-title text-h3 text-ink-800">
-            {monthLabel(month)} by category
-          </h2>
-          <Link href={`${base}/entries?m=${month}`} className="text-small font-semibold text-brand-700 underline underline-offset-4">
-            Open this month&apos;s entries
-          </Link>
-        </div>
-        <div className="grid gap-6 sm:grid-cols-2">
-          <Cats title="Money in" rows={byCategory(totals, month, "in")} currency={currency} />
-          <Cats title="Money out" rows={byCategory(totals, month, "out")} currency={currency} />
-        </div>
-      </section>
+        <Panel id="rep-month" title={`${monthLabel(month)} by category`} action={<MoreLink href={`${base}/entries?m=${month}`}>Entries</MoreLink>} className="lg:sticky lg:top-6">
+          <div className="space-y-6">
+            <Cats title="Money in" rows={byCategory(totals, month, "in")} currency={currency} />
+            <Cats title="Money out" rows={byCategory(totals, month, "out")} currency={currency} />
+          </div>
+        </Panel>
+      </div>
     </div>
   );
 }

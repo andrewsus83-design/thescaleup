@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { FormState } from "./actions";
 import { getInvoice } from "./finance/data";
-import { checkPaidOn, parseEntryInput, parseInvoiceInput } from "./finance/model";
+import { checkPaidOn, parseEntryInput, parseInvoiceInput, parsePlanInput } from "./finance/model";
 import { isCurrency } from "./money";
 import { atLeast } from "./permissions";
 import { audit } from "./session";
@@ -131,4 +131,19 @@ export async function setInvoiceStatus(_prev: FormState, fd: FormData): Promise<
     return { message: `Invoice ${inv.number} voided. It no longer counts as owed.` };
   }
   return { error: "Unknown change." };
+}
+
+/** Replaces the monthly plan with the lines on the form, all at once. */
+export async function savePlan(_prev: FormState, fd: FormData): Promise<FormState> {
+  const c = await financeContext(str(fd, "brandId"));
+  if (!c.ok) return { error: c.error };
+  const { ctx } = c;
+  const parsed = parsePlanInput(str(fd, "lines"));
+  if (!parsed.ok) return { error: parsed.error };
+  const rows = parsed.value.map((l) => ({ kind: l.kind, category: l.category, amount_cents: l.amount }));
+  const { error } = await ctx.admin.rpc("fin_save_plan", { p_brand: ctx.brandId, p_rows: rows, p_user: ctx.user.id });
+  if (error) return fail("savePlan", error.message);
+  await audit({ actor: ctx.user, brandId: ctx.brandId, action: "finance.plan.save", meta: { lines: rows.length } });
+  fresh(ctx);
+  return { message: rows.length === 0 ? "Plan cleared." : `Plan saved with ${rows.length} line${rows.length === 1 ? "" : "s"}.` };
 }

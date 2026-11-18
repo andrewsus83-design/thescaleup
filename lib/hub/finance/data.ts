@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isCurrency, type Currency } from "../money";
-import { isEntryKind, isInvoiceStatus, LIMITS, readTotals, type Entry, type Invoice, type TotalRow } from "./model";
+import { isEntryKind, isInvoiceStatus, LIMITS, readPlan, readTotals, type Entry, type Invoice, type PlanLine, type TotalRow } from "./model";
 
 // Reads for Finance. Service role only: every caller has already checked the Finance access.
 // Totals always come from the database's own sum (fin_month_totals), never from adding up a page of rows, so a long month cannot be undercounted.
@@ -69,4 +69,14 @@ export async function getInvoice(brandId: string, id: string): Promise<Invoice |
 export async function recentNumbers(brandId: string): Promise<string[]> {
   const { data } = await db().from("fin_invoices").select("number").eq("brand_id", brandId).order("created_at", { ascending: false }).limit(20);
   return (data ?? []).map((r) => r.number as string);
+}
+
+/** The brand's monthly plan. Empty when none was set, or when the plan table is not there yet. */
+export async function getPlan(brandId: string): Promise<PlanLine[]> {
+  const { data, error } = await db().from("fin_budgets").select("kind, category, amount_cents").eq("brand_id", brandId).limit(200);
+  if (error) {
+    console.error("[finance] plan failed:", error.message);
+    return [];
+  }
+  return readPlan(data);
 }

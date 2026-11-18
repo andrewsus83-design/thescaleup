@@ -183,7 +183,7 @@ export function Stat({ label, value, hint, tone }: { label: string; value: React
 
 /** Two to four `Stat`s in a row; they stack on a phone. */
 export function StatGrid({ cols = 3, className, children }: { cols?: 2 | 3 | 4; className?: string; children: React.ReactNode }) {
-  return <dl className={cn("grid gap-x-6 gap-y-5", cols === 2 ? "sm:grid-cols-2" : cols === 3 ? "sm:grid-cols-3" : "grid-cols-2 lg:grid-cols-4", className)}>{children}</dl>;
+  return <dl className={cn("grid gap-x-6 gap-y-5", cols === 2 ? "grid-cols-1 sm:grid-cols-2" : cols === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 lg:grid-cols-4", className)}>{children}</dl>;
 }
 
 /** A section of a page: an h2, an optional line under it and an optional action on the right, then the content. */

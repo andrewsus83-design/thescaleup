@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
-import { ArrowLeftRight, BarChart3, FileText } from "lucide-react";
-import { Alert, Card, PageHeader, Stat, StatGrid } from "@/components/brand/primitives";
+import { Card } from "@/components/brand/primitives";
+import { groupTitleCls } from "@/components/brand/styles";
 import { CurrencyForm } from "@/components/hub/finance/forms";
-import { SectionList } from "@/components/hub/section-list";
+import { FinanceHomeView } from "@/components/hub/finance/home-view";
 import { requireFunction } from "@/lib/hub/access";
-import { getCurrency, listInvoices, monthTotals } from "@/lib/hub/finance/data";
+import { getCurrency, getPlan, listEntries, listInvoices, monthTotals } from "@/lib/hub/finance/data";
 import { lastDayOfMonth } from "@/lib/hub/finance/dates";
-import { monthSeries, owed } from "@/lib/hub/finance/model";
-import { fmtMoney } from "@/lib/hub/money";
+import { monthProgress, monthSeries, owed, planTotals, planVsActual } from "@/lib/hub/finance/model";
 import { atLeast } from "@/lib/hub/permissions";
-import { hubTz, monthKey, monthLabel, todayIn } from "@/lib/hub/tasks/dates";
+import { hubTz, monthKey, shiftMonth, todayIn } from "@/lib/hub/tasks/dates";
 
 export const metadata: Metadata = { title: "Finance" };
 export const dynamic = "force-dynamic";
@@ -20,59 +19,44 @@ export default async function FinancePage({ params }: { params: Promise<{ slug: 
   const canEdit = atLeast(access.finance, "edit");
   const today = todayIn(hubTz());
   const month = monthKey(today);
-  const [currency, totals, invoices] = await Promise.all([getCurrency(brand.id), monthTotals(brand.id, `${month}-01`, lastDayOfMonth(month)), listInvoices(brand.id)]);
-  const now = totals ? monthSeries(totals, month, month)[0] : null;
-  const o = owed(invoices.open, today);
-  const base = `/hub/b/${slug}/finance`;
+  const first = shiftMonth(month, -5);
+  const [currency, totals, invoices, plan, list] = await Promise.all([
+    getCurrency(brand.id),
+    monthTotals(brand.id, `${first}-01`, lastDayOfMonth(month)),
+    listInvoices(brand.id),
+    getPlan(brand.id),
+    listEntries(brand.id, `${month}-01`, lastDayOfMonth(month)),
+  ]);
+  const series = totals ? monthSeries(totals, first, month) : [];
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
-      <PageHeader title="Finance" description="Simple books: what came in, what went out, and who still owes you." />
-
-      <section aria-labelledby="fin-now" className="mb-8">
-        <h2 id="fin-now" className="mb-3 font-title text-h3 text-ink-800">
-          {monthLabel(month)} so far
-        </h2>
-        {now ? (
-          <Card>
-            <StatGrid>
-              <Stat label="Money in" value={fmtMoney(now.in, currency)} />
-              <Stat label="Money out" value={fmtMoney(now.out, currency)} />
-              <Stat label={now.net >= 0 ? "Left over" : "Short by"} value={fmtMoney(Math.abs(now.net), currency)} tone={now.net < 0 ? "bad" : undefined} />
-            </StatGrid>
-            <p className="mt-4 text-small text-ink-600">
-              {o.unpaidCount === 0
-                ? "No invoices are waiting to be paid."
-                : `${o.unpaidCount} invoice${o.unpaidCount === 1 ? "" : "s"} not paid yet, ${fmtMoney(o.unpaid, currency)} in total${o.overdueCount > 0 ? `. ${o.overdueCount} of them ${o.overdueCount === 1 ? "is" : "are"} past the due date (${fmtMoney(o.overdue, currency)}).` : "."}`}
-              {invoices.openMore ? " Only the first 500 unpaid invoices are counted here." : ""}
-            </p>
-          </Card>
-        ) : (
-          <Alert tone="warn" role="alert">
-            The totals could not be read just now, so no numbers are shown. Reload the page. If this stays, the Finance tables may not be set up yet.
-          </Alert>
-        )}
-      </section>
-
-      <SectionList
-        items={[
-          { key: "entries", title: "Money in and out", hint: "Add and review every amount that came in or went out", icon: ArrowLeftRight, href: `${base}/entries` },
-          { key: "invoices", title: "Invoices", hint: "Who owes you, what is overdue, and what was paid", icon: FileText, href: `${base}/invoices` },
-          { key: "report", title: "Monthly report", hint: "In, out and what is left, month by month and by category", icon: BarChart3, href: `${base}/report` },
-        ]}
-      />
-
+    <FinanceHomeView
+      data={{
+        base: `/hub/b/${slug}/finance`,
+        month,
+        currency,
+        sum: totals ? series[series.length - 1] : null,
+        series,
+        plan: plan.length > 0 ? planTotals(plan) : null,
+        spending: totals ? planVsActual(plan, totals, month, "out") : [],
+        progress: monthProgress(month, today),
+        owed: owed(invoices.open, today),
+        owedMore: invoices.openMore,
+        recent: list.entries.slice(0, 6),
+        canEdit,
+      }}
+    >
       {canEdit && (
-        <section aria-labelledby="fin-set" className="mt-10">
-          <h2 id="fin-set" className="mb-3 font-title text-h3 text-ink-800">
-            Settings
-          </h2>
-          <Card>
+        <section aria-labelledby="fin-set" className="pt-4">
+          <Card small>
+            <h2 id="fin-set" className={`${groupTitleCls} mb-4`}>
+              Settings
+            </h2>
             <CurrencyForm brandId={brand.id} currency={currency} />
           </Card>
         </section>
       )}
-      <p className="mt-6 text-small text-ink-500">This is a cash book for running the business. It is not formal accounting and it does not work out tax: your accountant&apos;s books stay the record for that.</p>
-    </div>
+      <p className="text-small text-ink-500">This is a cash book for running the business. It is not formal accounting and it does not work out tax: your accountant&apos;s books stay the record for that.</p>
+    </FinanceHomeView>
   );
 }
