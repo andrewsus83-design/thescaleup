@@ -61,7 +61,7 @@ export function FinanceHomeView({ data, children }: { data: FinanceHome; childre
       )}
 
       {incoming.waiting > 0 && (
-        <Alert tone="info" title={`${incoming.waiting} payment${incoming.waiting === 1 ? "" : "s"} from Xendit ${incoming.waiting === 1 ? "waits" : "wait"} for your decision.`}>
+        <Alert tone="info" title={`${incoming.waiting} payment${incoming.waiting === 1 ? "" : "s"} from your payment gateway ${incoming.waiting === 1 ? "waits" : "wait"} for your decision.`}>
           {incoming.waiting === 1 ? "It is" : "They are"} not in the books yet.{" "}
           <Link href={`${base}/incoming`} className="font-semibold text-brand-700 underline underline-offset-4">
             Review {incoming.waiting === 1 ? "it" : "them"}
@@ -71,9 +71,9 @@ export function FinanceHomeView({ data, children }: { data: FinanceHome; childre
 
       <Shortcuts items={shortcuts} />
       <p className="px-1 text-small text-ink-500">
-        {incoming.connected ? "Xendit is connected. " : "Payments can come in by themselves. "}
+        {incoming.connected ? "A payment gateway is connected. " : "Payments can come in by themselves. "}
         <Link href={`${base}/incoming`} className="font-semibold text-brand-700 underline underline-offset-4">
-          {incoming.connected ? "Payments to review" : "Connect Xendit"}
+          {incoming.connected ? "Payments to review" : "Connect a payment gateway"}
         </Link>
       </p>
 

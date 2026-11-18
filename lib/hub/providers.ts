@@ -19,7 +19,7 @@ export const GROUPS: { id: GroupId; label: string; hint: string }[] = [
   { id: "google", label: "Google", hint: "Drive files and Calendar events" },
   { id: "import", label: "Import from other tools", hint: "Bring a brand's existing work over from the tool it uses today" },
   { id: "telegram", label: "Telegram", hint: "A bot of your own that the hub uses to message the team" },
-  { id: "payments", label: "Payments", hint: "Read the payments a brand received, so Finance can match them to invoices" },
+  { id: "payments", label: "Payment gateways", hint: "Read the payments a brand received, so Finance can match them to invoices. One key per gateway" },
 ];
 
 export const PROVIDERS: ProviderDef[] = [

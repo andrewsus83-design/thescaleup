@@ -13,7 +13,7 @@ const STEPS: Step[] = [
       </>
     ) },
   { title: "Copy the key", body: <p>Xendit shows the key once. It starts with {b("xnd_production_")} (or {b("xnd_development_")} in test mode). Copy all of it.</p> },
-  { title: "Paste it below and save", body: <p>Paste the key in the Xendit field on this page and press Save. It is stored encrypted, belongs to this brand only, and is never shown again: only its last four characters.</p> },
+  { title: "Paste it on this page and save", body: <p>Paste the key in the Xendit field on this page and press Save. It is stored encrypted, belongs to this brand only, and is never shown again: only its last four characters.</p> },
   { title: "Check the connection", body: <p>Press {b("Check connection")} next to the key. {b("Connected")} means the hub can read your payments. If it says the key is not allowed to read transactions, go back to step 3 and set Transaction to Read.</p> },
   { title: "Read your payments", body: <p>Open {b("Finance")}, then {b("Payments to review")}, and press {b("Get new payments")}. The first read goes back 31 days.</p> },
 ];

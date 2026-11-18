@@ -1,31 +1,21 @@
-// Pure rules for bringing a brand's Xendit payments into Finance. No I/O and no secrets, so the browser can import it and the
+// Xendit's own part of reading payments into Finance: its address, its pages and what one of its transactions means. No I/O and no secrets, so the browser can import it and the
 // rules are easy to test. The hub only READS from Xendit here: it lists payments that succeeded, and a person decides what each
 // one is (plain money in, or the payment of an invoice). Nothing is created or changed in Xendit.
 //
 // What is kept from a payment: its id, when, how much, the fee, the channel (e.g. ID_BCA) and the merchant's own reference.
 // What is never kept: the payer's account number (`account_identifier`) or anything else about the payer.
 
+import type { Incoming } from "../payments/model";
 import { dayIn } from "../tasks/dates";
+
+// The rules every gateway shares live in payments/model. They are passed on from here so older imports keep working.
+export { DEFAULT_CATEGORY, FEE_CATEGORY, FIRST_WINDOW_DAYS, matchesFor, nextState, OVERLAP_HOURS, syncWindow } from "../payments/model";
+export type { Incoming, Match, OpenInvoice, SyncState, Window } from "../payments/model";
 
 export const XENDIT_BASE = "https://api.xendit.co";
 export const PAGE_SIZE = 50;
 /** Pages read in one press of "Get new payments": 20 pages is 1,000 payments. More than that carries on with the next press. */
 export const MAX_PAGES = 20;
-/** How far back the first sync looks, and how much every later sync looks back again (a payment can be confirmed late). */
-export const FIRST_WINDOW_DAYS = 31;
-export const OVERLAP_HOURS = 72;
-
-export type Incoming = {
-  externalId: string;
-  occurredAt: string;
-  day: string;
-  amount: number;
-  fee: number;
-  currency: string;
-  channel: string;
-  reference: string;
-};
-
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : "");
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 /** An amount from Xendit (a number in currency units) as hundredths. null when it is not a sane amount. */
@@ -87,52 +77,6 @@ export function pageQuery(sinceIso: string, untilIso: string, afterId: string | 
   return `/transactions?${q}`;
 }
 
-export type SyncState = { lastSyncedAt: string | null; pendingUntil: string | null; pendingStarted: string | null };
-export type Window = { since: string; until: string; started: string };
-
-/**
- * The stretch of time one press reads. A first sync goes back 31 days. A later one starts 72 hours before the last finished sync,
- * because Xendit can confirm a payment late (the same payment is never stored twice). A sync that stopped at the page limit carries
- * on from where it stopped: Xendit lists newest first, so "where it stopped" is the oldest payment it reached.
- */
-export function syncWindow(state: SyncState, now: Date): Window {
-  const since = state.lastSyncedAt ? new Date(new Date(state.lastSyncedAt).getTime() - OVERLAP_HOURS * 3_600_000) : new Date(now.getTime() - FIRST_WINDOW_DAYS * 86_400_000);
-  if (state.pendingUntil && state.pendingStarted) return { since: since.toISOString(), until: state.pendingUntil, started: state.pendingStarted };
-  return { since: since.toISOString(), until: now.toISOString(), started: now.toISOString() };
-}
-
-/** What to remember after a press. Finished: the sync is complete up to when it started. Not finished: carry on from the oldest payment reached. */
-export function nextState(state: SyncState, w: Window, finished: boolean, oldestReached: string | null): SyncState {
-  if (finished) return { lastSyncedAt: w.started, pendingUntil: null, pendingStarted: null };
-  // Nothing readable came back, so there is no place to carry on from: leave things as they were and let the next press try again.
-  if (!oldestReached) return state;
-  return { lastSyncedAt: state.lastSyncedAt, pendingUntil: oldestReached, pendingStarted: w.started };
-}
-
-// ---------------------------------------------------------------------------------------------- matching a payment to an invoice
-export type OpenInvoice = { id: string; number: string; client: string; amount: number };
-export type Match = { invoice: OpenInvoice; sure: boolean };
-
-/**
- * Unpaid invoices this payment could be for: the same amount, to the cent. `sure` is true only when the payment's own reference also
- * names the invoice number. An amount alone is never proof (two clients can owe the same), so a person always confirms.
- */
-export function matchesFor(p: Pick<Incoming, "amount" | "reference">, invoices: readonly OpenInvoice[]): Match[] {
-  const ref = p.reference.toLowerCase();
-  return invoices
-    .filter((i) => i.amount === p.amount)
-    .map((invoice) => ({ invoice, sure: ref !== "" && invoice.number.trim() !== "" && ref.includes(invoice.number.trim().toLowerCase()) }))
-    .sort((a, b) => Number(b.sure) - Number(a.sure) || a.invoice.number.localeCompare(b.invoice.number));
-}
-
-/** A line for the entry's note: where the money came from, without anything about the payer. */
-export function describe(p: Pick<Incoming, "channel" | "reference">): string {
-  return ["Xendit", p.channel, p.reference].filter(Boolean).join(", ").slice(0, 300);
-}
-
 /** Whether a saved key is for Xendit's test mode. Test payments are not real money, so the page says so. */
 export const isTestKey = (key: string) => key.startsWith("xnd_development_");
 export const looksLikeKey = (key: string) => /^xnd_(production|development)_[\x21-\x7e]{10,480}$/.test(key);
-
-export const FEE_CATEGORY = "Payment fees";
-export const DEFAULT_CATEGORY = "Sales";

@@ -5,6 +5,7 @@ import { CurrencyForm } from "@/components/hub/finance/forms";
 import { FinanceHomeView } from "@/components/hub/finance/home-view";
 import { requireFunction } from "@/lib/hub/access";
 import { countIncoming, getCurrency, getPlan, listEntries, listInvoices, monthTotals } from "@/lib/hub/finance/data";
+import { GATEWAYS } from "@/lib/hub/payments/model";
 import { secretStatus } from "@/lib/hub/secrets";
 import { lastDayOfMonth } from "@/lib/hub/finance/dates";
 import { monthProgress, monthSeries, owed, planTotals, planVsActual } from "@/lib/hub/finance/model";
@@ -47,7 +48,7 @@ export default async function FinancePage({ params }: { params: Promise<{ slug: 
         owedMore: invoices.openMore,
         recent: list.entries.slice(0, 6),
         canEdit,
-        incoming: { waiting, connected: Boolean(keys.xendit) },
+        incoming: { waiting, connected: GATEWAYS.some((g) => Boolean(keys[g.keyProvider])) },
       }}
     >
       {canEdit && (
