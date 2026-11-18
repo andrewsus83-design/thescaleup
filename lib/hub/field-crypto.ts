@@ -12,7 +12,7 @@ import { decrypt, encrypt, parseKey } from "./crypto";
 // everything. It protects the database and its backups, not the running app.
 
 export const SEALED_PREFIX = "enc:v1:";
-export type SealedField = "crm_people.summary" | "crm_notes.body";
+export type SealedField = "crm_people.summary" | "crm_notes.body" | "hr_people.private" | "hr_leave.note";
 
 /** Shown in place of text that could not be opened (a missing key or a damaged value). */
 export const UNREADABLE = "(This text could not be decrypted.)";

@@ -22,7 +22,7 @@ export const FUNCTION_INFO: Record<Fn, { label: string; hint: string }> = {
   crm: { label: "CRM", hint: "Leads and clients: who they are, where they stand, when to follow up" },
   wiki: { label: "Wiki", hint: "What the company knows: brand, how-tos, training and research" },
   assets: { label: "Assets", hint: "Graphics, logos and the design system" },
-  team: { label: "Team", hint: "Team tasks, clock in and out, KPI, calendar" },
+  team: { label: "Team", hint: "Team tasks, clock in and out, KPI, calendar, people, leave and attendance. Can edit also manages people records, decides leave and sees everyone's attendance" },
   payroll: { label: "Salary and payroll", hint: "Sensitive: pay and payslips" },
   finance: { label: "Finance", hint: "Accounting and management" },
   products: { label: "Products", hint: "What the brand sells: SKU, price, stock" },
