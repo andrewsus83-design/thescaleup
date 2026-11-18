@@ -10,7 +10,7 @@ function Body({ item }: { item: SectionItem }) {
   const Icon = item.icon;
   return (
     <>
-      <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-field bg-paper-100 text-ink-600">
+      <span className={cn("inline-flex size-11 shrink-0 items-center justify-center rounded-full", item.href ? "bg-(--acc-tint) text-(--acc-ink)" : "bg-paper-100 text-ink-600")}>
         <Icon className="size-5" aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
@@ -24,19 +24,22 @@ function Body({ item }: { item: SectionItem }) {
   );
 }
 
-/** A stack of section cards. With an href it is a link; without one it is a plain card (nothing to open yet). */
-export function SectionList({ items }: { items: SectionItem[] }) {
+/**
+ * Section cards in a grid that uses the page's width: one column on a phone, two on a tablet, three on a wide screen.
+ * With an href a card is a link, in the menu's colour; without one it is a plain, quiet card (nothing to open yet).
+ */
+export function SectionList({ items, twoAtMost }: { items: SectionItem[]; /** For a list that sits in the main column beside a side column. */ twoAtMost?: boolean }) {
   return (
-    <ul className="space-y-3">
+    <ul className={cn("grid grid-cols-1 gap-3 md:grid-cols-2", !twoAtMost && "xl:grid-cols-3")}>
       {items.map((item) => (
-        <li key={item.key}>
+        <li key={item.key} className="min-w-0">
           {item.href ? (
-            <Link href={item.href} className={cn(cardCls(true, true), "flex min-h-16 items-center gap-4")}>
+            <Link href={item.href} className={cn(cardCls(true, true), "flex h-full min-h-16 items-center gap-4")}>
               <Body item={item} />
               <ChevronRight className="size-5 shrink-0 text-ink-400" aria-hidden />
             </Link>
           ) : (
-            <div className={cn(cardCls(true), "flex min-h-16 items-center gap-4")}>
+            <div className={cn(cardCls(true), "flex h-full min-h-16 items-center gap-4")}>
               <Body item={item} />
             </div>
           )}

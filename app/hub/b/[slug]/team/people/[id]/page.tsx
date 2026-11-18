@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Card, Chip, PageHeader, Stat, StatGrid } from "@/components/brand/primitives";
+import { Chip, PageHeader } from "@/components/brand/primitives";
 import { btnCls } from "@/components/brand/styles";
 import { BackLink } from "@/components/hub/back-link";
 import { PersonForm, StatusForm } from "@/components/hub/hr/forms";
+import { InkFigure, InkPanel, InkStats, Panel, panelRowsCls, Split, SplitMain, SplitSide } from "@/components/hub/panels";
 import { requireFunction } from "@/lib/hub/access";
 import { getPerson, getPrivate, getSettings, listLeave, listPeople } from "@/lib/hub/hr/data";
 import { EMPLOYMENT_LABEL, leaveBalance } from "@/lib/hub/hr/model";
@@ -51,58 +52,49 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
   ];
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div>
       <BackLink href={`${base}/people`}>People</BackLink>
       <PageHeader title={person.name} description={person.title || undefined} action={person.status === "left" ? <Chip tone="neutral">Left the company</Chip> : undefined} />
-
-      <section aria-labelledby="pp-leave" className="mb-8">
-        <h2 id="pp-leave" className="mb-3 font-title text-h3 text-ink-800">
-          Annual leave in {year}
-        </h2>
-        <Card>
-          <StatGrid>
-            <Stat label="Days left" value={balance.left} tone={balance.left < 0 ? "bad" : undefined} />
-            <Stat label="Taken or approved" value={balance.used} />
-            <Stat label="Waiting" value={balance.pending} />
-          </StatGrid>
-          <p className="mt-4 text-small text-ink-500">Out of {balance.allowance} days a year.</p>
-          <Link href={`${base}/leave`} className={btnCls("secondary", "sm", "mt-4")}>
-            Open leave
-          </Link>
-        </Card>
-      </section>
-
-      {manages ? (
-        <section aria-labelledby="pp-edit" className="space-y-6">
-          <h2 id="pp-edit" className="font-title text-h3 text-ink-800">
-            Record
-          </h2>
-          <Card>
-            <PersonForm key={person.id} brandId={brand.id} person={person} emergency={emergency} members={linkable} />
-          </Card>
-          <Card>
-            <p className="mb-3 text-small text-ink-500">{person.status === "active" ? "When someone leaves, mark them as left. Their record and leave history are kept." : "This person is marked as left."}</p>
-            <StatusForm brandId={brand.id} personId={person.id} status={person.status} />
-          </Card>
-        </section>
-      ) : (
-        <section aria-labelledby="pp-rec">
-          <h2 id="pp-rec" className="mb-3 font-title text-h3 text-ink-800">
-            Your record
-          </h2>
-          <Card>
-            <dl className="divide-y divide-ink-100">
-              {facts.map(([k, val]) => (
-                <div key={k} className="flex flex-wrap justify-between gap-x-6 gap-y-1 py-3 text-small">
-                  <dt className="text-ink-500">{k}</dt>
-                  <dd className="whitespace-pre-line text-ink-800">{val}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="mt-4 text-small text-ink-500">Something wrong? Ask whoever manages the team to change it.</p>
-          </Card>
-        </section>
-      )}
+      <Split>
+        <SplitSide first>
+          <InkPanel label={`Annual leave in ${year}`}>
+            <InkFigure label={balance.left === 1 ? "day left" : "days left"} value={balance.left} warn={balance.left < 0} />
+            <InkStats
+              items={[
+                { label: "Taken or approved", value: balance.used },
+                { label: "Waiting", value: balance.pending },
+              ]}
+            />
+            <p className="mt-4 text-caption font-normal text-ink-300">Out of {balance.allowance} days a year.</p>
+            <Link href={`${base}/leave`} className={btnCls("secondary", "sm", "mt-4 w-full bg-paper-0")}>
+              Open leave
+            </Link>
+          </InkPanel>
+          {manages && (
+            <Panel id="pp-status" title={person.status === "active" ? "When someone leaves" : "Marked as left"} hint={person.status === "active" ? "Mark them as left. Their record and leave history are kept." : "Their record and leave history are kept."}>
+              <StatusForm brandId={brand.id} personId={person.id} status={person.status} />
+            </Panel>
+          )}
+        </SplitSide>
+        <SplitMain>
+          {manages ? (
+            <Panel id="pp-edit" title="Record">
+              <PersonForm key={person.id} brandId={brand.id} person={person} emergency={emergency} members={linkable} />
+            </Panel>
+          ) : (
+            <Panel id="pp-rec" title="Your record" hint="Something wrong? Ask whoever manages the team to change it.">
+              <dl className={panelRowsCls}>
+                {facts.map(([k, val]) => (
+                  <div key={k} className="flex flex-wrap justify-between gap-x-6 gap-y-1 py-3 text-small">
+                    <dt className="text-ink-500">{k}</dt>
+                    <dd className="whitespace-pre-line text-ink-800">{val}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Panel>
+          )}
+        </SplitMain>
+      </Split>
     </div>
   );
 }
