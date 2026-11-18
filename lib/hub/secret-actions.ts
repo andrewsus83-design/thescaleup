@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit, actorFor, getHubUser } from "./session";
-import { providersFor, secretValueError } from "./providers";
-import { removeSecret, saveSecret } from "./secrets";
+import { PROVIDERS, fallsBack, providersFor, secretValueError } from "./providers";
+import { getKeys, removeSecret, saveSecret } from "./secrets";
+import { allow } from "./ratelimit";
+import { checkSpec, result, type CheckResult } from "./key-check-model";
+import { runCheck } from "./key-check";
 import type { FormState } from "./actions";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -53,4 +56,30 @@ export async function removeSecretAction(fd: FormData): Promise<void> {
   await removeSecret(auth.brandId, provider);
   await audit({ actor: auth.user, brandId: auth.brandId, action: "secret.remove", target: provider });
   refresh(auth.slug);
+}
+
+/**
+ * "Check connection": asks the provider one cheap question with the key this scope really uses (the brand's own key, or the
+ * workspace default it falls back to) and says what came back. Same people as saving a key. Returns text only, never a key.
+ */
+export async function checkKeyAction(scope: string, provider: string): Promise<CheckResult> {
+  if (typeof scope !== "string" || typeof provider !== "string") return result("error", "Unknown key.");
+  const auth = await authorize(scope);
+  if (!auth.ok) return result("error", auth.error);
+  const def = providersFor(auth.brandId ? "brand" : "workspace").find((p) => p.key === provider);
+  const spec = checkSpec(provider);
+  if (!def || !spec) return result("error", "That key cannot be checked yet.");
+  if (!allow(`keycheck:${auth.user.id}`, 60)) return result("error", "That is a lot of checks. Try again in a few minutes.");
+  if (spec.cost !== "free" && !allow(`keycheck-paid:${auth.user.id}`, 10)) return result("error", "That check costs a little each time, so it is limited. Try again later.");
+
+  const need = spec.needs ?? [provider];
+  // A pair only works when its other half comes from the same place the app reads it, so both halves follow the same fallback rule.
+  const fallback = auth.brandId ? need.every((k) => { const d = PROVIDERS.find((p) => p.key === k); return d ? fallsBack(d) : false; }) : false;
+  const keys = await getKeys(auth.brandId, need, fallback);
+  const out = need.some((k) => !keys[k])
+    ? result("missing", need.length > 1 && need.some((k) => keys[k]) ? `${spec.label} needs both the login and the password. Save the missing one too.` : "The saved key could not be read. Save it again.")
+    : await runCheck(provider, keys);
+
+  await audit({ actor: auth.user, brandId: auth.brandId, action: "secret.check", target: provider, meta: { status: out.status } });
+  return out;
 }

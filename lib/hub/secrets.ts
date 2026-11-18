@@ -82,3 +82,25 @@ export async function getBrandKey(brandId: string, provider: string, fallbackToW
   if (!fallbackToWorkspace) return null;
   return (await getWorkspaceSecrets())[provider] ?? null;
 }
+
+/** Several keys of one scope at once, decrypted (server only). A brand's own key wins; with fallback the workspace default fills the gaps. */
+export async function getKeys(brandId: string | null, providers: string[], fallbackToWorkspace: boolean): Promise<Record<string, string>> {
+  const admin = createSupabaseAdminClient();
+  const out: Record<string, string> = {};
+  if (brandId) {
+    const { data } = await admin.from("brand_secrets").select("provider, ciphertext, key_version").eq("brand_id", brandId).in("provider", providers);
+    for (const r of (data ?? []) as Row[]) {
+      const v = open(r, brandId);
+      if (v) out[r.provider] = v;
+    }
+  }
+  const missing = providers.filter((p) => !out[p]);
+  if (missing.length > 0 && (!brandId || fallbackToWorkspace)) {
+    const { data } = await admin.from("workspace_secrets").select("provider, ciphertext, key_version").in("provider", missing);
+    for (const r of (data ?? []) as Row[]) {
+      const v = open(r, null);
+      if (v) out[r.provider] = v;
+    }
+  }
+  return out;
+}
