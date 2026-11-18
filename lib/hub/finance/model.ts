@@ -144,3 +144,116 @@ export function byCategory(rows: readonly TotalRow[], month: string, kind: Entry
     .map((r) => ({ category: r.category, total: r.total, share: sum > 0 ? Math.round((r.total / sum) * 100) : 0 }))
     .sort((a, b) => b.total - a.total || a.category.localeCompare(b.category));
 }
+
+// ---------------------------------------------------------------------------------------------- the plan
+/** One line of the monthly plan: what the brand expects to bring in, or to spend, in a category. */
+export type PlanLine = { kind: EntryKind; category: string; amount: number };
+export const MAX_PLAN_LINES = 40;
+
+/** Plan lines as stored. Anything that is not a line is dropped. */
+export function readPlan(raw: unknown): PlanLine[] {
+  const out: PlanLine[] = [];
+  for (const r of Array.isArray(raw) ? raw : []) {
+    if (typeof r !== "object" || r === null) continue;
+    const o = r as Record<string, unknown>;
+    const amount = Number(o.amount_cents ?? o.amount);
+    if (!isEntryKind(o.kind) || typeof o.category !== "string" || !o.category.trim() || !Number.isSafeInteger(amount) || amount <= 0) continue;
+    out.push({ kind: o.kind, category: o.category.trim(), amount });
+  }
+  return out;
+}
+
+/**
+ * The plan as the form sends it: amounts are still the text the person typed. A row without an amount is skipped (the form offers
+ * suggested categories to fill in); an amount without a category, or one that is not an amount, is named. A category is planned once per kind.
+ */
+export function parsePlanInput(json: unknown): Parsed<PlanLine[]> {
+  let raw: unknown;
+  try {
+    raw = typeof json === "string" ? JSON.parse(json || "[]") : null;
+  } catch {
+    raw = null;
+  }
+  if (!Array.isArray(raw)) return { ok: false, error: "The plan could not be read. Try again." };
+  if (raw.length > MAX_PLAN_LINES * 2) return { ok: false, error: `A plan has at most ${MAX_PLAN_LINES} lines.` };
+  const out: PlanLine[] = [];
+  const seen = new Set<string>();
+  for (const r of raw) {
+    if (typeof r !== "object" || r === null) return { ok: false, error: "The plan could not be read. Try again." };
+    const o = r as Record<string, unknown>;
+    if (!isEntryKind(o.kind)) return { ok: false, error: "The plan could not be read. Try again." };
+    const category = text(o.category, LIMITS.category);
+    const amountText = typeof o.amount === "string" ? o.amount.trim() : "";
+    if (!category && !amountText) continue;
+    const where = o.kind === "in" ? "money in" : "money out";
+    if (!category) return { ok: false, error: `A ${where} line has an amount but no category.` };
+    // A category with no amount is a suggestion nobody filled in: it is simply not part of the plan.
+    if (!amountText) continue;
+    const amount = parseMoney(amountText);
+    if (amount === null) return { ok: false, error: `${category}: "${amountText.slice(0, 20)}" is not an amount.` };
+    if (amount === 0) return { ok: false, error: `${category}: the amount must be more than zero, or remove the line.` };
+    const key = `${o.kind}:${category.toLowerCase()}`;
+    if (seen.has(key)) return { ok: false, error: `${category} is in the ${where} plan twice.` };
+    seen.add(key);
+    out.push({ kind: o.kind, category, amount });
+  }
+  if (out.length > MAX_PLAN_LINES) return { ok: false, error: `A plan has at most ${MAX_PLAN_LINES} lines.` };
+  return { ok: true, value: out };
+}
+
+/** How a category stands against its plan. For money out, "near" is 80% used and "over" is past the plan; for money in, "over" is good news. */
+export type PlanState = "ok" | "near" | "over" | "unplanned";
+export type PlanRow = { kind: EntryKind; category: string; plan: number; actual: number; pct: number; left: number; state: PlanState };
+
+/**
+ * One month's plan beside what was really entered, per category. Categories match whatever the capitals. A category with entries
+ * but no plan is listed as unplanned, so spending outside the plan is never hidden. Planned lines come first, biggest plan first.
+ */
+export function planVsActual(plan: readonly PlanLine[], totals: readonly TotalRow[], month: string, kind: EntryKind): PlanRow[] {
+  const actual = new Map<string, { category: string; total: number }>();
+  for (const r of totals) {
+    if (r.month !== month || r.kind !== kind) continue;
+    const key = r.category.trim().toLowerCase();
+    const cur = actual.get(key);
+    if (cur) cur.total += r.total;
+    else actual.set(key, { category: r.category.trim(), total: r.total });
+  }
+  const rows: PlanRow[] = [];
+  for (const p of plan) {
+    if (p.kind !== kind) continue;
+    const key = p.category.toLowerCase();
+    const got = actual.get(key)?.total ?? 0;
+    actual.delete(key);
+    const pct = Math.round((got / p.amount) * 100);
+    rows.push({ kind, category: p.category, plan: p.amount, actual: got, pct, left: p.amount - got, state: got > p.amount ? "over" : pct >= 80 ? "near" : "ok" });
+  }
+  rows.sort((a, b) => b.plan - a.plan || a.category.localeCompare(b.category));
+  const extra = [...actual.values()].sort((a, b) => b.total - a.total || a.category.localeCompare(b.category));
+  for (const e of extra) rows.push({ kind, category: e.category, plan: 0, actual: e.total, pct: 0, left: -e.total, state: "unplanned" });
+  return rows;
+}
+
+/** The same rows with what needs a look first: over the plan, then spending that is not in the plan, then nearly used, then the rest. */
+export function needsAttentionFirst(rows: readonly PlanRow[]): PlanRow[] {
+  const rank: Record<PlanState, number> = { over: 0, unplanned: 1, near: 2, ok: 3 };
+  return rows.map((r, i) => ({ r, i })).sort((a, b) => rank[a.r.state] - rank[b.r.state] || a.i - b.i).map((x) => x.r);
+}
+
+export type PlanTotals = { in: number; out: number; net: number };
+/** What the plan adds up to for a month: planned in, planned out, and what should be left. */
+export function planTotals(plan: readonly PlanLine[]): PlanTotals {
+  const t = { in: 0, out: 0, net: 0 };
+  for (const p of plan) t[p.kind] += p.amount;
+  t.net = t.in - t.out;
+  return t;
+}
+
+/** How far through the month `today` is, 0 to 100. A past month is 100, a month that has not started is 0. */
+export function monthProgress(month: string, today: string): number {
+  if (!isMonthKey(month)) return 0;
+  const cur = today.slice(0, 7);
+  if (month < cur) return 100;
+  if (month > cur) return 0;
+  const days = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7), 0)).getUTCDate();
+  return Math.round((Number(today.slice(8, 10)) / days) * 100);
+}

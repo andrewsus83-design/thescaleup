@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeftRight } from "lucide-react";
-import { Alert, Card, Chip, EmptyState, PageHeader } from "@/components/brand/primitives";
-import { btnCls, listCls } from "@/components/brand/styles";
+import { Alert, Card, Chip, EmptyState, PageHeader, Stat, StatGrid } from "@/components/brand/primitives";
+import { btnCls, groupTitleCls } from "@/components/brand/styles";
 import { BackLink } from "@/components/hub/back-link";
 import { DeleteEntry, EntryForm } from "@/components/hub/finance/forms";
+import { EntryRow } from "@/components/hub/finance/views";
 import { requireFunction } from "@/lib/hub/access";
 import { getCurrency, listEntries, monthTotals } from "@/lib/hub/finance/data";
 import { lastDayOfMonth } from "@/lib/hub/finance/dates";
@@ -16,7 +17,7 @@ import { fmtDay, hubTz, isMonthKey, monthKey, monthLabel, shiftMonth, todayIn } 
 export const metadata: Metadata = { title: "Money in and out" };
 export const dynamic = "force-dynamic";
 
-export default async function EntriesPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ m?: string | string[] }> }) {
+export default async function EntriesPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ m?: string | string[]; add?: string | string[] }> }) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
   const { brand, access } = await requireFunction(slug, "finance");
   const canEdit = atLeast(access.finance, "edit");
@@ -29,66 +30,67 @@ export default async function EntriesPage({ params, searchParams }: { params: Pr
   const [currency, list, totals] = await Promise.all([getCurrency(brand.id), listEntries(brand.id, from, to), monthTotals(brand.id, from, to)]);
   const sum = totals ? monthSeries(totals, month, month)[0] : null;
   const href = (m: string) => `/hub/b/${slug}/finance/entries?m=${m}`;
+  const add = (Array.isArray(sp.add) ? sp.add[0] : sp.add) === "in" ? "in" : "out";
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div>
       <BackLink href={`/hub/b/${slug}/finance`}>Finance</BackLink>
       <PageHeader title="Money in and out" description="Every amount that came in or went out, by month." />
 
-      {canEdit && (
-        <Card className="mb-8">
-          <EntryForm brandId={brand.id} today={today} currency={currency} />
-        </Card>
-      )}
+      {/* On a desktop the form stays on the left while the month's list scrolls on the right. On a phone the form comes first. */}
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+        {canEdit && (
+          <section id="add" aria-labelledby="add-title" className="scroll-mt-6 lg:sticky lg:top-6">
+            <Card small>
+              <h2 id="add-title" className={`${groupTitleCls} mb-4`}>
+                Add an amount
+              </h2>
+              <EntryForm key={add} brandId={brand.id} today={today} currency={currency} initialKind={add} />
+            </Card>
+          </section>
+        )}
 
-      <nav aria-label="Month" className="mb-4 flex flex-wrap items-center gap-3">
-        <Link href={href(shiftMonth(month, -1))} className={btnCls("secondary", "sm")}>
-          Earlier
-        </Link>
-        <p className="font-title text-h4 text-ink-800">{monthLabel(month)}</p>
-        <Link href={href(shiftMonth(month, 1))} className={btnCls("secondary", "sm")}>
-          Later
-        </Link>
-      </nav>
-
-      {sum ? (
-        <p className="mb-4 text-small text-ink-600">
-          In {fmtMoney(sum.in, currency)}, out {fmtMoney(sum.out, currency)}, {sum.net >= 0 ? "left over" : "short by"} <span className="font-semibold text-ink-800">{fmtMoney(Math.abs(sum.net), currency)}</span>, from {sum.entries} entr{sum.entries === 1 ? "y" : "ies"}.
-        </p>
-      ) : (
-        <Alert tone="warn" role="alert" className="mb-4">
-          The month&apos;s totals could not be read just now. The entries below are still right.
-        </Alert>
-      )}
-
-      {list.entries.length === 0 ? (
-        <EmptyState icon={<ArrowLeftRight className="size-6" aria-hidden />} title={`Nothing in ${monthLabel(month)}`} hint={canEdit ? "Add the first amount with the form above." : "Nobody has added an amount for this month yet."} />
-      ) : (
-        <ul className={listCls}>
-          {list.entries.map((e) => (
-            <li key={e.id} className="px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                <p className="text-body font-semibold text-ink-800">{e.category}</p>
-                <p className="font-mono text-body font-medium text-ink-800">
-                  {e.kind === "in" ? "+" : "−"}
-                  {fmtMoney(e.amount, currency)}
-                </p>
+        <section aria-label={`Entries in ${monthLabel(month)}`} className={canEdit ? "lg:col-span-2" : "lg:col-span-3"}>
+          <Card small>
+            <nav aria-label="Month" className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <h2 className={groupTitleCls}>{monthLabel(month)}</h2>
+              <div className="flex gap-2">
+                <Link href={href(shiftMonth(month, -1))} className={btnCls("secondary", "xs")}>
+                  Earlier
+                </Link>
+                <Link href={href(shiftMonth(month, 1))} className={btnCls("secondary", "xs")}>
+                  Later
+                </Link>
               </div>
-              <div className="mt-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                <p className="text-small text-ink-500">
-                  {fmtDay(e.day)}
-                  {e.note ? `, ${e.note}` : ""}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Chip tone={e.kind === "in" ? "ok" : "neutral"}>{e.kind === "in" ? "In" : "Out"}</Chip>
-                  {e.invoiceId ? <Chip tone="info">Invoice payment</Chip> : canEdit ? <DeleteEntry brandId={brand.id} entryId={e.id} label={`${e.category}, ${fmtMoney(e.amount, currency)}, ${fmtDay(e.day)}`} /> : null}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-      {list.more && <p className="mt-3 text-small text-ink-500">Showing the newest {LIMITS.list} entries of this month. The totals above count all of them.</p>}
+            </nav>
+
+            {sum ? (
+              <StatGrid className="mb-5 rounded-field bg-paper-100 p-5">
+                <Stat label="Money in" value={<span className="text-h4">{fmtMoney(sum.in, currency)}</span>} />
+                <Stat label="Money out" value={<span className="text-h4">{fmtMoney(sum.out, currency)}</span>} />
+                <Stat label={sum.net >= 0 ? "Left over" : "Short by"} value={<span className="text-h4">{fmtMoney(Math.abs(sum.net), currency)}</span>} tone={sum.net < 0 ? "bad" : undefined} hint={`From ${sum.entries} entr${sum.entries === 1 ? "y" : "ies"}`} />
+              </StatGrid>
+            ) : (
+              <Alert tone="warn" role="alert" className="mb-5">
+                The month&apos;s totals could not be read just now. The entries below are still right.
+              </Alert>
+            )}
+
+            {list.entries.length === 0 ? (
+              <EmptyState icon={<ArrowLeftRight className="size-6" aria-hidden />} title={`Nothing in ${monthLabel(month)}`} hint={canEdit ? "Add the first amount with the form." : "Nobody has added an amount for this month yet."} />
+            ) : (
+              <ul className="-my-3 divide-y divide-ink-100">
+                {list.entries.map((e) => (
+                  <EntryRow key={e.id} entry={e} currency={currency}>
+                    {e.invoiceId ? <Chip tone="info">Invoice payment</Chip> : canEdit ? <DeleteEntry brandId={brand.id} entryId={e.id} label={`${e.category}, ${fmtMoney(e.amount, currency)}, ${fmtDay(e.day)}`} /> : null}
+                  </EntryRow>
+                ))}
+              </ul>
+            )}
+            {list.more && <p className="mt-5 text-small text-ink-500">Showing the newest {LIMITS.list} entries of this month. The totals above count all of them.</p>}
+          </Card>
+        </section>
+      </div>
     </div>
   );
 }

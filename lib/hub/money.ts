@@ -54,5 +54,11 @@ export function fmtMoney(cents: number, currency: string): string {
   }
 }
 
+/** An amount for a field that already holds a saved figure: grouped the way the currency is written (70.000.000), no symbol. `parseMoney` reads it back. */
+export function moneyGrouped(cents: number, currency: string): string {
+  const whole = cents % 100 === 0;
+  return new Intl.NumberFormat(currency === "IDR" ? "id-ID" : "en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 }).format(cents / 100);
+}
+
 /** An amount for an input field: plain digits, no currency, so it can be typed over. */
 export const moneyInput = (cents: number) => (cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2));

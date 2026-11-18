@@ -31,8 +31,8 @@ const Spin = ({ on }: { on: boolean }) => (on ? <Loader2 className="size-4 anima
 const AMOUNT_HINT = "Type it like 1.500.000 or 1,500,000.";
 
 /** Add money in or money out. The date and the kind stay after a save, so several entries of one day go in quickly. */
-export function EntryForm({ brandId, today, currency }: { brandId: string; today: string; currency: string }) {
-  const [kind, setKind] = useState<EntryKind>("out");
+export function EntryForm({ brandId, today, currency, initialKind = "out" }: { brandId: string; today: string; currency: string; initialKind?: EntryKind }) {
+  const [kind, setKind] = useState<EntryKind>(initialKind);
   const [v, setV] = useState({ day: today, amount: "", category: "", note: "" });
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => setV((old) => ({ ...old, [k]: e.target.value }));
   const [state, action, pending] = useActionState<FormState, FormData>(async (prev, fd) => {
@@ -52,7 +52,7 @@ export function EntryForm({ brandId, today, currency }: { brandId: string; today
           </button>
         ))}
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1">
         <div>
           <label htmlFor="fe-amount" className={labelCls}>
             Amount ({currency})
@@ -135,7 +135,7 @@ export function InvoiceForm({ brandId, today, currency, suggestedNumber }: { bra
     <form action={action} className="space-y-4">
       <input type="hidden" name="brandId" value={brandId} />
       <Notes state={state} />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1">
         <div>
           <label htmlFor="fi-number" className={labelCls}>
             Invoice number
