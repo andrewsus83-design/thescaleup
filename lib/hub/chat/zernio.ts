@@ -1,9 +1,9 @@
 import "server-only";
-import { getBrandKey } from "../secrets";
+import { brandScope, listAccounts, ownsAccount } from "../zernio/api";
 import { addDays, dayIn } from "../tasks/dates";
 import { buildComments, buildDm, CONNECT, dayStart, flattenComments, parseConversation, parseDmMessage, parsePost, type Built, type CommentRow, type DmMessage, type Failed, type Source } from "./connect";
 
-// Reads the brand's inbox from Zernio with the brand's own key: conversations, their messages, commented posts and their comments.
+// Reads the brand's inbox from Zernio with the agency's one key, limited to this brand's own profile: conversations, their messages, commented posts and their comments.
 // Read only: none of these calls marks anything as read or sends anything (docs.zernio.com, Inbox). Nothing from here is stored.
 
 const base = () => ((process.env.ZERNIO_BASE_URL ?? "").trim() || "https://zernio.com/api").replace(/\/$/, "");
@@ -14,7 +14,7 @@ export type Problem = { kind: "no-key" | "auth" | "addon" | "busy" | "error"; me
 type Got = { ok: true; json: Record<string, unknown> } | { ok: false; problem: Problem };
 
 function problemFor(status: number, body: string): Problem {
-  if (status === 401) return { kind: "auth", message: "Zernio did not accept this brand's key. Paste it again in Settings, Social media connections." };
+  if (status === 401) return { kind: "auth", message: "Zernio did not accept the agency's key. The agency owner can check it in the workspace settings." };
   if (status === 403 && /inbox/i.test(body)) return { kind: "addon", message: "Zernio says the Inbox add-on is not turned on for this key. Turn it on in your Zernio account, then check again." };
   if (status === 403) return { kind: "auth", message: "Zernio did not allow this key to read the inbox." };
   if (status === 429) {
@@ -41,7 +41,6 @@ async function zget(key: string, path: string, qs: Record<string, string>, label
   }
 }
 
-const noKey: Problem = { kind: "no-key", message: "This brand has no Zernio key yet. Add it in Settings, Social media connections." };
 const asList = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const strOf = (v: unknown) => (typeof v === "string" && v ? v : "");
 
@@ -53,8 +52,13 @@ const BUDGET_MS = 40_000;
 
 /** Every conversation (and, if asked, every recent post that has comments) Zernio holds for this brand. No AI is used here. */
 export async function loadSources(brandId: string, from: string, withComments: boolean, tz: string): Promise<{ ok: true; loaded: Loaded } | { ok: false; problem: Problem }> {
-  const key = await getBrandKey(brandId, "zernio", false);
-  if (!key) return { ok: false, problem: noKey };
+  const scope = await brandScope(brandId);
+  if (!scope.ok) return { ok: false, problem: scope.problem };
+  const { key, profileId } = scope;
+  // The list is asked for with the brand's profile, and is cut again to the brand's own accounts: two locks, so a brand can never read another's inbox.
+  const own = await listAccounts(key, profileId);
+  if (!own.ok) return { ok: false, problem: own.problem };
+  const ownIds = new Set(own.accounts.map((a) => a.id));
   const started = Date.now();
   const seen = new Set<string>();
   const sources: Source[] = [];
@@ -67,7 +71,7 @@ export async function loadSources(brandId: string, from: string, withComments: b
       more = true;
       break;
     }
-    const r = await zget(key, "/v1/inbox/conversations", { limit: "100", ...(cursor ? { cursor } : {}) }, "conversations");
+    const r = await zget(key, "/v1/inbox/conversations", { profileId, limit: "100", ...(cursor ? { cursor } : {}) }, "conversations");
     if (!r.ok) {
       if (page === 0) return { ok: false, problem: r.problem };
       more = true;
@@ -75,7 +79,7 @@ export async function loadSources(brandId: string, from: string, withComments: b
     }
     for (const raw of asList(r.json.data)) {
       const s = parseConversation(raw);
-      if (s && !seen.has(`dm:${s.accountId}:${s.id}`)) {
+      if (s && ownIds.has(s.accountId) && !seen.has(`dm:${s.accountId}:${s.id}`)) {
         seen.add(`dm:${s.accountId}:${s.id}`);
         sources.push(s);
       }
@@ -84,7 +88,7 @@ export async function loadSources(brandId: string, from: string, withComments: b
     for (const f of asList(meta.failedAccounts)) {
       if (!isObj(f)) continue;
       const accountId = strOf(f.accountId);
-      if (accountId) failed.set(accountId, { accountId, account: strOf(f.accountUsername), platform: strOf(f.platform), error: strOf(f.error), code: strOf(f.code) });
+      if (accountId && ownIds.has(accountId)) failed.set(accountId, { accountId, account: strOf(f.accountUsername), platform: strOf(f.platform), error: strOf(f.error), code: strOf(f.code) });
     }
     const pg = isObj(r.json.pagination) ? r.json.pagination : {};
     cursor = strOf(pg.nextCursor);
@@ -101,7 +105,7 @@ export async function loadSources(brandId: string, from: string, withComments: b
         commentsNote = "Stopped early to stay within the time limit. Some older posts were not checked.";
         break;
       }
-      const r = await zget(key, "/v1/inbox/comments", { limit: "50", view: "summary", ...(c ? { cursor: c } : {}) }, "commented-posts");
+      const r = await zget(key, "/v1/inbox/comments", { profileId, limit: "50", view: "summary", ...(c ? { cursor: c } : {}) }, "commented-posts");
       if (!r.ok) {
         commentsNote = r.problem.message;
         break;
@@ -111,7 +115,7 @@ export async function loadSources(brandId: string, from: string, withComments: b
         const s = parsePost(raw);
         if (s) {
           if (dayIn(tz, s.at) < oldest) reachedOld = true;
-          else if (!seen.has(`c:${s.accountId}:${s.id}`)) {
+          else if (ownIds.has(s.accountId) && !seen.has(`c:${s.accountId}:${s.id}`)) {
             seen.add(`c:${s.accountId}:${s.id}`);
             sources.push(s);
           }
@@ -131,8 +135,12 @@ const READ_BUDGET_MS = 25_000;
 
 /** One source cut to the chosen dates. `built` is null when fewer than two messages fall inside them. */
 export async function readSource(brandId: string, src: Source, from: string, to: string, tz: string): Promise<{ ok: true; built: Built | null } | { ok: false; problem: Problem }> {
-  const key = await getBrandKey(brandId, "zernio", false);
-  if (!key) return { ok: false, problem: noKey };
+  const scope = await brandScope(brandId);
+  if (!scope.ok) return { ok: false, problem: scope.problem };
+  const { key } = scope;
+  // The conversation and account ids come from the browser. With one shared key they could belong to another brand, so check first.
+  const mine = await ownsAccount(scope, src.accountId);
+  if (!mine.ok) return { ok: false, problem: mine.problem };
   const started = Date.now();
 
   if (src.kind === "dm") {

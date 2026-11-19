@@ -17,7 +17,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ s
     <SettingsShell
       slug={slug}
       title="Integrations and API keys"
-      description="This brand's own keys. Leave one empty and the agency's default is used. Keys are encrypted and cannot be read back. Social accounts and WhatsApp are under Social media connections."
+      description="This brand's own keys. Leave one empty and the agency's default is used. Keys are encrypted and cannot be read back. Social accounts are under Social media connections."
     >
       <Card>
         <KeysSection brandId={brand.id} only={["ai", "research", "media", "pages", "ads", "cost", "google"]} />

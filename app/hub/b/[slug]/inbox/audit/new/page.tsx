@@ -5,7 +5,7 @@ import { ConnectWizard } from "@/components/hub/chat/connect-wizard";
 import { SettingsShell } from "@/components/hub/settings-shell";
 import { UploadWizard } from "@/components/hub/chat/upload-wizard";
 import { requireFunction } from "@/lib/hub/access";
-import { getBrandKey } from "@/lib/hub/secrets";
+import { brandScope } from "@/lib/hub/zernio/api";
 import { hasAiKey } from "@/lib/hub/tasks/data";
 import { hubTz, todayIn } from "@/lib/hub/tasks/dates";
 
@@ -19,7 +19,7 @@ export default async function NewAuditPage({ params, searchParams }: { params: P
   const hasKey = await hasAiKey(brand.id);
   const connect = mode === "connect";
   const base = `/hub/b/${slug}/inbox/audit/new`;
-  const hasZernio = connect ? (await getBrandKey(brand.id, "zernio", false)) !== null : false;
+  const hasZernio = connect ? (await brandScope(brand.id)).ok : false;
   return (
     <SettingsShell
       slug={slug}
