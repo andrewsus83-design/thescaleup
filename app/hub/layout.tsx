@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { bricolage, instrument } from "@/lib/brand-fonts";
+import { all41FontVariables } from "@/lib/all41-fonts";
+import "./all41-hub.css";
 
 export const metadata: Metadata = {
-  title: { default: "ScaleUp", template: "%s · ScaleUp" },
+  title: { default: "All41 Hub", template: "%s · All41" },
   robots: { index: false, follow: false },
 };
 
@@ -12,7 +13,7 @@ export const viewport: Viewport = { viewportFit: "cover" };
 /** The brand app (founders, ops and agency staff). Paints its own paper surface like the Room does. */
 export default function HubLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`${bricolage.variable} ${instrument.variable} room-app fixed inset-0 z-10 overflow-y-auto bg-paper-100 font-text text-body text-ink-800 antialiased`}>
+    <div className={`${all41FontVariables} room-app all41-hub fixed inset-0 z-10 overflow-y-auto bg-paper-100 font-text text-body text-ink-800 antialiased`}>
       {children}
     </div>
   );
