@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { Logo } from "@/components/brand/logo";
+import { All41Logo } from "@/components/hub/all41-logo";
 import { Alert, Btn, Card } from "@/components/brand/primitives";
 import { codeInputCls, inputCls, labelCls, pillCls } from "@/components/brand/styles";
 import { requestLoginCode, signInWithPassword, verifyLoginCode, type FormState } from "@/lib/hub/actions";
@@ -20,7 +20,7 @@ export function HubLoginForm({ next, presetEmail }: { next: string; presetEmail?
   return (
     <div className="mx-auto flex min-h-full w-full max-w-auth flex-col justify-center px-5 py-12">
       <div className="mb-10 flex flex-col items-center text-center">
-        <Logo variant="lockup" size={32} />
+        <All41Logo />
         <h1 className="mt-10 font-title text-balance text-h2 text-ink-800">Sign in</h1>
         <p className="mt-3 text-pretty text-body text-ink-500">Use your password, or get a sign-in code by email.</p>
       </div>
