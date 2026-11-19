@@ -107,7 +107,7 @@ export function BrandTabs({ slug, tabs, bar, more }: { slug: string; tabs: TabKe
         hidden && "translate-y-[calc(100%+1rem)]",
       )}
     >
-      <div className="pointer-events-auto relative w-full max-w-md rounded-card border border-hairline bg-paper-0 p-2 shadow-overlay md:max-w-6xl">
+      <div className="all41-bottom-menu pointer-events-auto relative w-full max-w-md p-2 md:max-w-6xl">
         {/* Tablet and up: every menu */}
         <ul className="hidden gap-1 md:flex">{tabs.map((k) => tab(k, true))}</ul>
 
