@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarCheck, ChevronRight, CircleCheck } from "lucide-react";
+import { ArrowRight, CalendarCheck, ChevronRight, CircleCheck } from "lucide-react";
+import { HubSection, HubSurface } from "@/components/hub/all41-ui";
 import { btnCls } from "@/components/brand/styles";
 import { MENU } from "@/components/hub/menus";
 import { accessFor } from "@/lib/hub/access";
@@ -18,7 +19,6 @@ export const metadata: Metadata = { title: "Home" };
 export const dynamic = "force-dynamic";
 
 // Secondary text on a coloured tint: Ink-500 is a little too light on some tints, so it is a shade darker here.
-const SUB = "text-ink-600";
 
 /** Home: a greeting, what needs the person today, and every menu they can open. Only counts they are allowed to see are looked up. */
 export default async function BrandHome({ params }: { params: Promise<{ slug: string }> }) {
@@ -50,89 +50,105 @@ export default async function BrandHome({ params }: { params: Promise<{ slug: st
   const dateLine = new Intl.DateTimeFormat("en-US", { weekday: "long", day: "numeric", month: "long", timeZone: tz }).format(new Date());
 
   return (
-    <div className="space-y-10">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-title text-balance text-h2 text-ink-800 sm:text-h1">{greeting(hourIn(tz))}</h1>
-          <p className="mt-2 text-body text-ink-500">{dateLine}</p>
+    <div className="space-y-9 sm:space-y-11">
+      <header className="all41-home-hero all41-surface relative overflow-hidden px-6 py-7 sm:px-9 sm:py-9">
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-6">
+          <div className="min-w-0">
+            <p className="all41-section-eyebrow mb-3">YOUR WORKSPACE AT A GLANCE</p>
+            <h1 className="font-title text-balance text-h2 font-extrabold tracking-tight text-ink-800 sm:text-h1">
+              {greeting(hourIn(tz))}
+            </h1>
+            <p className="mt-3 text-body text-ink-500">
+              A good day starts with <span className="all41-editorial">a little clarity.</span>
+            </p>
+            <p className="mt-2 text-caption text-ink-500">{dateLine}</p>
+          </div>
+          <Link href={`${base}/today`} className={btnCls("primary", "md")}>
+            <CalendarCheck className="size-4" aria-hidden />
+            Plan my day
+            <ArrowRight className="size-4" aria-hidden />
+          </Link>
         </div>
-        <Link href={`${base}/today`} className={btnCls("secondary", "md")}>
-          <CalendarCheck className="size-4" aria-hidden />
-          What&apos;s today
-        </Link>
       </header>
 
       {watching && (
-        <section aria-labelledby="needs-you">
-          <h2 id="needs-you" className="mb-4 font-title text-h3 text-ink-800">
-            Needs you
-          </h2>
+        <HubSection
+          id="needs-you"
+          eyebrow="YOUR NEXT ACTIONS"
+          title="Needs your attention"
+          description="A practical starting point for today's work. Only information you're allowed to see appears here."
+        >
           {signals.length === 0 ? (
-            <div data-acc="finance" className="flex items-center gap-4 rounded-bubble border border-hairline bg-paper-0 p-4 shadow-raised">
-              <span aria-hidden className="inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-(--acc-tint) text-(--acc-ink)">
+            <HubSurface className="flex items-center gap-4">
+              <span aria-hidden className="all41-module-icon inline-flex size-12 shrink-0 items-center justify-center rounded-field">
                 <CircleCheck className="size-6" />
               </span>
               <div className="min-w-0">
-                <p className="text-body font-semibold text-ink-800">You&apos;re all caught up</p>
-                <p className="text-small text-ink-500">Nothing is late, unread, due for a follow-up or running low.</p>
+                <p className="font-title text-body font-bold text-ink-800">You're all caught up</p>
+                <p className="mt-1 text-small text-ink-500">No overdue tasks, unread mail, follow-ups or stock alerts currently require your attention.</p>
               </div>
-            </div>
+            </HubSurface>
           ) : (
             <ul className="grid gap-3 md:grid-cols-2">
-              {signals.map((s) => {
-                const Icon = MENU[s.menu].icon;
+              {signals.map((signal) => {
+                const Icon = MENU[signal.menu].icon;
                 return (
-                  <li key={s.key}>
+                  <li key={signal.key} className="min-w-0">
                     <Link
-                      href={s.href}
-                      data-acc={s.menu}
-                      className="hit-44 flex items-center gap-4 rounded-bubble border border-hairline bg-paper-0 p-4 shadow-raised transition-shadow hover:shadow-overlay motion-reduce:transition-none"
+                      href={signal.href}
+                      data-acc={signal.menu}
+                      className="all41-surface all41-module-card hit-44 flex h-full min-h-24 items-center gap-4 p-4 sm:p-5"
                     >
-                      <span aria-hidden className="inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-(--acc-tint) text-(--acc-ink)">
+                      <span aria-hidden className="all41-module-icon inline-flex size-12 shrink-0 items-center justify-center rounded-field">
                         <Icon className="size-6" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block text-body font-semibold text-ink-800">{s.title}</span>
-                        {s.detail && <span className="block text-small text-ink-500">{s.detail}</span>}
+                        <span className="block font-title text-body font-bold text-ink-800">{signal.title}</span>
+                        {signal.detail && <span className="mt-1 block text-small text-ink-500">{signal.detail}</span>}
                       </span>
-                      <ChevronRight className="size-5 shrink-0 text-ink-300" aria-hidden />
+                      <ChevronRight className="size-5 shrink-0 text-ink-500" aria-hidden />
                     </Link>
                   </li>
                 );
               })}
             </ul>
           )}
-        </section>
+        </HubSection>
       )}
 
-      <section aria-labelledby="your-menus">
-        <h2 id="your-menus" className="mb-4 font-title text-h3 text-ink-800">
-          Your menus
-        </h2>
+      <HubSection
+        id="your-menus"
+        eyebrow="ONE CONNECTED WORKSPACE"
+        title="Everything, in its place."
+        description="Open a module to keep work moving. Your available tools are based on your permissions."
+      >
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {menus.map((k) => {
-            const { label, icon: Icon } = MENU[k];
-            const note = tileNote(k, counts);
+          {menus.map((menu) => {
+            const { label, icon: Icon } = MENU[menu];
+            const note = tileNote(menu, counts);
             return (
-              <li key={k}>
+              <li key={menu} className="min-w-0">
                 <Link
-                  href={`${base}/${k}`}
-                  data-acc={k}
-                  className="hit-44 flex min-h-32 flex-col justify-between gap-4 rounded-bubble bg-(--acc-tint) p-5 transition-transform active:scale-[0.98] motion-reduce:transition-none"
+                  href={`${base}/${menu}`}
+                  data-acc={menu}
+                  className="all41-surface all41-module-card hit-44 group flex h-full min-h-40 flex-col justify-between gap-5 p-4 sm:p-5"
                 >
-                  <span aria-hidden className="inline-flex size-11 items-center justify-center rounded-full bg-paper-0/70 text-(--acc-ink)">
-                    <Icon className="size-5" />
+                  <span className="flex items-start justify-between gap-2">
+                    <span aria-hidden className="all41-module-icon inline-flex size-12 items-center justify-center rounded-field">
+                      <Icon className="size-6" />
+                    </span>
+                    <ArrowRight className="size-4 text-ink-400 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden />
                   </span>
                   <span>
-                    <span className="block font-title text-body font-bold text-(--acc-ink)">{label}</span>
-                    {note && <span className={`block text-caption ${SUB}`}>{note}</span>}
+                    <span className="block font-title text-body font-extrabold text-ink-800">{label}</span>
+                    {note && <span className="mt-1 block text-caption text-ink-500">{note}</span>}
                   </span>
                 </Link>
               </li>
             );
           })}
         </ul>
-      </section>
+      </HubSection>
     </div>
   );
 }
