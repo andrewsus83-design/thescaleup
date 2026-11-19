@@ -1,0 +1,190 @@
+/**
+ * All41 Hub v3 — scoped design system, NEVER applied to public TheScaleUp or the Room.
+ * All surfaces consume semantic aliases. No hardcoded brand values in components.
+ *
+ * Four brand families
+ * identity: warm coral    light: ivory/paper
+ * dark: editorial ink     accent: botanical mint
+ *
+ * The legacy Tailwind token names are bridged here to preserve modules and
+ * existing bottom navigation while we migrate one component at a time.
+ */
+.all41-hub {
+  --all41-identity: #F9703E;
+  --all41-identity-hover: #E45D30;
+  --all41-identity-pressed: #B8410F;
+  --all41-identity-soft: #FFF0E8;
+  --all41-identity-ring: #FFDDCC;
+
+  --all41-light: #FAF9F6;
+  --all41-surface: #FFFFFF;
+  --all41-surface-muted: #F4F3EF;
+  --all41-surface-raised: #FFFFFF;
+  --all41-hairline: #E9E8E2;
+
+  --all41-dark: #262626;
+  --all41-dark-soft: #484843;
+  --all41-dark-muted: #656963;
+  --all41-dark-disabled: #A5A9A1;
+
+  --all41-accent: #B8E4D1;
+  --all41-accent-soft: #ECF7F1;
+  --all41-accent-ink: #286347;
+
+  --all41-radius-field: 1rem;
+  --all41-radius-card: 1.5rem;
+  --all41-radius-panel: 1.25rem;
+  --all41-radius-chip: 999px;
+  --all41-shadow-card: 0 4px 20px rgb(38 38 38 / .055), 0 1px 3px rgb(38 38 38 / .025);
+  --all41-shadow-hover: 0 15px 35px rgb(38 38 38 / .085);
+  --all41-shadow-float: 0 15px 48px rgb(38 38 38 / .12);
+
+  /* Compatibility for the existing Tailwind utilities — all values derive from All41 tokens. */
+  --color-brand-25: var(--all41-identity-soft);
+  --color-brand-50: var(--all41-identity-soft);
+  --color-brand-100: var(--all41-identity-ring);
+  --color-brand-300: var(--all41-identity);
+  --color-brand-500: var(--all41-identity);
+  --color-brand-600: var(--all41-identity-hover);
+  --color-brand-700: var(--all41-identity-pressed);
+  --color-brand-chip: var(--all41-identity-soft);
+  --color-brand-chip-ink: var(--all41-identity-pressed);
+  --color-ink-800: var(--all41-dark);
+  --color-ink-700: var(--all41-dark-soft);
+  --color-ink-600: var(--all41-dark-soft);
+  --color-ink-500: var(--all41-dark-muted);
+  --color-ink-450: var(--all41-dark-muted);
+  --color-ink-400: var(--all41-dark-muted);
+  --color-ink-300: var(--all41-dark-disabled);
+  --color-ink-200: #D9DAD4;
+  --color-ink-100: var(--all41-hairline);
+  --color-paper-0: var(--all41-surface);
+  --color-paper-50: var(--all41-light);
+  --color-paper-100: var(--all41-light);
+  --color-paper-200: var(--all41-surface-muted);
+  --color-hairline: var(--all41-hairline);
+
+  /* Four type roles: title, body, mono, editorial accent. */
+  --font-title: var(--font-all41-title), ui-sans-serif, system-ui, sans-serif;
+  --font-text: var(--font-all41-body), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-all41-mono), ui-monospace, monospace;
+  --font-art: var(--font-all41-accent), Georgia, serif;
+  --font-body: var(--font-all41-body), ui-sans-serif, system-ui, sans-serif;
+  --shadow-raised: var(--all41-shadow-card);
+  --shadow-overlay: var(--all41-shadow-hover);
+  --shadow-menu: var(--all41-shadow-float);
+  --shadow-focus: 0 0 0 4px var(--all41-identity-ring);
+  --radius-card: var(--all41-radius-card);
+  --radius-bubble: var(--all41-radius-panel);
+  --radius-panel: var(--all41-radius-panel);
+  --radius-field: var(--all41-radius-field);
+
+  color-scheme: light;
+  background: var(--all41-light);
+  color: var(--all41-dark);
+  font-family: var(--font-text);
+  min-height: 100%;
+}
+
+/* Context is still communicated by label + icon. Limit color to our four families. */
+.all41-hub [data-acc] {
+  --acc-tint: var(--all41-accent-soft);
+  --acc-fill: var(--all41-accent);
+  --acc-ink: var(--all41-accent-ink);
+}
+.all41-hub [data-acc="home"],
+.all41-hub [data-acc="brand"] {
+  --acc-tint: var(--all41-identity-soft);
+  --acc-fill: var(--all41-identity);
+  --acc-ink: var(--all41-identity-pressed);
+}
+
+/* All41 app shell: semantic classes used by the shared shell and home screen. */
+.all41-hub .all41-topbar {
+  border-bottom: 1px solid var(--all41-hairline);
+  background: rgb(255 255 255 / .86);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.all41-hub .all41-workspace-switcher {
+  border: 1px solid var(--all41-hairline);
+  border-radius: var(--all41-radius-chip);
+  box-shadow: var(--all41-shadow-card);
+  background: var(--all41-surface);
+}
+.all41-hub .all41-shell {
+  width: min(100%, var(--all41-content-width, 1240px));
+  margin-inline: auto;
+}
+.all41-hub .all41-page {
+  padding-inline: clamp(1rem, 3vw, 3rem);
+}
+.all41-hub .all41-surface {
+  background: var(--all41-surface);
+  border: 1px solid var(--all41-hairline);
+  border-radius: var(--all41-radius-card);
+  box-shadow: var(--all41-shadow-card);
+}
+.all41-hub .all41-surface-muted {
+  background: var(--all41-surface-muted);
+  border: 1px solid var(--all41-hairline);
+  border-radius: var(--all41-radius-panel);
+}
+.all41-hub .all41-section-eyebrow {
+  font-family: var(--font-mono);
+  color: var(--all41-identity-pressed);
+  font-size: .6875rem;
+  letter-spacing: .11em;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.all41-hub .all41-editorial {
+  font-family: var(--font-art);
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -.035em;
+  color: var(--all41-identity-pressed);
+}
+.all41-hub .all41-bottom-menu {
+  border: 1px solid var(--all41-hairline);
+  border-radius: var(--all41-radius-card);
+  box-shadow: var(--all41-shadow-float);
+  background: var(--all41-surface);
+}
+.all41-hub .all41-bottom-menu [aria-current="page"] {
+  background: var(--all41-identity-soft);
+  color: var(--all41-identity-pressed);
+}
+.all41-hub .all41-bottom-menu :where(a,button):focus-visible {
+  outline: 2px solid var(--all41-identity-pressed);
+  outline-offset: 2px;
+}
+.all41-hub .all41-module-card {
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.all41-hub .all41-module-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--all41-shadow-hover);
+  border-color: var(--all41-accent);
+}
+.all41-hub .all41-module-icon {
+  background: var(--all41-accent-soft);
+  color: var(--all41-accent-ink);
+}
+.all41-hub .all41-home-panel {
+  background: linear-gradient(110deg, var(--all41-surface) 58%, var(--all41-accent-soft));
+}
+.all41-hub .all41-home-hero {
+  background: radial-gradient(ellipse at 88% 8%, var(--all41-accent-soft), transparent 48%), var(--all41-surface);
+}
+.all41-hub :where(input,textarea,select) {
+  accent-color: var(--all41-identity);
+}
+.all41-hub ::selection {
+  background: var(--all41-identity-ring);
+  color: var(--all41-dark);
+}
+@media (prefers-reduced-motion: reduce) {
+  .all41-hub .all41-module-card { transition: none; }
+  .all41-hub .all41-module-card:hover { transform: none; }
+}
