@@ -70,6 +70,10 @@
   --font-mono: var(--font-all41-mono), ui-monospace, monospace;
   --font-art: var(--font-all41-accent), Georgia, serif;
   --font-body: var(--font-all41-body), ui-sans-serif, system-ui, sans-serif;
+  /* Compatibility with Tailwind @theme inline font-title/font-text utilities. */
+  --font-bricolage: var(--font-all41-title);
+  --font-instrument: var(--font-all41-body);
+  --font-jbmono: var(--font-all41-mono);
   --shadow-raised: var(--all41-shadow-card);
   --shadow-overlay: var(--all41-shadow-hover);
   --shadow-menu: var(--all41-shadow-float);
